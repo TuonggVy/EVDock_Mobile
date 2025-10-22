@@ -26,11 +26,10 @@ export const PERMISSIONS = {
   ],
   // EVM Staff permissions - Quản lý danh mục và tồn kho
   EVM_STAFF: [
-    'manage_ev_catalog',
-    'manage_models_versions_colors',
     'manage_total_inventory',
     'coordinate_vehicles_dealers',
     'view_inventory_reports',
+    'manage_preorder_tasks',
   ],
   // Dealer Manager permissions - Quản lý đại lý
   DEALER_MANAGER: [
