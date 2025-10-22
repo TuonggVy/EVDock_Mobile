@@ -2,16 +2,15 @@
 export const API_CONFIG = {
   BASE_URL: __DEV__ 
     ? 'http://localhost:3000/api' // Development URL
-    : 'https://your-production-api.com/api', // Production URL
+    : 'https://evm-project.onrender.com', // Production URL
   
   TIMEOUT: 10000, // 10 seconds
   
   ENDPOINTS: {
     AUTH: {
-      LOGIN: '/auth/login',
-      REGISTER: '/auth/register',
+      LOGIN: '/auth/signin',
       LOGOUT: '/auth/logout',
-      REFRESH_TOKEN: '/auth/refresh',
+      REFRESH_TOKEN: '/auth/token',
     },
     USER: {
       PROFILE: '/user/profile',
