@@ -1,235 +1,182 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import MockAuthService from '../services/mock/mockAuthService';
-import { USER_ROLES } from '../constants';
+// src/contexts/AuthContext.js
+import React, { createContext, useContext, useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { login as loginApi, logout as logoutApi, refreshToken as refreshTokenApi } from "../../src/services/api/authApi";
+import { USER_ROLES } from "../constants/roles";  
 
-// Initial state
-const initialState = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-};
-
-// Action types
-const AUTH_ACTIONS = {
-  LOGIN_START: 'LOGIN_START',
-  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-  LOGIN_FAILURE: 'LOGIN_FAILURE',
-  LOGOUT: 'LOGOUT',
-  SET_LOADING: 'SET_LOADING',
-  CLEAR_ERROR: 'CLEAR_ERROR',
-  SET_USER: 'SET_USER',
-};
-
-// Reducer
-const authReducer = (state, action) => {
-  switch (action.type) {
-    case AUTH_ACTIONS.LOGIN_START:
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.LOGIN_SUCCESS:
-      return {
-        ...state,
-        user: action.payload.user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.LOGIN_FAILURE:
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: action.payload.error,
-      };
-    
-    case AUTH_ACTIONS.LOGOUT:
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.SET_LOADING:
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    
-    case AUTH_ACTIONS.CLEAR_ERROR:
-      return {
-        ...state,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.SET_USER:
-      return {
-        ...state,
-        user: action.payload.user,
-        isAuthenticated: !!action.payload.user,
-        isLoading: false,
-      };
-    
+const AuthContext = createContext();
+const mapApiRoleToUserRole = (apiRole) => {
+  switch (apiRole) {
+    case "Admin":
+      return USER_ROLES.EVM_ADMIN;
+    case "Staff":
+      return USER_ROLES.EVM_STAFF;
+    case "DealerManager":
+      return USER_ROLES.DEALER_MANAGER;
+    case "DealerStaff":
+      return USER_ROLES.DEALER_STAFF;
     default:
-      return state;
+      return USER_ROLES.DEALER_STAFF; // fallback
   }
 };
 
-// Create context
-const AuthContext = createContext();
 
-// AuthProvider component
 export const AuthProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Check authentication status on app start
+  const clearError = () => setError(null);
+
+  // Check for existing auth data on app start
   useEffect(() => {
-    checkAuthStatus();
+    checkAuthState();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthState = async () => {
     try {
-      const isAuth = await MockAuthService.isAuthenticated();
+      const [storedToken, storedRefreshToken, storedUser] = await AsyncStorage.multiGet([
+        "token",
+        "refreshToken", 
+        "user"
+      ]);
       
-      if (isAuth) {
-        const result = await MockAuthService.getCurrentUser();
-        if (result.success) {
-          console.log('Current user data:', result.data);
-          dispatch({
-            type: AUTH_ACTIONS.SET_USER,
-            payload: { user: result.data },
-          });
-        } else {
-          dispatch({ type: AUTH_ACTIONS.LOGOUT });
-        }
-      } else {
-        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      // Set token if available
+      if (storedToken[1]) {
+        setToken(storedToken[1]);
       }
+      
+      // Set refresh token if available
+      if (storedRefreshToken[1]) {
+        setRefreshToken(storedRefreshToken[1]);
+      }
+      
+      // Set user if available
+      if (storedUser[1]) {
+        setUser(JSON.parse(storedUser[1]));
+      }
+      
+      console.log('Auth state restored:', {
+        hasToken: !!storedToken[1],
+        hasRefreshToken: !!storedRefreshToken[1],
+        hasUser: !!storedUser[1]
+      });
     } catch (error) {
-      console.log('Auth check error:', error);
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      console.error("Error checking auth state:", error);
     }
   };
 
   const login = async (email, password) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-    
+    setIsLoading(true);
+    setError(null);
     try {
-      const result = await MockAuthService.login(email, password);
-      
-      if (result.success) {
-        console.log('Login successful, user data:', result.data.user);
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user: result.data.user },
-        });
-        return { success: true, message: result.message };
-      } else {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_FAILURE,
-          payload: { error: result.message },
-        });
-        return { success: false, message: result.message };
+      const res = await loginApi(email, password);
+      console.log("Login response:", res);
+
+      const accessToken = res.data?.accessToken;
+      const refreshTokenValue = res.data?.refreshToken;
+      const apiRole = res.data?.role?.[0];
+      const mappedRole = mapApiRoleToUserRole(apiRole);
+      const userId = res.data?.userId;
+
+      // Lưu tokens
+      if (accessToken) {
+        setToken(accessToken);
+        await AsyncStorage.setItem("token", accessToken);
       }
-    } catch (error) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: 'Login failed. Please try again.' },
-      });
-      return { success: false, message: 'Login failed. Please try again.' };
+      
+      if (refreshTokenValue) {
+        setRefreshToken(refreshTokenValue);
+        await AsyncStorage.setItem("refreshToken", refreshTokenValue);
+      }
+
+      // Lưu user info
+      const userData = { id: userId, role: mappedRole };
+      setUser(userData);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+
+      return { success: true, data: userData };
+    } catch (err) {
+      console.error("Login failed:", err.response?.data || err.message);
+      const message =
+        err.response?.data?.message || "Đăng nhập thất bại, vui lòng thử lại!";
+      setError(message);
+      return { success: false, message };
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const register = async (userData) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-    
-    try {
-      const result = await MockAuthService.register(userData);
-      
-      if (result.success) {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user: result.data.user },
-        });
-        return { success: true, message: result.message };
-      } else {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_FAILURE,
-          payload: { error: result.message },
-        });
-        return { success: false, message: result.message };
-      }
-    } catch (error) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: 'Registration failed. Please try again.' },
-      });
-      return { success: false, message: 'Registration failed. Please try again.' };
-    }
-  };
 
   const logout = async () => {
     try {
-      await MockAuthService.logout();
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
-      return { success: true };
+      // Call logout API if we have a token
+      if (token) {
+        await logoutApi(token);
+      }
     } catch (error) {
-      return { success: false, message: 'Logout failed' };
+      console.error("Logout API error:", error);
+      // Continue with local logout even if API call fails
+    } finally {
+      // Clear local storage and state
+      await AsyncStorage.multiRemove(["token", "refreshToken", "user"]);
+      setUser(null);
+      setToken(null);
+      setRefreshToken(null);
     }
   };
 
-  const clearError = () => {
-    dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+  // Manual token refresh function
+  const refreshAccessToken = async () => {
+    try {
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
+      }
+      
+      const response = await refreshTokenApi(refreshToken);
+      const newAccessToken = response.data?.accessToken;
+      
+      if (newAccessToken) {
+        setToken(newAccessToken);
+        await AsyncStorage.setItem("token", newAccessToken);
+        return newAccessToken;
+      }
+      
+      throw new Error("No access token in refresh response");
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      // If refresh fails, logout user
+      await logout();
+      throw error;
+    }
   };
 
-  // Helper functions
-  const hasRole = (role) => {
-    return state.user?.role === role;
-  };
-
-  const hasAnyRole = (roles) => {
-    return roles.includes(state.user?.role);
-  };
-
-  const isAdmin = () => hasRole(USER_ROLES.ADMIN);
-  const isManager = () => hasRole(USER_ROLES.MANAGER);
-  const isEmployee = () => hasRole(USER_ROLES.EMPLOYEE);
-
-  const value = {
-    ...state,
-    login,
-    register,
-    logout,
-    clearError,
-    hasRole,
-    hasAnyRole,
-    isAdmin,
-    isManager,
-    isEmployee,
-  };
+  // Calculate isAuthenticated based on user and token
+  const isAuthenticated = !!(user && token);
+  
+  // Debug log
+  console.log('AuthContext - isAuthenticated:', isAuthenticated, 'user:', user, 'token:', !!token);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        refreshToken,
+        isLoading,
+        error,
+        isAuthenticated,
+        login,
+        logout,
+        refreshAccessToken,
+        clearError,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use auth context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export default AuthContext;
+export const useAuth = () => useContext(AuthContext);
