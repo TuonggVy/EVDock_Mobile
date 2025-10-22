@@ -103,12 +103,6 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('AllocationManagement'),
     },
     {
-      title: 'Vehicles',
-      gradient: COLORS.GRADIENT.GREEN,
-      icon: '🚗',
-      onPress: () => navigation.navigate('VehicleManagement'),
-    },
-    {
       title: 'Pre-order Tasks',
       gradient: COLORS.GRADIENT.ORANGE,
       icon: '📥',
