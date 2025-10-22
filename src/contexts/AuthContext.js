@@ -1,235 +1,92 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import MockAuthService from '../services/mock/mockAuthService';
-import { USER_ROLES } from '../constants';
+// src/contexts/AuthContext.js
+import React, { createContext, useContext, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { login as loginApi } from "../../src/services/api/authApi";
+import { USER_ROLES } from "../constants/roles";  
 
-// Initial state
-const initialState = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-};
-
-// Action types
-const AUTH_ACTIONS = {
-  LOGIN_START: 'LOGIN_START',
-  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-  LOGIN_FAILURE: 'LOGIN_FAILURE',
-  LOGOUT: 'LOGOUT',
-  SET_LOADING: 'SET_LOADING',
-  CLEAR_ERROR: 'CLEAR_ERROR',
-  SET_USER: 'SET_USER',
-};
-
-// Reducer
-const authReducer = (state, action) => {
-  switch (action.type) {
-    case AUTH_ACTIONS.LOGIN_START:
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.LOGIN_SUCCESS:
-      return {
-        ...state,
-        user: action.payload.user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.LOGIN_FAILURE:
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: action.payload.error,
-      };
-    
-    case AUTH_ACTIONS.LOGOUT:
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.SET_LOADING:
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    
-    case AUTH_ACTIONS.CLEAR_ERROR:
-      return {
-        ...state,
-        error: null,
-      };
-    
-    case AUTH_ACTIONS.SET_USER:
-      return {
-        ...state,
-        user: action.payload.user,
-        isAuthenticated: !!action.payload.user,
-        isLoading: false,
-      };
-    
+const AuthContext = createContext();
+const mapApiRoleToUserRole = (apiRole) => {
+  switch (apiRole) {
+    case "Admin":
+      return USER_ROLES.EVM_ADMIN;
+    case "Staff":
+      return USER_ROLES.EVM_STAFF;
+    case "DealerManager":
+      return USER_ROLES.DEALER_MANAGER;
+    case "DealerStaff":
+      return USER_ROLES.DEALER_STAFF;
     default:
-      return state;
+      return USER_ROLES.DEALER_STAFF; // fallback
   }
 };
 
-// Create context
-const AuthContext = createContext();
 
-// AuthProvider component
 export const AuthProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Check authentication status on app start
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const isAuth = await MockAuthService.isAuthenticated();
-      
-      if (isAuth) {
-        const result = await MockAuthService.getCurrentUser();
-        if (result.success) {
-          console.log('Current user data:', result.data);
-          dispatch({
-            type: AUTH_ACTIONS.SET_USER,
-            payload: { user: result.data },
-          });
-        } else {
-          dispatch({ type: AUTH_ACTIONS.LOGOUT });
-        }
-      } else {
-        dispatch({ type: AUTH_ACTIONS.LOGOUT });
-      }
-    } catch (error) {
-      console.log('Auth check error:', error);
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
-    }
-  };
+  const clearError = () => setError(null);
 
   const login = async (email, password) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-    
-    try {
-      const result = await MockAuthService.login(email, password);
-      
-      if (result.success) {
-        console.log('Login successful, user data:', result.data.user);
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user: result.data.user },
-        });
-        return { success: true, message: result.message };
-      } else {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_FAILURE,
-          payload: { error: result.message },
-        });
-        return { success: false, message: result.message };
-      }
-    } catch (error) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: 'Login failed. Please try again.' },
-      });
-      return { success: false, message: 'Login failed. Please try again.' };
-    }
-  };
+  setIsLoading(true);
+  setError(null);
+  try {
+    const res = await loginApi(email, password);
+    console.log("Login response:", res);
 
-  const register = async (userData) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
-    
-    try {
-      const result = await MockAuthService.register(userData);
-      
-      if (result.success) {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user: result.data.user },
-        });
-        return { success: true, message: result.message };
-      } else {
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_FAILURE,
-          payload: { error: result.message },
-        });
-        return { success: false, message: result.message };
-      }
-    } catch (error) {
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: { error: 'Registration failed. Please try again.' },
-      });
-      return { success: false, message: 'Registration failed. Please try again.' };
+    const token = res.data?.accessToken;
+    const apiRole = res.data?.role?.[0];
+    const mappedRole = mapApiRoleToUserRole(apiRole);
+    const userId = res.data?.userId;
+
+    // Lưu token
+    if (token) {
+      setToken(token);
+      await AsyncStorage.setItem("token", token);
     }
-  };
+
+    // Lưu user info
+    const userData = { id: userId, role: mappedRole };
+    setUser(userData);
+    await AsyncStorage.setItem("user", JSON.stringify(userData));
+
+    return { success: true, data: userData };
+  } catch (err) {
+    console.error("Login failed:", err.response?.data || err.message);
+    const message =
+      err.response?.data?.message || "Đăng nhập thất bại, vui lòng thử lại!";
+    setError(message);
+    return { success: false, message };
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const logout = async () => {
-    try {
-      await MockAuthService.logout();
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: 'Logout failed' };
-    }
-  };
-
-  const clearError = () => {
-    dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
-  };
-
-  // Helper functions
-  const hasRole = (role) => {
-    return state.user?.role === role;
-  };
-
-  const hasAnyRole = (roles) => {
-    return roles.includes(state.user?.role);
-  };
-
-  const isAdmin = () => hasRole(USER_ROLES.ADMIN);
-  const isManager = () => hasRole(USER_ROLES.MANAGER);
-  const isEmployee = () => hasRole(USER_ROLES.EMPLOYEE);
-
-  const value = {
-    ...state,
-    login,
-    register,
-    logout,
-    clearError,
-    hasRole,
-    hasAnyRole,
-    isAdmin,
-    isManager,
-    isEmployee,
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+    setUser(null);
+    setToken(null);
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        error,
+        login,
+        logout,
+        clearError,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use auth context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export default AuthContext;
+export const useAuth = () => useContext(AuthContext);
