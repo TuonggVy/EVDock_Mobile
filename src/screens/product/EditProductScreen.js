@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import motorbikeService from '../../services/motorbikeService';
 
 const EditProductScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -25,6 +26,9 @@ const EditProductScreen = ({ navigation, route }) => {
     name: '',
     price: '',
     description: '',
+    model: '',
+    makeFrom: '',
+    version: '',
     specifications: {
       battery: '',
       topSpeed: '',
@@ -33,20 +37,55 @@ const EditProductScreen = ({ navigation, route }) => {
       maxLoad: '',
       chargingTime: ''
     },
+    // Configuration data
+    configuration: {
+      motorType: '',
+      speedLimit: '',
+      maximumCapacity: ''
+    },
+    appearance: {
+      length: '',
+      width: '',
+      height: '',
+      weight: '',
+      undercarriageDistance: '',
+      storageLimit: ''
+    },
+    battery: {
+      type: '',
+      capacity: '',
+      chargeTime: '',
+      chargeType: '',
+      energyConsumption: '',
+      limit: ''
+    },
+    safeFeature: {
+      brake: '',
+      lock: ''
+    },
     image: null,
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [configurations, setConfigurations] = useState({
+    appearance: null,
+    battery: null,
+    configuration: null,
+    safeFeature: null,
+  });
 
   // Category removed in this screen
 
-  // Initialize form with product data
+  // Initialize form with product data and load configurations
   useEffect(() => {
     setFormData({
       name: product.name || '',
       price: product.price?.toString() || '',
       description: product.description || '',
+      model: product.model || '',
+      makeFrom: product.makeFrom || '',
+      version: product.version || '',
       specifications: {
         battery: product.specifications?.battery || '',
         topSpeed: product.specifications?.topSpeed || '',
@@ -57,7 +96,64 @@ const EditProductScreen = ({ navigation, route }) => {
       },
       image: product.image || null,
     });
+
+    // Load existing configurations
+    loadConfigurations();
   }, [product]);
+
+  const loadConfigurations = async () => {
+    if (!product.id) return;
+    
+    try {
+      const [batteryResult, configResult, safeFeatureResult, appearanceResult] = await Promise.all([
+        motorbikeService.getBattery(product.id),
+        motorbikeService.getConfiguration(product.id),
+        motorbikeService.getSafeFeature(product.id),
+        motorbikeService.getAppearance(product.id),
+      ]);
+
+      const configData = {
+        appearance: appearanceResult.success ? appearanceResult.data : null,
+        battery: batteryResult.success ? batteryResult.data : null,
+        configuration: configResult.success ? configResult.data : null,
+        safeFeature: safeFeatureResult.success ? safeFeatureResult.data : null,
+      };
+
+      setConfigurations(configData);
+
+      // Update form data with loaded configurations
+      setFormData(prev => ({
+        ...prev,
+        configuration: {
+          motorType: configData.configuration?.motorType || '',
+          speedLimit: configData.configuration?.speedLimit || '',
+          maximumCapacity: configData.configuration?.maximumCapacity?.toString() || '',
+        },
+        appearance: {
+          length: configData.appearance?.length?.toString() || '',
+          width: configData.appearance?.width?.toString() || '',
+          height: configData.appearance?.height?.toString() || '',
+          weight: configData.appearance?.weight?.toString() || '',
+          undercarriageDistance: configData.appearance?.undercarriageDistance?.toString() || '',
+          storageLimit: configData.appearance?.storageLimit?.toString() || '',
+        },
+        battery: {
+          type: configData.battery?.type || '',
+          capacity: configData.battery?.capacity || '',
+          chargeTime: configData.battery?.chargeTime || '',
+          chargeType: configData.battery?.chargeType || '',
+          energyConsumption: configData.battery?.energyConsumption || '',
+          limit: configData.battery?.limit || '',
+        },
+        safeFeature: {
+          brake: configData.safeFeature?.brake || '',
+          lock: configData.safeFeature?.lock || '',
+        },
+      }));
+    } catch (error) {
+      console.error('Error loading configurations:', error);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -84,6 +180,46 @@ const EditProductScreen = ({ navigation, route }) => {
     }));
   };
 
+  const handleConfigChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      configuration: {
+        ...prev.configuration,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleAppearanceChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      appearance: {
+        ...prev.appearance,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleBatteryChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      battery: {
+        ...prev.battery,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSafeFeatureChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      safeFeature: {
+        ...prev.safeFeature,
+        [field]: value
+      }
+    }));
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -101,7 +237,17 @@ const EditProductScreen = ({ navigation, route }) => {
       newErrors.description = 'Description is required';
     }
 
-    // Stock quantity removed in this screen
+    if (!formData.model.trim()) {
+      newErrors.model = 'Model is required';
+    }
+
+    if (!formData.makeFrom.trim()) {
+      newErrors.makeFrom = 'Make from is required';
+    }
+
+    if (!formData.version.trim()) {
+      newErrors.version = 'Version is required';
+    }
 
     // Validate specifications (align with Product Detail fields)
     if (!formData.specifications.battery.trim()) {
@@ -128,17 +274,83 @@ const EditProductScreen = ({ navigation, route }) => {
     setLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      // const response = await productService.updateProduct(product.id, {
-      //   ...formData,
-      //   price: Number(formData.price),
-      //   stock: Number(formData.stock),
-      // });
+      // First update the motorbike
+      const motorbikeData = {
+        name: formData.name,
+        price: Number(formData.price),
+        description: formData.description,
+        model: formData.model,
+        makeFrom: formData.makeFrom,
+        version: formData.version,
+        isDeleted: false
+      };
 
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const motorbikeResponse = await motorbikeService.updateMotorbike(product.id, motorbikeData);
       
-      showInfo('Success', 'Product updated successfully!');
+      if (!motorbikeResponse.success) {
+        showInfo('Error', motorbikeResponse.message || 'Failed to update motorbike');
+        return;
+      }
+
+      // Update all configurations
+      const configPromises = [];
+
+      // Configuration
+      if (formData.configuration.motorType || formData.configuration.speedLimit || formData.configuration.maximumCapacity) {
+        configPromises.push(
+          motorbikeService.updateConfiguration(product.id, {
+            motorType: formData.configuration.motorType,
+            speedLimit: formData.configuration.speedLimit,
+            maximumCapacity: formData.configuration.maximumCapacity ? Number(formData.configuration.maximumCapacity) : undefined
+          })
+        );
+      }
+
+      // Appearance
+      if (formData.appearance.length || formData.appearance.width || formData.appearance.height) {
+        configPromises.push(
+          motorbikeService.updateAppearance(product.id, {
+            length: formData.appearance.length ? Number(formData.appearance.length) : undefined,
+            width: formData.appearance.width ? Number(formData.appearance.width) : undefined,
+            height: formData.appearance.height ? Number(formData.appearance.height) : undefined,
+            weight: formData.appearance.weight ? Number(formData.appearance.weight) : undefined,
+            undercarriageDistance: formData.appearance.undercarriageDistance ? Number(formData.appearance.undercarriageDistance) : undefined,
+            storageLimit: formData.appearance.storageLimit ? Number(formData.appearance.storageLimit) : undefined
+          })
+        );
+      }
+
+      // Battery
+      if (formData.battery.type || formData.battery.capacity || formData.battery.chargeTime) {
+        configPromises.push(
+          motorbikeService.updateBattery(product.id, {
+            type: formData.battery.type,
+            capacity: formData.battery.capacity,
+            chargeTime: formData.battery.chargeTime,
+            chargeType: formData.battery.chargeType,
+            energyConsumption: formData.battery.energyConsumption,
+            limit: formData.battery.limit
+          })
+        );
+      }
+
+      // Safe Feature
+      if (formData.safeFeature.brake || formData.safeFeature.lock) {
+        configPromises.push(
+          motorbikeService.updateSafeFeature(product.id, {
+            brake: formData.safeFeature.brake,
+            lock: formData.safeFeature.lock
+          })
+        );
+      }
+
+      // Execute all configuration updates
+      if (configPromises.length > 0) {
+        const configResults = await Promise.allSettled(configPromises);
+        console.log('Configuration update results:', configResults);
+      }
+
+      showInfo('Success', 'Motorbike and configurations updated successfully!');
       
       // Navigate back after a short delay
       setTimeout(() => {
@@ -146,8 +358,8 @@ const EditProductScreen = ({ navigation, route }) => {
       }, 1500);
       
     } catch (error) {
-      console.error('Error updating product:', error);
-      showInfo('Error', 'Failed to update product. Please try again.');
+      console.error('Error updating motorbike:', error);
+      showInfo('Error', 'Failed to update motorbike. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -196,6 +408,78 @@ const EditProductScreen = ({ navigation, route }) => {
     </View>
   );
 
+  const renderConfigInput = (label, field, value, placeholder, keyboardType = 'default') => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          errors[field] && styles.textInputError
+        ]}
+        value={value}
+        onChangeText={(text) => handleConfigChange(field, text)}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.TEXT.SECONDARY}
+        keyboardType={keyboardType}
+      />
+      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
+    </View>
+  );
+
+  const renderAppearanceInput = (label, field, value, placeholder, keyboardType = 'default') => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          errors[field] && styles.textInputError
+        ]}
+        value={value}
+        onChangeText={(text) => handleAppearanceChange(field, text)}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.TEXT.SECONDARY}
+        keyboardType={keyboardType}
+      />
+      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
+    </View>
+  );
+
+  const renderBatteryInput = (label, field, value, placeholder, keyboardType = 'default') => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          errors[field] && styles.textInputError
+        ]}
+        value={value}
+        onChangeText={(text) => handleBatteryChange(field, text)}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.TEXT.SECONDARY}
+        keyboardType={keyboardType}
+      />
+      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
+    </View>
+  );
+
+  const renderSafeFeatureInput = (label, field, value, placeholder, keyboardType = 'default') => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          errors[field] && styles.textInputError
+        ]}
+        value={value}
+        onChangeText={(text) => handleSafeFeatureChange(field, text)}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.TEXT.SECONDARY}
+        keyboardType={keyboardType}
+      />
+      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -227,12 +511,15 @@ const EditProductScreen = ({ navigation, route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
           
-          {renderInput('Product Name', 'name', formData.name, 'e.g., Tesla Model X')}
+          {renderInput('Product Name', 'name', formData.name, 'e.g., EV Superbike')}
           
-        {/* Category removed */}
+          {renderInput('Model', 'model', formData.model, 'e.g., Model X')}
+          
+          {renderInput('Make From', 'makeFrom', formData.makeFrom, 'e.g., Vietnam')}
+          
+          {renderInput('Version', 'version', formData.version, 'e.g., 2025')}
 
-          {renderInput('Price ($)', 'price', formData.price, 'e.g., 89990', 'numeric')}
-          {/* Stock quantity removed */}
+          {renderInput('Price ($)', 'price', formData.price, 'e.g., 150000', 'numeric')}
           {renderInput('Description', 'description', formData.description, 'Enter product description...', 'default', true)}
         </View>
 
@@ -258,6 +545,89 @@ const EditProductScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.specsGridInputGroup}>
               {renderSpecInput('Charging Time', 'chargingTime', formData.specifications.chargingTime, 'e.g., 6-8 hours')}
+            </View>
+          </View>
+        </View>
+
+        {/* Configuration */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Configuration</Text>
+          
+          <View style={styles.specsGrid}>
+            <View style={styles.specsGridInputGroup}>
+              {renderConfigInput('Motor Type', 'motorType', formData.configuration.motorType, 'e.g., Brushless DC')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderConfigInput('Speed Limit', 'speedLimit', formData.configuration.speedLimit, 'e.g., 80km/h')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderConfigInput('Maximum Capacity', 'maximumCapacity', formData.configuration.maximumCapacity, 'e.g., 2', 'numeric')}
+            </View>
+          </View>
+        </View>
+
+        {/* Appearance */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          
+          <View style={styles.specsGrid}>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Length (mm)', 'length', formData.appearance.length, 'e.g., 2000', 'numeric')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Width (mm)', 'width', formData.appearance.width, 'e.g., 700', 'numeric')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Height (mm)', 'height', formData.appearance.height, 'e.g., 1100', 'numeric')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Weight (kg)', 'weight', formData.appearance.weight, 'e.g., 120', 'numeric')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Undercarriage Distance (mm)', 'undercarriageDistance', formData.appearance.undercarriageDistance, 'e.g., 150', 'numeric')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderAppearanceInput('Storage Limit (L)', 'storageLimit', formData.appearance.storageLimit, 'e.g., 30', 'numeric')}
+            </View>
+          </View>
+        </View>
+
+        {/* Battery */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Battery</Text>
+          
+          <View style={styles.specsGrid}>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Type', 'type', formData.battery.type, 'e.g., Lithium-ion')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Capacity', 'capacity', formData.battery.capacity, 'e.g., 60V 30Ah')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Charge Time', 'chargeTime', formData.battery.chargeTime, 'e.g., 4 hours')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Charge Type', 'chargeType', formData.battery.chargeType, 'e.g., Fast')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Energy Consumption', 'energyConsumption', formData.battery.energyConsumption, 'e.g., 2kWh/100km')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderBatteryInput('Range Limit', 'limit', formData.battery.limit, 'e.g., 100km')}
+            </View>
+          </View>
+        </View>
+
+        {/* Safe Feature */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Safe Feature</Text>
+          
+          <View style={styles.specsGrid}>
+            <View style={styles.specsGridInputGroup}>
+              {renderSafeFeatureInput('Brake System', 'brake', formData.safeFeature.brake, 'e.g., ABS')}
+            </View>
+            <View style={styles.specsGridInputGroup}>
+              {renderSafeFeatureInput('Lock System', 'lock', formData.safeFeature.lock, 'e.g., Smart Lock')}
             </View>
           </View>
         </View>
