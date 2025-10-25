@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,58 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import motorbikeService from '../../services/motorbikeService';
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
   
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [configurations, setConfigurations] = useState({
+    appearance: null,
+    battery: null,
+    configuration: null,
+    safeFeature: null,
+  });
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+
+  // Load configurations when component mounts
+  useEffect(() => {
+    loadConfigurations();
+  }, []);
+
+  const loadConfigurations = async () => {
+    if (!product.id) return;
+    
+    setLoadingConfigs(true);
+    try {
+      const [batteryResult, configResult, safeFeatureResult, appearanceResult] = await Promise.all([
+        motorbikeService.getBattery(product.id),
+        motorbikeService.getConfiguration(product.id),
+        motorbikeService.getSafeFeature(product.id),
+        motorbikeService.getAppearance(product.id),
+      ]);
+
+      console.log('API Results:', {
+        battery: batteryResult,
+        config: configResult,
+        safeFeature: safeFeatureResult,
+        appearance: appearanceResult
+      });
+
+      setConfigurations({
+        appearance: appearanceResult.success ? appearanceResult.data : null,
+        battery: batteryResult.success ? batteryResult.data : null,
+        configuration: configResult.success ? configResult.data : null,
+        safeFeature: safeFeatureResult.success ? safeFeatureResult.data : null,
+      });
+    } catch (error) {
+      console.error('Error loading configurations:', error);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
 
   const handleEdit = () => {
     navigation.navigate('EditProduct', { product });
@@ -35,22 +81,22 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const deleteProduct = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // await productService.deleteProduct(product.id);
+      const response = await motorbikeService.deleteMotorbike(product.id);
       
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      showInfo('Success', 'Product deleted successfully');
-      
-      // Navigate back after a short delay
-      setTimeout(() => {
-        navigation.goBack();
-      }, 1500);
+      if (response.success) {
+        showInfo('Success', 'Motorbike deleted successfully');
+        
+        // Navigate back after a short delay
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
+      } else {
+        showInfo('Error', response.message || 'Failed to delete motorbike');
+      }
       
     } catch (error) {
-      console.error('Error deleting product:', error);
-      showInfo('Error', 'Failed to delete product. Please try again.');
+      console.error('Error deleting motorbike:', error);
+      showInfo('Error', 'Failed to delete motorbike. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -115,6 +161,187 @@ const ProductDetailScreen = ({ navigation, route }) => {
       <View style={styles.specContent}>
         <Text style={styles.specLabel}>{label}</Text>
         <Text style={styles.specValue}>{value}</Text>
+      </View>
+    </View>
+  );
+
+  // Configuration render functions
+  const renderAppearanceTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.tabTitle}>Appearance</Text>
+      <Text style={styles.tabSubtitle}>Physical dimensions and specifications</Text>
+      
+      {configurations.appearance ? (
+        <View style={styles.configContainer}>
+          {Object.entries(configurations.appearance).map(([key, value]) => {
+            if (key === 'electricMotorbikeId' || key === 'id') return null; // Skip internal IDs
+            const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            const displayValue = key.includes('Distance') || key.includes('Limit') ? `${value} mm` : 
+                                key.includes('Weight') ? `${value} kg` : 
+                                key.includes('Storage') ? `${value} L` : 
+                                `${value}`;
+            return (
+              <View key={key} style={styles.configItem}>
+                <Text style={styles.configLabel}>{displayLabel}</Text>
+                <Text style={styles.configValue}>{displayValue}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.noDataText}>No appearance data available</Text>
+      )}
+    </View>
+  );
+
+  const renderBatteryTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.tabTitle}>Battery</Text>
+      <Text style={styles.tabSubtitle}>Battery specifications and performance</Text>
+      
+      {configurations.battery ? (
+        <View style={styles.configContainer}>
+          {Object.entries(configurations.battery).map(([key, value]) => {
+            if (key === 'electricMotorbikeId' || key === 'id') return null; // Skip internal IDs
+            const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            const displayValue = key.includes('Capacity') ? `${value}` : 
+                                key.includes('Time') ? `${value}` : 
+                                key.includes('Consumption') ? `${value}` : 
+                                key.includes('Limit') ? `${value}` : 
+                                `${value}`;
+            return (
+              <View key={key} style={styles.configItem}>
+                <Text style={styles.configLabel}>{displayLabel}</Text>
+                <Text style={styles.configValue}>{displayValue}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.noDataText}>No battery data available</Text>
+      )}
+    </View>
+  );
+
+  const renderConfigurationTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.tabTitle}>Configuration</Text>
+      <Text style={styles.tabSubtitle}>Technical configuration and settings</Text>
+      
+      {configurations.configuration ? (
+        <View style={styles.configContainer}>
+          {Object.entries(configurations.configuration).map(([key, value]) => {
+            if (key === 'electricMotorbikeId' || key === 'id') return null; // Skip internal IDs
+            const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            const displayValue = key.includes('Speed') ? `${value}` : 
+                                key.includes('Capacity') ? `${value} people` : 
+                                `${value}`;
+            return (
+              <View key={key} style={styles.configItem}>
+                <Text style={styles.configLabel}>{displayLabel}</Text>
+                <Text style={styles.configValue}>{displayValue}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.noDataText}>No configuration data available</Text>
+      )}
+    </View>
+  );
+
+  const renderSafeFeatureTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.tabTitle}>Safe Features</Text>
+      <Text style={styles.tabSubtitle}>Safety features and security systems</Text>
+      
+      {configurations.safeFeature ? (
+        <View style={styles.configContainer}>
+          {Object.entries(configurations.safeFeature).map(([key, value]) => {
+            if (key === 'electricMotorbikeId' || key === 'id') return null; // Skip internal IDs
+            const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            return (
+              <View key={key} style={styles.configItem}>
+                <Text style={styles.configLabel}>{displayLabel}</Text>
+                <Text style={styles.configValue}>{String(value)}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.noDataText}>No safety feature data available</Text>
+      )}
+    </View>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'appearance':
+        return renderAppearanceTab();
+      case 'battery':
+        return renderBatteryTab();
+      case 'configuration':
+        return renderConfigurationTab();
+      case 'safeFeature':
+        return renderSafeFeatureTab();
+      default:
+        return renderOverviewTab();
+    }
+  };
+
+  const renderOverviewTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.tabTitle}>Overview</Text>
+      <Text style={styles.tabSubtitle}>Basic information and specifications</Text>
+      
+      <View style={styles.specsContainer}>
+        {renderSpecificationItem('Model', product.model || product.category, '🚗')}
+        {renderSpecificationItem('Version', product.version, '⚡')}
+        {renderSpecificationItem('Make From', product.makeFrom, '🌍')}
+        {renderSpecificationItem('Price', `$${product.price?.toLocaleString()}`, '💰')}
+        {renderSpecificationItem('Status', product.isDeleted ? 'Out of Stock' : 'Available', product.isDeleted ? '❌' : '✅')}
+      </View>
+
+      {/* Quick summary of configurations */}
+      <View style={styles.quickSummaryContainer}>
+        <Text style={styles.quickSummaryTitle}>Quick Summary</Text>
+        <View style={styles.quickSummaryGrid}>
+          {configurations.appearance && (
+            <View style={styles.quickSummaryItem}>
+              <Text style={styles.quickSummaryLabel}>Dimensions</Text>
+              <Text style={styles.quickSummaryValue}>
+                {configurations.appearance.length && configurations.appearance.width && configurations.appearance.height 
+                  ? `${configurations.appearance.length}×${configurations.appearance.width}×${configurations.appearance.height}mm`
+                  : 'N/A'
+                }
+              </Text>
+            </View>
+          )}
+          {configurations.battery && (
+            <View style={styles.quickSummaryItem}>
+              <Text style={styles.quickSummaryLabel}>Battery</Text>
+              <Text style={styles.quickSummaryValue}>
+                {configurations.battery.capacity || 'N/A'}
+              </Text>
+            </View>
+          )}
+          {configurations.configuration && (
+            <View style={styles.quickSummaryItem}>
+              <Text style={styles.quickSummaryLabel}>Motor</Text>
+              <Text style={styles.quickSummaryValue}>
+                {configurations.configuration.motorType || 'N/A'}
+              </Text>
+            </View>
+          )}
+          {configurations.safeFeature && (
+            <View style={styles.quickSummaryItem}>
+              <Text style={styles.quickSummaryLabel}>Brake</Text>
+              <Text style={styles.quickSummaryValue}>
+                {configurations.safeFeature.brake || 'N/A'}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -187,31 +414,62 @@ const ProductDetailScreen = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Specifications */}
-        <View style={styles.specsSection}>
-          <Text style={styles.sectionTitle}>Specifications</Text>
-        <View style={styles.specsContainer}>
-          <View style={styles.specsGrid}>
-            {renderSpecTile('🔋', 'Battery Capacity',
-              product?.specifications?.battery || '0 Ah'
-            )}
-            {renderSpecTile('⚡', 'Maximum Speed',
-              product?.specifications?.topSpeed || '0 mph'
-            )}
-            {renderSpecTile('🛣️', 'Distance (WLTP)',
-              product?.specifications?.range || '0 miles'
-            )}
-            {renderSpecTile('⚖️', 'Weight',
-              product?.specifications?.weight || '0 kg'
-            )}
-            {renderSpecTile('👤', 'Max Load',
-              product?.specifications?.maxLoad || '0 kg'
-            )}
-            {renderSpecTile('⏱️', 'Charging Time',
-              product?.specifications?.chargingTime || '0 h'
-            )}
+        {/* Configuration Tabs */}
+        <View style={styles.tabsSection}>
+          <Text style={styles.sectionTitle}>Configuration Details</Text>
+          
+          {/* Tab Navigation */}
+          <View style={styles.tabNavigation}>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'overview' && styles.activeTabButton]}
+              onPress={() => setActiveTab('overview')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'overview' && styles.activeTabButtonText]}>
+                Overview
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'appearance' && styles.activeTabButton]}
+              onPress={() => setActiveTab('appearance')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'appearance' && styles.activeTabButtonText]}>
+                Appearance
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'battery' && styles.activeTabButton]}
+              onPress={() => setActiveTab('battery')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'battery' && styles.activeTabButtonText]}>
+                Battery
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'configuration' && styles.activeTabButton]}
+              onPress={() => setActiveTab('configuration')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'configuration' && styles.activeTabButtonText]}>
+                Config
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'safeFeature' && styles.activeTabButton]}
+              onPress={() => setActiveTab('safeFeature')}
+            >
+              <Text style={[styles.tabButtonText, activeTab === 'safeFeature' && styles.activeTabButtonText]}>
+                Safety
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
+
+          {/* Tab Content */}
+          {loadingConfigs ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading configurations...</Text>
+            </View>
+          ) : (
+            renderTabContent()
+          )}
         </View>
 
         {/* Additional Info */}
@@ -583,6 +841,158 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+  },
+
+  // Tab styles
+  tabsSection: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+  },
+  tabNavigation: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.XSMALL,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.XSMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  tabButtonText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+  },
+  activeTabButtonText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  tabContent: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  tabSubtitle: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  loadingContainer: {
+    padding: SIZES.PADDING.XXXLARGE,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  noDataText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: SIZES.PADDING.LARGE,
+  },
+  configContainer: {
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  configItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
+  },
+  configLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    flex: 1,
+  },
+  configValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    flex: 1,
+    textAlign: 'right',
+  },
+  colorsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  colorItem: {
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  colorSwatch: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    marginBottom: SIZES.PADDING.SMALL,
+    borderWidth: 2,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  colorName: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.PRIMARY,
+    textAlign: 'center',
+  },
+  specsContainer: {
+    gap: SIZES.PADDING.SMALL,
+  },
+  quickSummaryContainer: {
+    marginTop: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.LARGE,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BORDER.PRIMARY,
+  },
+  quickSummaryTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  quickSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  quickSummaryItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#F8F9FA',
+    padding: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  quickSummaryLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SIZES.PADDING.XSMALL,
+    fontWeight: '500',
+  },
+  quickSummaryValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
   },
 });
 
