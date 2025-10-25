@@ -49,6 +49,7 @@ import CreateDepositAvailableScreen from '../screens/deposit/CreateDepositAvaila
 import CreatePreOrderScreen from '../screens/deposit/CreatePreOrderScreen';
 import DepositDetailScreen from '../screens/deposit/DepositDetailScreen';
 import PreOrderTasksScreen from '../screens/evm/PreOrderTasksScreen';
+import StaffManagementScreen from '../screens/staff/StaffManagementScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -218,11 +219,16 @@ const AppNavigator = () => {
               component={ProductManagementScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
-              name="PreOrderTasks"
-              component={PreOrderTasksScreen}
-              options={{ headerShown: false }}
-            />
+        <Stack.Screen 
+          name="PreOrderTasks" 
+          component={PreOrderTasksScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="StaffManagement" 
+          component={StaffManagementScreen} 
+          options={{ headerShown: false }}
+        />
             <Stack.Screen 
               name="AddProduct"
               component={AddProductScreen}
