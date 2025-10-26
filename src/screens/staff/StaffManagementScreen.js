@@ -21,8 +21,12 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 <<<<<<< HEAD
 =======
 import staffService from '../../services/staffService';
+<<<<<<< HEAD
 import dealerService from '../../services/dealerService';
 >>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
+=======
+import agencyService from '../../services/agencyService';
+>>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -89,12 +93,15 @@ const StaffManagementScreen = ({ navigation }) => {
 =======
   const loadAgencies = async () => {
     try {
-      const result = await dealerService.getDealers();
-      if (result.success) {
-        setAgencies(result.data || []);
-      }
+      const agenciesData = await agencyService.getAgencies({
+        limit: 100,
+        page: 1,
+      });
+      setAgencies(agenciesData || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
+      // Set empty array as fallback
+      setAgencies([]);
     }
   };
 
@@ -359,6 +366,7 @@ const StaffManagementScreen = ({ navigation }) => {
         
         <ScrollView style={styles.modalContent}>
 <<<<<<< HEAD
+<<<<<<< HEAD
           <Text style={styles.inputLabel}>Chọn agency</Text>
           <ScrollView style={styles.agencySelector}>
             {agencies.length > 0 ? agencies.map((agency) => (
@@ -367,6 +375,11 @@ const StaffManagementScreen = ({ navigation }) => {
           <ScrollView style={styles.agencySelector}>
             {agencies.map((agency) => (
 >>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
+=======
+          <Text style={styles.inputLabel}>Chọn agency</Text>
+          <ScrollView style={styles.agencySelector}>
+            {agencies.length > 0 ? agencies.map((agency) => (
+>>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
               <TouchableOpacity
                 key={agency.id}
                 style={[
@@ -379,6 +392,7 @@ const StaffManagementScreen = ({ navigation }) => {
                   styles.agencyOptionText,
                   selectedAgencyId === agency.id && styles.agencyOptionTextSelected
                 ]}>
+<<<<<<< HEAD
 <<<<<<< HEAD
                   {agency.name} - {agency.location}
                 </Text>
@@ -394,6 +408,16 @@ const StaffManagementScreen = ({ navigation }) => {
               </TouchableOpacity>
             ))}
 >>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
+=======
+                  {agency.name} - {agency.location}
+                </Text>
+              </TouchableOpacity>
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Không có agency nào</Text>
+              </View>
+            )}
+>>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
           </ScrollView>
         </ScrollView>
         
@@ -941,6 +965,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -950,8 +977,11 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
   },
+<<<<<<< HEAD
 =======
 >>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
+=======
+>>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
 });
 
 export default StaffManagementScreen;
