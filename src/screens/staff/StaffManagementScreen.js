@@ -19,6 +19,7 @@ import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import staffService from '../../services/staffService';
+import dealerService from '../../services/dealerService';
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -29,6 +30,9 @@ const StaffManagementScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningStaff, setAssigningStaff] = useState(null);
+  const [agencies, setAgencies] = useState([]);
   
   // Form states for creating new staff
   const [newStaff, setNewStaff] = useState({
@@ -38,8 +42,11 @@ const StaffManagementScreen = ({ navigation }) => {
     email: '',
     phone: '',
     address: '',
-    role: [5], // Array of role IDs: 3=Dealer Manager, 4=Dealer Staff, 5=Evm Staff
+    role: [5], // Array of role IDs: 3=Dealer Manager (có thể assign), 5=Evm Staff
   });
+
+  // Selected agency for assignment
+  const [selectedAgencyId, setSelectedAgencyId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,11 +62,23 @@ const StaffManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadStaffList(currentPage);
+    loadAgencies();
   }, []);
 
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList, filters]);
+
+  const loadAgencies = async () => {
+    try {
+      const result = await dealerService.getDealers();
+      if (result.success) {
+        setAgencies(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading agencies:', error);
+    }
+  };
 
   const loadStaffList = async (page = 1) => {
     try {
@@ -180,7 +199,44 @@ const StaffManagementScreen = ({ navigation }) => {
     return isActive ? COLORS.SUCCESS : COLORS.ERROR;
   };
 
-  const renderStaffItem = ({ item }) => (
+  const isDealerManager = (staff) => {
+    return staff.roleNames && Array.isArray(staff.roleNames) && 
+           staff.roleNames.some(name => name && name.includes('Dealer Manager'));
+  };
+
+  const handleAssignAgency = (staff) => {
+    setAssigningStaff(staff);
+    setSelectedAgencyId(null);
+    setShowAssignModal(true);
+  };
+
+  const confirmAssignAgency = async () => {
+    if (!assigningStaff || !selectedAgencyId) {
+      showAlert('Lỗi', 'Vui lòng chọn đại lý');
+      return;
+    }
+
+    try {
+      const result = await staffService.assignStaffToAgency(assigningStaff.id, selectedAgencyId);
+      if (result.success) {
+        showAlert('Thành công', result.message || 'Đã gán nhân viên vào đại lý thành công');
+        setShowAssignModal(false);
+        setAssigningStaff(null);
+        setSelectedAgencyId(null);
+        loadStaffList(currentPage);
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể gán nhân viên vào đại lý');
+      }
+    } catch (error) {
+      console.error('Error assigning staff:', error);
+      showAlert('Lỗi', 'Không thể gán nhân viên vào đại lý');
+    }
+  };
+
+  const renderStaffItem = ({ item }) => {
+    const isDM = isDealerManager(item);
+    
+    return (
     <View style={styles.staffCard}>
       <View style={styles.staffInfo}>
         <Text style={styles.staffName}>{item.fullname || item.name}</Text>
@@ -204,6 +260,14 @@ const StaffManagementScreen = ({ navigation }) => {
         </View>
       </View>
       <View style={styles.staffActions}>
+        {isDM && (
+          <TouchableOpacity
+            style={styles.assignButton}
+            onPress={() => handleAssignAgency(item)}
+          >
+            <Text style={styles.assignButtonText}>🏢</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => handleEditStaff(item)}
@@ -218,6 +282,64 @@ const StaffManagementScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </View>
+    );
+  };
+
+  const renderAssignModal = () => (
+    <Modal
+      visible={showAssignModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>
+            Gán đại lý - {assigningStaff?.fullname || ''}
+          </Text>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => {
+              setShowAssignModal(false);
+              setAssigningStaff(null);
+              setSelectedAgencyId(null);
+            }}
+          >
+            <Text style={styles.closeButtonText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <Text style={styles.inputLabel}>Chọn đại lý</Text>
+          <ScrollView style={styles.agencySelector}>
+            {agencies.map((agency) => (
+              <TouchableOpacity
+                key={agency.id}
+                style={[
+                  styles.agencyOption,
+                  selectedAgencyId === agency.id && styles.agencyOptionSelected
+                ]}
+                onPress={() => setSelectedAgencyId(agency.id)}
+              >
+                <Text style={[
+                  styles.agencyOptionText,
+                  selectedAgencyId === agency.id && styles.agencyOptionTextSelected
+                ]}>
+                  {agency.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </ScrollView>
+        
+        <View style={styles.modalFooter}>
+          <Button
+            title="Gán vào đại lý"
+            onPress={confirmAssignAgency}
+            style={styles.createButton}
+          />
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 
   const renderCreateModal = () => (
@@ -289,9 +411,8 @@ const StaffManagementScreen = ({ navigation }) => {
             <Text style={styles.inputLabel}>Vai trò *</Text>
             <View style={styles.roleSelector}>
               {[
-                { id: [3], label: 'Dealer Manager', description: 'ID: 3' },
-                { id: [4], label: 'Dealer Staff', description: 'ID: 4' },
-                { id: [5], label: 'Evm Staff', description: 'ID: 5' },
+                { id: [3], label: 'Dealer Manager' },
+                { id: [5], label: 'Evm Staff' },
               ].map((role, index) => (
                 <TouchableOpacity
                   key={index}
@@ -306,12 +427,6 @@ const StaffManagementScreen = ({ navigation }) => {
                     JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionTextSelected
                   ]}>
                     {role.label}
-                  </Text>
-                  <Text style={[
-                    styles.roleOptionDesc,
-                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionDescSelected
-                  ]}>
-                    {role.description}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -411,6 +526,7 @@ const StaffManagementScreen = ({ navigation }) => {
       </View>
 
       {renderCreateModal()}
+      {renderAssignModal()}
     </View>
   );
 };
@@ -713,6 +829,43 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: COLORS.PRIMARY,
+  },
+  assignButton: {
+    backgroundColor: COLORS.SUCCESS,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginRight: SIZES.PADDING.SMALL,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  assignButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+  },
+  agencySelector: {
+    maxHeight: 150,
+  },
+  agencyOption: {
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    marginBottom: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+  },
+  agencyOptionSelected: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  agencyOptionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  agencyOptionTextSelected: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
   },
 });
 
