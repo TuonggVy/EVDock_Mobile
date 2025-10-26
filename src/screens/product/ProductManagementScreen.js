@@ -133,7 +133,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             console.log(`📸 Motorbike ${motorbike.id} - Data:`, result.data);
             
             // Get the first product image, or first color image, or use placeholder
-            let imageUri = 'https://via.placeholder.com/400x300?text=Motorbike';
+            let imageUri = 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png';
             
             if (result.success && result.data) {
               const data = result.data.data || result.data;
