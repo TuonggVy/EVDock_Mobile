@@ -72,6 +72,7 @@ const EditProductScreen = ({ navigation, route }) => {
   const [selectedColor, setSelectedColor] = useState(null);
   const [motorbikeImages, setMotorbikeImages] = useState([]);
   const [colorImage, setColorImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
 
   // Category removed in this screen
 
@@ -94,6 +95,9 @@ const EditProductScreen = ({ navigation, route }) => {
     
     // Load colors
     loadColors();
+    
+    // Load existing images
+    loadProductImages();
     
     // Set selected color if product has a color
     if (product.colorId && product.colorType) {
@@ -168,6 +172,46 @@ const EditProductScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Error loading colors:', error);
+    }
+  };
+
+  const loadProductImages = async () => {
+    if (!product.id) return;
+    
+    try {
+      const result = await motorbikeService.getMotorbikeById(product.id);
+      if (result.success && result.data) {
+        const data = result.data.data || result.data;
+        
+        // Load existing motorbike images
+        if (data.images && Array.isArray(data.images)) {
+          // Format existing images to match the upload format
+          const existingImages = data.images.map(img => ({
+            id: img.id,
+            uri: img.imageUrl,
+            type: 'image/jpeg',
+            name: img.imageUrl.split('/').pop() || 'image.jpg',
+            imageUrl: img.imageUrl,
+          }));
+          setMotorbikeImages(existingImages);
+        }
+        
+        // Load existing color images for selected color
+        if (selectedColor && data.colors && Array.isArray(data.colors)) {
+          const colorImageData = data.colors.find(c => c.color?.id === selectedColor.id);
+          if (colorImageData?.imageUrl) {
+            setColorImage({
+              id: colorImageData.color.id,
+              uri: colorImageData.imageUrl,
+              type: 'image/jpeg',
+              name: colorImageData.imageUrl.split('/').pop() || 'color_image.jpg',
+              imageUrl: colorImageData.imageUrl,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading product images:', error);
     }
   };
 
@@ -364,19 +408,39 @@ const EditProductScreen = ({ navigation, route }) => {
         console.log('Configuration update results:', configResults);
       }
 
-      // Upload motorbike images if any selected
-      if (motorbikeImages.length > 0) {
-        const imageResult = await motorbikeService.uploadMotorbikeImages(product.id, motorbikeImages);
+      // Upload only NEW motorbike images (images without id)
+      const newMotorbikeImages = motorbikeImages.filter(img => !img.id);
+      console.log('Images to upload:', newMotorbikeImages.length);
+      if (newMotorbikeImages.length > 0) {
+        const imageResult = await motorbikeService.uploadMotorbikeImages(product.id, newMotorbikeImages);
         if (!imageResult.success) {
           console.error('Error uploading motorbike images:', imageResult.message);
+          showInfo('Error', imageResult.message || 'Failed to upload some images');
+        } else {
+          console.log('Images uploaded successfully:', imageResult.data);
         }
       }
 
-      // Upload color image if selected
-      if (colorImage && selectedColor) {
+      // Upload color image if selected and it's a new image
+      if (colorImage && selectedColor && !colorImage.id) {
+        console.log('Uploading color image for color:', selectedColor.id);
+        console.log('Color image data:', colorImage);
         const colorImageResult = await motorbikeService.uploadColorImage(product.id, selectedColor.id, colorImage);
+        console.log('Color image upload result:', colorImageResult);
+        
         if (!colorImageResult.success) {
           console.error('Error uploading color image:', colorImageResult.message);
+          showInfo('Error', colorImageResult.message || 'Failed to upload color image');
+        } else {
+          console.log('Color image uploaded successfully:', colorImageResult.data);
+          // Update colorImage with the URL from response
+          if (colorImageResult.data) {
+            setColorImage({
+              ...colorImage,
+              imageUrl: colorImageResult.data,
+              id: colorImageResult.data // Use URL as id for now
+            });
+          }
         }
       }
 
@@ -476,12 +540,89 @@ const EditProductScreen = ({ navigation, route }) => {
     }
   };
 
+  const toggleImageSelection = (index) => {
+    setSelectedImages(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else {
+        return [...prev, index];
+      }
+    });
+  };
+
+  const deleteSelectedImages = async () => {
+    if (selectedImages.length === 0) return;
+    
+    const imagesToDelete = selectedImages.map(i => motorbikeImages[i]);
+    const serverImages = imagesToDelete.filter(img => img.id);
+    const localImages = imagesToDelete.filter(img => !img.id);
+    
+    // Delete images from server
+    if (serverImages.length > 0) {
+      const deletePromises = serverImages.map(img => 
+        motorbikeService.deleteMotorbikeImage(img.id, img.imageUrl || img.uri)
+      );
+      const results = await Promise.all(deletePromises);
+      const failedCount = results.filter(r => !r.success).length;
+      
+      if (failedCount > 0) {
+        showInfo('Error', `Failed to delete ${failedCount} image(s)`);
+      } else if (results.length > 0) {
+        showInfo('Success', `${results.length} image(s) deleted successfully`);
+      }
+    }
+    
+    // Remove all selected images from state
+    setMotorbikeImages(prev => prev.filter((_, i) => !selectedImages.includes(i)));
+    setSelectedImages([]);
+  };
+
   const removeImage = (index) => {
-    setMotorbikeImages(prev => prev.filter((_, i) => i !== index));
+    const image = motorbikeImages[index];
+    
+    // If image has an ID, it's already on server - delete it
+    if (image.id) {
+      showConfirm(
+        'Delete Image',
+        'Are you sure you want to delete this image from the server?',
+        async () => {
+          const result = await motorbikeService.deleteMotorbikeImage(image.id, image.imageUrl || image.uri);
+          if (result.success) {
+            setMotorbikeImages(prev => prev.filter((_, i) => i !== index));
+            showInfo('Success', 'Image deleted successfully');
+          } else {
+            showInfo('Error', result.message || 'Failed to delete image');
+          }
+        }
+      );
+    } else {
+      // Just remove from local state (not uploaded yet)
+      setMotorbikeImages(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const removeColorImage = () => {
-    setColorImage(null);
+    if (!colorImage) return;
+    
+    // If image has an ID, it's already on server - delete it
+    if (colorImage.id && selectedColor) {
+      showConfirm(
+        'Delete Color Image',
+        'Are you sure you want to delete this color image from the server?',
+        async () => {
+          const result = await motorbikeService.deleteColorImage(product.id, selectedColor.id);
+          if (result.success) {
+            setColorImage(null);
+            showInfo('Success', 'Color image deleted successfully');
+          } else {
+            showInfo('Error', result.message || 'Failed to delete color image');
+          }
+        }
+      );
+    } else {
+      // Just remove from local state
+      setColorImage(null);
+    }
   };
 
   const renderInput = (label, field, value, placeholder, keyboardType = 'default', multiline = false) => (
@@ -743,19 +884,55 @@ const EditProductScreen = ({ navigation, route }) => {
           
           {/* Selected Images Preview */}
           {motorbikeImages.length > 0 && (
-            <View style={styles.imagesGrid}>
-              {motorbikeImages.map((image, index) => (
-                <View key={index} style={styles.imageItemContainer}>
-                  <Image source={{ uri: image.uri }} style={styles.imagePreview} />
-                  <TouchableOpacity 
-                    style={styles.removeImageButton}
-                    onPress={() => removeImage(index)}
-                  >
-                    <Text style={styles.removeImageButtonText}>✕</Text>
-                  </TouchableOpacity>
+            <>
+              <View style={styles.imagesGrid}>
+                {motorbikeImages.map((image, index) => (
+                  <View key={index} style={styles.imageItemContainer}>
+                    <TouchableOpacity
+                      style={styles.imageWrapper}
+                      onPress={() => toggleImageSelection(index)}
+                    >
+                      <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+                      {/* Selection Overlay */}
+                      {selectedImages.includes(index) && (
+                        <View style={styles.selectedOverlay}>
+                          <Text style={styles.checkmark}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+              
+              {/* Selection Actions */}
+              {selectedImages.length > 0 && (
+                <View style={styles.selectionActions}>
+                  <Text style={styles.selectionText}>
+                    {selectedImages.length} image(s) selected
+                  </Text>
+                  <View style={styles.selectionButtons}>
+                    <TouchableOpacity
+                      style={styles.cancelSelectionButton}
+                      onPress={() => setSelectedImages([])}
+                    >
+                      <Text style={styles.cancelSelectionText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteSelectionButton}
+                      onPress={() => {
+                        showConfirm(
+                          'Delete Images',
+                          `Are you sure you want to delete ${selectedImages.length} image(s)?`,
+                          deleteSelectedImages
+                        );
+                      }}
+                    >
+                      <Text style={styles.deleteSelectionText}>Delete Selected</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
-            </View>
+              )}
+            </>
           )}
 
           <TouchableOpacity style={styles.imageUploadButton} onPress={handleSelectMotorbikeImages}>
@@ -1037,10 +1214,76 @@ const styles = StyleSheet.create({
     width: '48%',
     position: 'relative',
   },
+  imageWrapper: {
+    width: '100%',
+    position: 'relative',
+  },
   imagePreview: {
     width: '100%',
     height: 150,
     borderRadius: SIZES.RADIUS.MEDIUM,
+  },
+  selectedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 100, 200, 0.3)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.PRIMARY,
+  },
+  checkmark: {
+    fontSize: 40,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: 'bold',
+  },
+  selectionActions: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+  },
+  selectionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  selectionButtons: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  cancelSelectionButton: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  cancelSelectionText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  deleteSelectionButton: {
+    flex: 1,
+    backgroundColor: COLORS.ERROR,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+  },
+  deleteSelectionText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
   },
   removeImageButton: {
     position: 'absolute',

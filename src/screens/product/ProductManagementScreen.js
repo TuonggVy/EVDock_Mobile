@@ -122,30 +122,88 @@ const ProductManagementScreen = ({ navigation, route }) => {
       const res = await motorbikeService.getAllMotorbikes(filters);
       const items = Array.isArray(res?.data) ? res.data : [];
       
-      // Map motorbike API response to local card structure
-      const mapped = items.map(motorbike => ({
-        id: motorbike.id,
-        name: motorbike.name,
-        category: motorbike.model,
-        version: motorbike.version,
-        price: motorbike.price,
-        status: motorbike.isDeleted ? 'out_of_stock' : 'available',
-        image: { uri: 'https://via.placeholder.com/400x300?text=Motorbike' }, // Placeholder image
-        description: motorbike.description,
-        specifications: {
-          model: motorbike.model,
-          version: motorbike.version,
-          makeFrom: motorbike.makeFrom,
-        },
-        model: motorbike.model,
-        makeFrom: motorbike.makeFrom,
-        colors: [], // Will be loaded from appearance data if needed
-        createdAt: new Date().toISOString(), // Use current date as fallback
-        isDeleted: motorbike.isDeleted,
-      }));
+      // Fetch detailed info including images for each motorbike
+      const productsWithImages = await Promise.all(
+        items.map(async (motorbike) => {
+            try {
+            // Fetch detailed motorbike data including images (same as ProductDetailScreen)
+            const result = await motorbikeService.getMotorbikeById(motorbike.id);
+            
+            console.log(`📸 Motorbike ${motorbike.id} - Result:`, result.success);
+            console.log(`📸 Motorbike ${motorbike.id} - Data:`, result.data);
+            
+            // Get the first product image, or first color image, or use placeholder
+            let imageUri = 'https://via.placeholder.com/400x300?text=Motorbike';
+            
+            if (result.success && result.data) {
+              const data = result.data.data || result.data;
+              console.log(`📸 Motorbike ${motorbike.id} - Extracted data:`, data);
+              console.log(`📸 Motorbike ${motorbike.id} - Images array:`, data.images);
+              console.log(`📸 Motorbike ${motorbike.id} - Colors array:`, data.colors);
+              
+              // Extract images from the response (same as ProductDetailScreen)
+              if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+                imageUri = data.images[0].imageUrl;
+                console.log(`✅ Motorbike ${motorbike.id} - Using image: ${imageUri}`);
+              } else if (data.colors && Array.isArray(data.colors) && data.colors.length > 0) {
+                imageUri = data.colors[0].imageUrl;
+                console.log(`✅ Motorbike ${motorbike.id} - Using color image: ${imageUri}`);
+              } else {
+                console.log(`⚠️ Motorbike ${motorbike.id} - No images found, using placeholder`);
+              }
+            } else {
+              console.log(`❌ Motorbike ${motorbike.id} - Failed to get result or data`);
+            }
+            
+            return {
+              id: motorbike.id,
+              name: motorbike.name,
+              category: motorbike.model,
+              version: motorbike.version,
+              price: motorbike.price,
+              status: motorbike.isDeleted ? 'out_of_stock' : 'available',
+              image: { uri: imageUri },
+              description: motorbike.description,
+              specifications: {
+                model: motorbike.model,
+                version: motorbike.version,
+                makeFrom: motorbike.makeFrom,
+              },
+              model: motorbike.model,
+              makeFrom: motorbike.makeFrom,
+              colors: [],
+              createdAt: new Date().toISOString(),
+              isDeleted: motorbike.isDeleted,
+            };
+          } catch (error) {
+            console.error(`Error loading details for motorbike ${motorbike.id}:`, error);
+            // Return product with placeholder image if detail fetch fails
+            return {
+              id: motorbike.id,
+              name: motorbike.name,
+              category: motorbike.model,
+              version: motorbike.version,
+              price: motorbike.price,
+              status: motorbike.isDeleted ? 'out_of_stock' : 'available',
+              image: { uri: 'https://via.placeholder.com/400x300?text=Motorbike' },
+              description: motorbike.description,
+              specifications: {
+                model: motorbike.model,
+                version: motorbike.version,
+                makeFrom: motorbike.makeFrom,
+              },
+              model: motorbike.model,
+              makeFrom: motorbike.makeFrom,
+              colors: [],
+              createdAt: new Date().toISOString(),
+              isDeleted: motorbike.isDeleted,
+            };
+          }
+        })
+      );
       
       // Sort products by ID in descending order (newest first)
-      const sorted = mapped.sort((a, b) => b.id - a.id);
+      const sorted = productsWithImages.sort((a, b) => b.id - a.id);
       
       setProducts(sorted);
       setLoading(false);

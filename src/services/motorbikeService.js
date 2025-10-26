@@ -168,6 +168,15 @@ class MotorbikeService {
         message: 'Appearance retrieved successfully'
       };
     } catch (error) {
+      // 404 means no configuration exists yet - not an error
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          data: null,
+          error: 'No appearance configuration found',
+          message: 'No appearance configuration found'
+        };
+      }
       console.error('Error fetching appearance:', error);
       return {
         success: false,
@@ -241,6 +250,15 @@ class MotorbikeService {
         message: 'Configuration retrieved successfully'
       };
     } catch (error) {
+      // 404 means no configuration exists yet - not an error
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          data: null,
+          error: 'No configuration found',
+          message: 'No configuration found'
+        };
+      }
       console.error('Error fetching configuration:', error);
       return {
         success: false,
@@ -314,6 +332,15 @@ class MotorbikeService {
         message: 'Battery details retrieved successfully'
       };
     } catch (error) {
+      // 404 means no configuration exists yet - not an error
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          data: null,
+          error: 'No battery configuration found',
+          message: 'No battery configuration found'
+        };
+      }
       console.error('Error fetching battery:', error);
       return {
         success: false,
@@ -387,6 +414,15 @@ class MotorbikeService {
         message: 'Safe feature details retrieved successfully'
       };
     } catch (error) {
+      // 404 means no configuration exists yet - not an error
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          data: null,
+          error: 'No safe feature configuration found',
+          message: 'No safe feature configuration found'
+        };
+      }
       console.error('Error fetching safe feature:', error);
       return {
         success: false,
@@ -490,15 +526,31 @@ class MotorbikeService {
 
   async uploadColorImage(motorbikeId, colorId, image) {
     try {
+      console.log('Uploading color image:', { motorbikeId, colorId, imageUri: image.uri, imageName: image.name });
+      
+      // Get the correct URI format for the platform
+      let imageUri = image.uri;
+      if (Platform.OS === 'ios' && imageUri.startsWith('file://')) {
+        imageUri = imageUri.replace('file://', '');
+      } else if (Platform.OS === 'android' && !imageUri.startsWith('file://')) {
+        imageUri = `file://${imageUri}`;
+      }
+      
+      console.log('Formatted image URI:', imageUri);
+      
       const formData = new FormData();
-      formData.append('color_image', {
-        uri: image.uri,
+      const fileData = {
+        uri: imageUri,
         type: image.type || 'image/jpeg',
         name: image.name || 'color_image.jpg',
-      });
+      };
+      formData.append('color_image', fileData);
 
+      const url = `${API_BASE_URL}/images/motorbike-color/${motorbikeId}/${colorId}`;
+      console.log('Upload URL:', url);
+      
       const response = await axiosInstance.post(
-        `${API_BASE_URL}/images/motorbike-color/${motorbikeId}/${colorId}`,
+        url,
         formData,
         {
           headers: {
@@ -507,17 +559,71 @@ class MotorbikeService {
         }
       );
 
+      console.log('Upload response:', response.data);
+
       return {
         success: true,
-        data: response.data.data || response.data,
-        message: 'Color image uploaded successfully'
+        data: typeof response.data.data === 'string' ? response.data.data : (response.data.data || response.data),
+        message: response.data.message || 'Color image uploaded successfully'
       };
     } catch (error) {
-      console.error('Error uploading color image:', error.response?.data || error);
+      console.error('Error uploading color image:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Error message:', error.message);
       return {
         success: false,
         error: error.response?.data?.message || error.message || 'Failed to upload color image',
         message: 'Failed to upload color image'
+      };
+    }
+  }
+
+  async deleteMotorbikeImage(imageId, imageUrl) {
+    try {
+      console.log('Deleting motorbike image with ID:', imageId);
+      console.log('Image URL:', imageUrl);
+      const url = `${API_BASE_URL}/images/motorbike/${imageId}`;
+      console.log('Delete URL:', url);
+      
+      // Server expects imageUrl in request body
+      const response = await axiosInstance.delete(url, {
+        data: { imageUrl }
+      });
+      
+      console.log('Delete response:', response.data);
+      
+      return {
+        success: true,
+        data: response.data,
+        message: 'Image deleted successfully'
+      };
+    } catch (error) {
+      console.error('Error deleting motorbike image:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to delete image',
+        message: 'Failed to delete image'
+      };
+    }
+  }
+
+  async deleteColorImage(motorbikeId, colorId) {
+    try {
+      const response = await axiosInstance.delete(`${API_BASE_URL}/images/color/${motorbikeId}/${colorId}`);
+      return {
+        success: true,
+        data: response.data,
+        message: 'Color image deleted successfully'
+      };
+    } catch (error) {
+      console.error('Error deleting color image:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to delete color image',
+        message: 'Failed to delete color image'
       };
     }
   }
