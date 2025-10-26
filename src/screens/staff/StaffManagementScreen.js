@@ -18,6 +18,8 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import staffService from '../../services/staffService';
+import agencyService from '../../services/agencyService';
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -28,16 +30,28 @@ const StaffManagementScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningStaff, setAssigningStaff] = useState(null);
+  const [agencies, setAgencies] = useState([]);
   
   // Form states for creating new staff
   const [newStaff, setNewStaff] = useState({
-    name: '',
+    username: '',
+    password: '',
+    fullname: '',
     email: '',
     phone: '',
-    role: 'evm_staff',
-    department: '',
-    position: '',
+    address: '',
+    role: [5], // Array of role IDs: 3=Dealer Manager (có thể assign), 5=Evm Staff
   });
+
+  // Selected agency for assignment
+  const [selectedAgencyId, setSelectedAgencyId] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageLimit = 10;
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -47,55 +61,51 @@ const StaffManagementScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
-    loadStaffList();
+    loadStaffList(currentPage);
+    loadAgencies();
   }, []);
 
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList, filters]);
 
-  const loadStaffList = async () => {
+  const loadAgencies = async () => {
+    try {
+      const agenciesData = await agencyService.getAgencies({
+        limit: 100,
+        page: 1,
+      });
+      setAgencies(agenciesData || []);
+    } catch (error) {
+      console.error('Error loading agencies:', error);
+      // Set empty array as fallback
+      setAgencies([]);
+    }
+  };
+
+  const loadStaffList = async (page = 1) => {
     try {
       setIsLoading(true);
-      // Mock data - replace with actual API call
-      const mockStaff = [
-        {
-          id: '1',
-          name: 'Nguyễn Văn A',
-          email: 'nguyenvana@evm.com',
-          phone: '0123456789',
-          role: 'evm_staff',
-          department: 'Sales',
-          position: 'Sales Staff',
-          status: 'active',
-          createdAt: '2024-01-15',
-        },
-        {
-          id: '2',
-          name: 'Trần Thị B',
-          email: 'tranthib@evm.com',
-          phone: '0987654321',
-          role: 'evm_staff',
-          department: 'Marketing',
-          position: 'Marketing Staff',
-          status: 'active',
-          createdAt: '2024-01-20',
-        },
-        {
-          id: '3',
-          name: 'Lê Văn C',
-          email: 'levanc@evm.com',
-          phone: '0369258147',
-          role: 'evm_staff',
-          department: 'IT',
-          position: 'IT Staff',
-          status: 'inactive',
-          createdAt: '2024-02-01',
-        },
-      ];
-      setStaffList(mockStaff);
+      
+      // Call API to get staff list with pagination
+      const result = await staffService.getStaffList({}, page, pageLimit);
+      
+      if (result.success) {
+        setStaffList(result.data || []);
+        setCurrentPage(result.page || page);
+        // Calculate total pages based on total items
+        const calculatedTotalPages = result.total ? Math.ceil(result.total / pageLimit) : 1;
+        setTotalPages(calculatedTotalPages);
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
+        // Fallback to empty array
+        setStaffList([]);
+      }
     } catch (error) {
+      console.error('Error loading staff list:', error);
       showAlert('Lỗi', 'Không thể tải danh sách nhân viên');
+      // Fallback to empty array
+      setStaffList([]);
     } finally {
       setIsLoading(false);
     }
@@ -104,28 +114,15 @@ const StaffManagementScreen = ({ navigation }) => {
   const filterStaff = () => {
     let filtered = staffList;
 
-    // Search filter
+    // Only apply search filter locally (other filters are handled by API)
     if (searchQuery) {
       filtered = filtered.filter(staff =>
-        staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.phone.includes(searchQuery)
+        (staff.name || staff.fullname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.phone || '').includes(searchQuery) ||
+        (staff.address || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
-    }
-
-    // Role filter
-    if (filters.role) {
-      filtered = filtered.filter(staff => staff.role === filters.role);
-    }
-
-    // Department filter
-    if (filters.department) {
-      filtered = filtered.filter(staff => staff.department === filters.department);
-    }
-
-    // Status filter
-    if (filters.status) {
-      filtered = filtered.filter(staff => staff.status === filters.status);
     }
 
     setFilteredStaff(filtered);
@@ -133,31 +130,33 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const handleCreateStaff = async () => {
     try {
-      if (!newStaff.name || !newStaff.email || !newStaff.phone) {
-        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+      // Validation
+      if (!newStaff.username || !newStaff.password || !newStaff.fullname || !newStaff.email || !newStaff.phone) {
+        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (username, password, fullname, email, phone)');
         return;
       }
 
-      // Mock API call - replace with actual API
-      const newStaffData = {
-        ...newStaff,
-        id: Date.now().toString(),
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-
-      setStaffList(prev => [newStaffData, ...prev]);
-      setShowCreateModal(false);
-      setNewStaff({
-        name: '',
-        email: '',
-        phone: '',
-        role: 'evm_staff',
-        department: '',
-        position: '',
-      });
-      showAlert('Thành công', 'Tạo tài khoản nhân viên thành công');
+      // Call API to create staff
+      const result = await staffService.createStaff(newStaff);
+      
+      if (result.success) {
+        setShowCreateModal(false);
+        setNewStaff({
+          username: '',
+          password: '',
+          fullname: '',
+          email: '',
+          phone: '',
+          address: '',
+          role: [5],
+        });
+        showAlert('Thành công', result.message || 'Tạo tài khoản nhân viên thành công');
+        loadStaffList(); // Reload the staff list
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể tạo tài khoản nhân viên');
+      }
     } catch (error) {
+      console.error('Error creating staff:', error);
       showAlert('Lỗi', 'Không thể tạo tài khoản nhân viên');
     }
   };
@@ -186,7 +185,7 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadStaffList().finally(() => setRefreshing(false));
+    loadStaffList(currentPage).finally(() => setRefreshing(false));
   };
 
   const getRoleDisplayName = (role) => {
@@ -199,27 +198,79 @@ const StaffManagementScreen = ({ navigation }) => {
     return roleNames[role] || role;
   };
 
-  const getStatusColor = (status) => {
-    return status === 'active' ? COLORS.SUCCESS : COLORS.ERROR;
+  const getStatusColor = (isActive) => {
+    return isActive ? COLORS.SUCCESS : COLORS.ERROR;
   };
 
-  const renderStaffItem = ({ item }) => (
+  const isDealerManager = (staff) => {
+    return staff.roleNames && Array.isArray(staff.roleNames) && 
+           staff.roleNames.some(name => name && name.includes('Dealer Manager'));
+  };
+
+  const handleAssignAgency = (staff) => {
+    setAssigningStaff(staff);
+    setSelectedAgencyId(null);
+    setShowAssignModal(true);
+  };
+
+  const confirmAssignAgency = async () => {
+    if (!assigningStaff || !selectedAgencyId) {
+      showAlert('Lỗi', 'Vui lòng chọn đại lý');
+      return;
+    }
+
+    try {
+      const result = await staffService.assignStaffToAgency(assigningStaff.id, selectedAgencyId);
+      if (result.success) {
+        showAlert('Thành công', result.message || 'Đã gán nhân viên vào đại lý thành công');
+        setShowAssignModal(false);
+        setAssigningStaff(null);
+        setSelectedAgencyId(null);
+        loadStaffList(currentPage);
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể gán nhân viên vào đại lý');
+      }
+    } catch (error) {
+      console.error('Error assigning staff:', error);
+      showAlert('Lỗi', 'Không thể gán nhân viên vào đại lý');
+    }
+  };
+
+  const renderStaffItem = ({ item }) => {
+    const isDM = isDealerManager(item);
+    
+    return (
     <View style={styles.staffCard}>
       <View style={styles.staffInfo}>
-        <Text style={styles.staffName}>{item.name}</Text>
+        <Text style={styles.staffName}>{item.fullname || item.name}</Text>
+        {item.username && (
+          <Text style={styles.staffUsername}>@{item.username}</Text>
+        )}
         <Text style={styles.staffEmail}>{item.email}</Text>
         <Text style={styles.staffPhone}>{item.phone}</Text>
+        {item.address && (
+          <Text style={styles.staffAddress}>{item.address}</Text>
+        )}
         <View style={styles.staffDetails}>
-          <Text style={styles.staffRole}>{getRoleDisplayName(item.role)}</Text>
-          <Text style={[styles.staffStatus, { color: getStatusColor(item.status) }]}>
-            {item.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+          {item.roleNames && item.roleNames.length > 0 && (
+            <Text style={styles.staffRole}>
+              {Array.isArray(item.roleNames) ? item.roleNames.join(', ') : item.roleNames}
+            </Text>
+          )}
+          <Text style={[styles.staffStatus, { color: getStatusColor(item.isActive) }]}>
+            {item.isActive ? 'Hoạt động' : 'Không hoạt động'}
           </Text>
         </View>
-        {item.department && (
-          <Text style={styles.staffDepartment}>{item.department} - {item.position}</Text>
-        )}
       </View>
       <View style={styles.staffActions}>
+        {isDM && (
+          <TouchableOpacity
+            style={styles.assignButton}
+            onPress={() => handleAssignAgency(item)}
+          >
+            <Text style={styles.assignButtonText}>🏢</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => handleEditStaff(item)}
@@ -234,6 +285,68 @@ const StaffManagementScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </View>
+    );
+  };
+
+  const renderAssignModal = () => (
+    <Modal
+      visible={showAssignModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>
+            Gán đại lý - {assigningStaff?.fullname || ''}
+          </Text>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => {
+              setShowAssignModal(false);
+              setAssigningStaff(null);
+              setSelectedAgencyId(null);
+            }}
+          >
+            <Text style={styles.closeButtonText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <Text style={styles.inputLabel}>Chọn agency</Text>
+          <ScrollView style={styles.agencySelector}>
+            {agencies.length > 0 ? agencies.map((agency) => (
+              <TouchableOpacity
+                key={agency.id}
+                style={[
+                  styles.agencyOption,
+                  selectedAgencyId === agency.id && styles.agencyOptionSelected
+                ]}
+                onPress={() => setSelectedAgencyId(agency.id)}
+              >
+                <Text style={[
+                  styles.agencyOptionText,
+                  selectedAgencyId === agency.id && styles.agencyOptionTextSelected
+                ]}>
+                  {agency.name} - {agency.location}
+                </Text>
+              </TouchableOpacity>
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Không có agency nào</Text>
+              </View>
+            )}
+          </ScrollView>
+        </ScrollView>
+        
+        <View style={styles.modalFooter}>
+          <Button
+            title="Gán vào đại lý"
+            onPress={confirmAssignAgency}
+            style={styles.createButton}
+          />
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 
   const renderCreateModal = () => (
@@ -255,9 +368,25 @@ const StaffManagementScreen = ({ navigation }) => {
         
         <ScrollView style={styles.modalContent}>
           <Input
+            label="Username *"
+            value={newStaff.username}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, username: text }))}
+            placeholder="Nhập username"
+            autoCapitalize="none"
+          />
+          
+          <Input
+            label="Password *"
+            value={newStaff.password}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, password: text }))}
+            placeholder="Nhập password"
+            secureTextEntry
+          />
+          
+          <Input
             label="Họ và tên *"
-            value={newStaff.name}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, name: text }))}
+            value={newStaff.fullname}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, fullname: text }))}
             placeholder="Nhập họ và tên"
           />
           
@@ -267,6 +396,7 @@ const StaffManagementScreen = ({ navigation }) => {
             onChangeText={(text) => setNewStaff(prev => ({ ...prev, email: text }))}
             placeholder="Nhập email"
             keyboardType="email-address"
+            autoCapitalize="none"
           />
           
           <Input
@@ -277,25 +407,31 @@ const StaffManagementScreen = ({ navigation }) => {
             keyboardType="phone-pad"
           />
           
+          <Input
+            label="Địa chỉ"
+            value={newStaff.address}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, address: text }))}
+            placeholder="Nhập địa chỉ"
+          />
+          
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Vai trò *</Text>
             <View style={styles.roleSelector}>
               {[
-                { value: 'evm_staff', label: 'EVM Staff' },
-                { value: 'dealer_manager', label: 'Dealer Manager' },
-                { value: 'dealer_staff', label: 'Dealer Staff' },
-              ].map((role) => (
+                { id: [3], label: 'Dealer Manager' },
+                { id: [5], label: 'Evm Staff' },
+              ].map((role, index) => (
                 <TouchableOpacity
-                  key={role.value}
+                  key={index}
                   style={[
                     styles.roleOption,
-                    newStaff.role === role.value && styles.roleOptionSelected
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionSelected
                   ]}
-                  onPress={() => setNewStaff(prev => ({ ...prev, role: role.value }))}
+                  onPress={() => setNewStaff(prev => ({ ...prev, role: role.id }))}
                 >
                   <Text style={[
                     styles.roleOptionText,
-                    newStaff.role === role.value && styles.roleOptionTextSelected
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionTextSelected
                   ]}>
                     {role.label}
                   </Text>
@@ -303,20 +439,6 @@ const StaffManagementScreen = ({ navigation }) => {
               ))}
             </View>
           </View>
-          
-          <Input
-            label="Phòng ban"
-            value={newStaff.department}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, department: text }))}
-            placeholder="Nhập phòng ban"
-          />
-          
-          <Input
-            label="Chức vụ"
-            value={newStaff.position}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, position: text }))}
-            placeholder="Nhập chức vụ"
-          />
         </ScrollView>
         
         <View style={styles.modalFooter}>
@@ -411,6 +533,7 @@ const StaffManagementScreen = ({ navigation }) => {
       </View>
 
       {renderCreateModal()}
+      {renderAssignModal()}
     </View>
   );
 };
@@ -561,6 +684,12 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.XSMALL,
   },
+  staffUsername: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontStyle: 'italic',
+    marginBottom: 2,
+  },
   staffEmail: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
@@ -569,7 +698,13 @@ const styles = StyleSheet.create({
   staffPhone: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    marginBottom: 2,
+  },
+  staffAddress: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
     marginBottom: SIZES.PADDING.SMALL,
+    opacity: 0.8,
   },
   staffDetails: {
     flexDirection: 'row',
@@ -668,6 +803,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.SURFACE,
     marginRight: SIZES.PADDING.SMALL,
     marginBottom: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
   },
   roleOptionSelected: {
     backgroundColor: COLORS.PRIMARY,
@@ -675,9 +813,20 @@ const styles = StyleSheet.create({
   roleOptionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   roleOptionTextSelected: {
     color: COLORS.TEXT.WHITE,
+  },
+  roleOptionDesc: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  roleOptionDescSelected: {
+    color: COLORS.TEXT.WHITE,
+    opacity: 0.9,
   },
   modalFooter: {
     padding: SIZES.PADDING.LARGE,
@@ -687,6 +836,52 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: COLORS.PRIMARY,
+  },
+  assignButton: {
+    backgroundColor: COLORS.SUCCESS,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginRight: SIZES.PADDING.SMALL,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  assignButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+  },
+  agencySelector: {
+    maxHeight: 150,
+  },
+  agencyOption: {
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    marginBottom: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+  },
+  agencyOptionSelected: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  agencyOptionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  agencyOptionTextSelected: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.LARGE,
+  },
+  emptyText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
   },
 });
 

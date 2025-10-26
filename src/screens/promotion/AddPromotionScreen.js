@@ -15,6 +15,7 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import DealerAssignmentModal from '../../components/common/DealerAssignmentModal';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import agencyService from '../../services/agencyService';
 
 const AddPromotionScreen = ({ navigation }) => {
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
@@ -37,15 +38,31 @@ const AddPromotionScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showDealerModal, setShowDealerModal] = useState(false);
+  const [agencies, setAgencies] = useState([]);
+  const [loadingAgencies, setLoadingAgencies] = useState(false);
 
-  // Mock dealers data - sẽ được thay thế bằng API call
-  const mockDealers = [
-    { id: '1', name: 'Dealer A', city: 'Ho Chi Minh City' },
-    { id: '2', name: 'Dealer B', city: 'Hanoi' },
-    { id: '3', name: 'Dealer C', city: 'Da Nang' },
-    { id: '4', name: 'Dealer D', city: 'Can Tho' },
-    { id: '5', name: 'Dealer E', city: 'Hai Phong' },
-  ];
+  // Fetch agencies from API
+  useEffect(() => {
+    const fetchAgencies = async () => {
+      setLoadingAgencies(true);
+      try {
+        const agenciesData = await agencyService.getAgencies({
+          limit: 100,
+          page: 1,
+        });
+        setAgencies(agenciesData);
+      } catch (error) {
+        console.error('Error fetching agencies:', error);
+        // Don't show alert on initial load if it fails
+        // User can retry by going back and returning to the screen
+      } finally {
+        setLoadingAgencies(false);
+      }
+    };
+
+    fetchAgencies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const promotionTypes = [
     { id: 'percentage', name: 'Percentage', icon: '%' },
@@ -79,7 +96,7 @@ const AddPromotionScreen = ({ navigation }) => {
   const handleSelectAllDealers = () => {
     setFormData(prev => ({
       ...prev,
-      applicableDealers: mockDealers.map(dealer => dealer.id)
+      applicableDealers: agencies.map(agency => agency.id)
     }));
   };
 
@@ -155,7 +172,7 @@ const AddPromotionScreen = ({ navigation }) => {
     }
 
     if (formData.applicableDealers.length === 0) {
-      newErrors.applicableDealers = 'Please select at least one dealer';
+      newErrors.applicableDealers = 'Please select at least one agency';
     }
 
     setErrors(newErrors);
@@ -330,9 +347,9 @@ const AddPromotionScreen = ({ navigation }) => {
         {/* Dealer Assignment */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Dealer Assignment</Text>
+            <Text style={styles.sectionTitle}>Agency Assignment</Text>
             <Text style={styles.sectionSubtitle}>
-              Select which dealers this promotion applies to
+              Select which agencies this promotion applies to
             </Text>
           </View>
           
@@ -344,17 +361,17 @@ const AddPromotionScreen = ({ navigation }) => {
           >
             <View style={styles.dealerAssignmentContent}>
               <View style={styles.dealerAssignmentInfo}>
-                <Text style={styles.dealerAssignmentTitle}>Dealer Assignment</Text>
+                <Text style={styles.dealerAssignmentTitle}>Agency Assignment</Text>
                 <Text style={styles.dealerAssignmentSubtitle}>
-                  {formData.applicableDealers.length} of {mockDealers.length} dealers selected
+                  {formData.applicableDealers.length} of {agencies.length} agencies selected
                 </Text>
                 {formData.applicableDealers.length > 0 && (
                   <View style={styles.selectedDealersPreview}>
-                    {formData.applicableDealers.slice(0, 3).map((dealerId, index) => {
-                      const dealer = mockDealers.find(d => d.id === dealerId);
+                    {formData.applicableDealers.slice(0, 3).map((agencyId, index) => {
+                      const agency = agencies.find(a => a.id === agencyId);
                       return (
-                        <View key={dealerId} style={styles.dealerChip}>
-                          <Text style={styles.dealerChipText}>{dealer?.name}</Text>
+                        <View key={agencyId} style={styles.dealerChip}>
+                          <Text style={styles.dealerChipText}>{agency?.name}</Text>
                         </View>
                       );
                     })}
@@ -423,10 +440,10 @@ const AddPromotionScreen = ({ navigation }) => {
       <DealerAssignmentModal
         visible={showDealerModal}
         onClose={handleDealerModalClose}
-        dealers={mockDealers}
+        dealers={agencies}
         selectedDealers={formData.applicableDealers}
         onDealersChange={handleDealersChange}
-        title="Dealer Assignment"
+        title="Agency Assignment"
       />
     </KeyboardAvoidingView>
   );
