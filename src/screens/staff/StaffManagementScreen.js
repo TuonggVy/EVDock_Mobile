@@ -18,6 +18,7 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import staffService from '../../services/staffService';
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -31,13 +32,19 @@ const StaffManagementScreen = ({ navigation }) => {
   
   // Form states for creating new staff
   const [newStaff, setNewStaff] = useState({
-    name: '',
+    username: '',
+    password: '',
+    fullname: '',
     email: '',
     phone: '',
-    role: 'evm_staff',
-    department: '',
-    position: '',
+    address: '',
+    role: [5], // Array of role IDs: 3=Dealer Manager, 4=Dealer Staff, 5=Evm Staff
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageLimit = 10;
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -47,55 +54,36 @@ const StaffManagementScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
-    loadStaffList();
+    loadStaffList(currentPage);
   }, []);
 
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList, filters]);
 
-  const loadStaffList = async () => {
+  const loadStaffList = async (page = 1) => {
     try {
       setIsLoading(true);
-      // Mock data - replace with actual API call
-      const mockStaff = [
-        {
-          id: '1',
-          name: 'Nguyễn Văn A',
-          email: 'nguyenvana@evm.com',
-          phone: '0123456789',
-          role: 'evm_staff',
-          department: 'Sales',
-          position: 'Sales Staff',
-          status: 'active',
-          createdAt: '2024-01-15',
-        },
-        {
-          id: '2',
-          name: 'Trần Thị B',
-          email: 'tranthib@evm.com',
-          phone: '0987654321',
-          role: 'evm_staff',
-          department: 'Marketing',
-          position: 'Marketing Staff',
-          status: 'active',
-          createdAt: '2024-01-20',
-        },
-        {
-          id: '3',
-          name: 'Lê Văn C',
-          email: 'levanc@evm.com',
-          phone: '0369258147',
-          role: 'evm_staff',
-          department: 'IT',
-          position: 'IT Staff',
-          status: 'inactive',
-          createdAt: '2024-02-01',
-        },
-      ];
-      setStaffList(mockStaff);
+      
+      // Call API to get staff list with pagination
+      const result = await staffService.getStaffList({}, page, pageLimit);
+      
+      if (result.success) {
+        setStaffList(result.data || []);
+        setCurrentPage(result.page || page);
+        // Calculate total pages based on total items
+        const calculatedTotalPages = result.total ? Math.ceil(result.total / pageLimit) : 1;
+        setTotalPages(calculatedTotalPages);
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
+        // Fallback to empty array
+        setStaffList([]);
+      }
     } catch (error) {
+      console.error('Error loading staff list:', error);
       showAlert('Lỗi', 'Không thể tải danh sách nhân viên');
+      // Fallback to empty array
+      setStaffList([]);
     } finally {
       setIsLoading(false);
     }
@@ -104,28 +92,15 @@ const StaffManagementScreen = ({ navigation }) => {
   const filterStaff = () => {
     let filtered = staffList;
 
-    // Search filter
+    // Only apply search filter locally (other filters are handled by API)
     if (searchQuery) {
       filtered = filtered.filter(staff =>
-        staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        staff.phone.includes(searchQuery)
+        (staff.name || staff.fullname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (staff.phone || '').includes(searchQuery) ||
+        (staff.address || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
-    }
-
-    // Role filter
-    if (filters.role) {
-      filtered = filtered.filter(staff => staff.role === filters.role);
-    }
-
-    // Department filter
-    if (filters.department) {
-      filtered = filtered.filter(staff => staff.department === filters.department);
-    }
-
-    // Status filter
-    if (filters.status) {
-      filtered = filtered.filter(staff => staff.status === filters.status);
     }
 
     setFilteredStaff(filtered);
@@ -133,31 +108,33 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const handleCreateStaff = async () => {
     try {
-      if (!newStaff.name || !newStaff.email || !newStaff.phone) {
-        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+      // Validation
+      if (!newStaff.username || !newStaff.password || !newStaff.fullname || !newStaff.email || !newStaff.phone) {
+        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (username, password, fullname, email, phone)');
         return;
       }
 
-      // Mock API call - replace with actual API
-      const newStaffData = {
-        ...newStaff,
-        id: Date.now().toString(),
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-
-      setStaffList(prev => [newStaffData, ...prev]);
-      setShowCreateModal(false);
-      setNewStaff({
-        name: '',
-        email: '',
-        phone: '',
-        role: 'evm_staff',
-        department: '',
-        position: '',
-      });
-      showAlert('Thành công', 'Tạo tài khoản nhân viên thành công');
+      // Call API to create staff
+      const result = await staffService.createStaff(newStaff);
+      
+      if (result.success) {
+        setShowCreateModal(false);
+        setNewStaff({
+          username: '',
+          password: '',
+          fullname: '',
+          email: '',
+          phone: '',
+          address: '',
+          role: [5],
+        });
+        showAlert('Thành công', result.message || 'Tạo tài khoản nhân viên thành công');
+        loadStaffList(); // Reload the staff list
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể tạo tài khoản nhân viên');
+      }
     } catch (error) {
+      console.error('Error creating staff:', error);
       showAlert('Lỗi', 'Không thể tạo tài khoản nhân viên');
     }
   };
@@ -186,7 +163,7 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadStaffList().finally(() => setRefreshing(false));
+    loadStaffList(currentPage).finally(() => setRefreshing(false));
   };
 
   const getRoleDisplayName = (role) => {
@@ -199,25 +176,32 @@ const StaffManagementScreen = ({ navigation }) => {
     return roleNames[role] || role;
   };
 
-  const getStatusColor = (status) => {
-    return status === 'active' ? COLORS.SUCCESS : COLORS.ERROR;
+  const getStatusColor = (isActive) => {
+    return isActive ? COLORS.SUCCESS : COLORS.ERROR;
   };
 
   const renderStaffItem = ({ item }) => (
     <View style={styles.staffCard}>
       <View style={styles.staffInfo}>
-        <Text style={styles.staffName}>{item.name}</Text>
+        <Text style={styles.staffName}>{item.fullname || item.name}</Text>
+        {item.username && (
+          <Text style={styles.staffUsername}>@{item.username}</Text>
+        )}
         <Text style={styles.staffEmail}>{item.email}</Text>
         <Text style={styles.staffPhone}>{item.phone}</Text>
+        {item.address && (
+          <Text style={styles.staffAddress}>{item.address}</Text>
+        )}
         <View style={styles.staffDetails}>
-          <Text style={styles.staffRole}>{getRoleDisplayName(item.role)}</Text>
-          <Text style={[styles.staffStatus, { color: getStatusColor(item.status) }]}>
-            {item.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+          {item.roleNames && item.roleNames.length > 0 && (
+            <Text style={styles.staffRole}>
+              {Array.isArray(item.roleNames) ? item.roleNames.join(', ') : item.roleNames}
+            </Text>
+          )}
+          <Text style={[styles.staffStatus, { color: getStatusColor(item.isActive) }]}>
+            {item.isActive ? 'Hoạt động' : 'Không hoạt động'}
           </Text>
         </View>
-        {item.department && (
-          <Text style={styles.staffDepartment}>{item.department} - {item.position}</Text>
-        )}
       </View>
       <View style={styles.staffActions}>
         <TouchableOpacity
@@ -255,9 +239,25 @@ const StaffManagementScreen = ({ navigation }) => {
         
         <ScrollView style={styles.modalContent}>
           <Input
+            label="Username *"
+            value={newStaff.username}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, username: text }))}
+            placeholder="Nhập username"
+            autoCapitalize="none"
+          />
+          
+          <Input
+            label="Password *"
+            value={newStaff.password}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, password: text }))}
+            placeholder="Nhập password"
+            secureTextEntry
+          />
+          
+          <Input
             label="Họ và tên *"
-            value={newStaff.name}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, name: text }))}
+            value={newStaff.fullname}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, fullname: text }))}
             placeholder="Nhập họ và tên"
           />
           
@@ -267,6 +267,7 @@ const StaffManagementScreen = ({ navigation }) => {
             onChangeText={(text) => setNewStaff(prev => ({ ...prev, email: text }))}
             placeholder="Nhập email"
             keyboardType="email-address"
+            autoCapitalize="none"
           />
           
           <Input
@@ -277,46 +278,45 @@ const StaffManagementScreen = ({ navigation }) => {
             keyboardType="phone-pad"
           />
           
+          <Input
+            label="Địa chỉ"
+            value={newStaff.address}
+            onChangeText={(text) => setNewStaff(prev => ({ ...prev, address: text }))}
+            placeholder="Nhập địa chỉ"
+          />
+          
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Vai trò *</Text>
             <View style={styles.roleSelector}>
               {[
-                { value: 'evm_staff', label: 'EVM Staff' },
-                { value: 'dealer_manager', label: 'Dealer Manager' },
-                { value: 'dealer_staff', label: 'Dealer Staff' },
-              ].map((role) => (
+                { id: [3], label: 'Dealer Manager', description: 'ID: 3' },
+                { id: [4], label: 'Dealer Staff', description: 'ID: 4' },
+                { id: [5], label: 'Evm Staff', description: 'ID: 5' },
+              ].map((role, index) => (
                 <TouchableOpacity
-                  key={role.value}
+                  key={index}
                   style={[
                     styles.roleOption,
-                    newStaff.role === role.value && styles.roleOptionSelected
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionSelected
                   ]}
-                  onPress={() => setNewStaff(prev => ({ ...prev, role: role.value }))}
+                  onPress={() => setNewStaff(prev => ({ ...prev, role: role.id }))}
                 >
                   <Text style={[
                     styles.roleOptionText,
-                    newStaff.role === role.value && styles.roleOptionTextSelected
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionTextSelected
                   ]}>
                     {role.label}
+                  </Text>
+                  <Text style={[
+                    styles.roleOptionDesc,
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionDescSelected
+                  ]}>
+                    {role.description}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-          
-          <Input
-            label="Phòng ban"
-            value={newStaff.department}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, department: text }))}
-            placeholder="Nhập phòng ban"
-          />
-          
-          <Input
-            label="Chức vụ"
-            value={newStaff.position}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, position: text }))}
-            placeholder="Nhập chức vụ"
-          />
         </ScrollView>
         
         <View style={styles.modalFooter}>
@@ -561,6 +561,12 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.XSMALL,
   },
+  staffUsername: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontStyle: 'italic',
+    marginBottom: 2,
+  },
   staffEmail: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
@@ -569,7 +575,13 @@ const styles = StyleSheet.create({
   staffPhone: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    marginBottom: 2,
+  },
+  staffAddress: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
     marginBottom: SIZES.PADDING.SMALL,
+    opacity: 0.8,
   },
   staffDetails: {
     flexDirection: 'row',
@@ -668,6 +680,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.SURFACE,
     marginRight: SIZES.PADDING.SMALL,
     marginBottom: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
   },
   roleOptionSelected: {
     backgroundColor: COLORS.PRIMARY,
@@ -675,9 +690,20 @@ const styles = StyleSheet.create({
   roleOptionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   roleOptionTextSelected: {
     color: COLORS.TEXT.WHITE,
+  },
+  roleOptionDesc: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  roleOptionDescSelected: {
+    color: COLORS.TEXT.WHITE,
+    opacity: 0.9,
   },
   modalFooter: {
     padding: SIZES.PADDING.LARGE,
