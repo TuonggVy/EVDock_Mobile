@@ -35,7 +35,7 @@ class StaffService {
       if (filters.status) queryParams.append('status', filters.status);
       if (filters.search) queryParams.append('search', filters.search);
 
-      const token = await this.getAuthTokenAsync();
+      let token = await this.getAuthTokenAsync();
       const url = `${API_BASE_URL}/admin/staff/list?${queryParams}`;
       
       console.log('Staff API Request:', {
@@ -46,7 +46,7 @@ class StaffService {
       });
 
       // Use the admin/staff/list endpoint for getting staff list
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -55,6 +55,23 @@ class StaffService {
       });
 
       console.log('Staff API Response:', response.status, response.statusText);
+
+      // Handle token expiration - try to refresh token and retry
+      if (response.status === 401) {
+        console.log('Token expired, attempting to refresh...');
+        const refreshedToken = await this.refreshToken();
+        if (refreshedToken) {
+          console.log('Token refreshed successfully, retrying request...');
+          response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${refreshedToken}`,
+            },
+          });
+          console.log('Staff API Response (after refresh):', response.status, response.statusText);
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -403,6 +420,44 @@ class StaffService {
         error: error.message,
         data: [],
       };
+    }
+  }
+
+  // Refresh token when expired
+  async refreshToken() {
+    try {
+      const refreshTokenValue = await AsyncStorage.getItem('refreshToken');
+      if (!refreshTokenValue) {
+        console.error('No refresh token found');
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/token`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshTokenValue}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Failed to refresh token');
+        return null;
+      }
+
+      const data = await response.json();
+      const newAccessToken = data.accessToken;
+      
+      if (newAccessToken) {
+        await AsyncStorage.setItem('token', newAccessToken);
+        console.log('Token refreshed and saved to storage');
+        return newAccessToken;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return null;
     }
   }
 
