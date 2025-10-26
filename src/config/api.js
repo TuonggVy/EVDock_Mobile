@@ -58,6 +58,13 @@ export const API_ENDPOINTS = {
     CREATE: '/orders',
     UPDATE: (id) => `/orders/${id}`,
   },
+
+  // Agency
+  AGENCY: {
+    LIST: '/agency/list',
+    BASE: '/agency',
+    BY_ID: (id) => `/agency/${id}`,
+  },
 };
 
 // HTTP Headers

@@ -19,7 +19,7 @@ import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import staffService from '../../services/staffService';
-import dealerService from '../../services/dealerService';
+import agencyService from '../../services/agencyService';
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -71,12 +71,15 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const loadAgencies = async () => {
     try {
-      const result = await dealerService.getDealers();
-      if (result.success) {
-        setAgencies(result.data || []);
-      }
+      const agenciesData = await agencyService.getAgencies({
+        limit: 100,
+        page: 1,
+      });
+      setAgencies(agenciesData || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
+      // Set empty array as fallback
+      setAgencies([]);
     }
   };
 
@@ -309,9 +312,9 @@ const StaffManagementScreen = ({ navigation }) => {
         </View>
         
         <ScrollView style={styles.modalContent}>
-          <Text style={styles.inputLabel}>Chọn đại lý</Text>
+          <Text style={styles.inputLabel}>Chọn agency</Text>
           <ScrollView style={styles.agencySelector}>
-            {agencies.map((agency) => (
+            {agencies.length > 0 ? agencies.map((agency) => (
               <TouchableOpacity
                 key={agency.id}
                 style={[
@@ -324,10 +327,14 @@ const StaffManagementScreen = ({ navigation }) => {
                   styles.agencyOptionText,
                   selectedAgencyId === agency.id && styles.agencyOptionTextSelected
                 ]}>
-                  {agency.name}
+                  {agency.name} - {agency.location}
                 </Text>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Không có agency nào</Text>
+              </View>
+            )}
           </ScrollView>
         </ScrollView>
         
@@ -866,6 +873,15 @@ const styles = StyleSheet.create({
   agencyOptionTextSelected: {
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.LARGE,
+  },
+  emptyText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
   },
 });
 
