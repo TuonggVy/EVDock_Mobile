@@ -3,8 +3,8 @@
 
 // Base API URL - Update this when backend is ready
 export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000/api' // Development
-  : 'https://api.evdock.com';   // Production
+  ? 'https://evm-project.onrender.com' // Development - Use actual backend URL
+  : 'https://evm-project.onrender.com';   // Production
 
 // API Endpoints
 export const API_ENDPOINTS = {
