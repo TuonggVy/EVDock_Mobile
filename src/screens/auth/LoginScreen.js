@@ -22,14 +22,6 @@ const LoginScreen = ({ navigation }) => {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  // Predefined test accounts for easy testing
-  const testAccounts = [
-    { email: 'evmadmin@evdock.com', password: 'evmadmin123', role: USER_ROLES.EVM_ADMIN },
-    { email: 'evmstaff@evdock.com', password: 'evmstaff123', role: USER_ROLES.EVM_STAFF },
-    { email: 'dealermanager@evdock.com', password: 'dealermanager123', role: USER_ROLES.DEALER_MANAGER },
-    { email: 'dealerstaff@evdock.com', password: 'dealerstaff123', role: USER_ROLES.DEALER_STAFF },
-  ];
-
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
@@ -97,7 +89,8 @@ const LoginScreen = ({ navigation }) => {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          <View style={styles.contentContainer}>
             <View style={styles.header}>
               <Image 
                 source={IMAGES.LOGO_BLACK} 
@@ -107,7 +100,7 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.subtitle}>Đăng nhập vào tài khoản của bạn</Text>
             </View>
 
-          <View style={styles.form}>
+            <View style={styles.form}>
             <Input
               label="Email"
               placeholder="Nhập email của bạn"
@@ -139,32 +132,6 @@ const LoginScreen = ({ navigation }) => {
             textStyle={styles.loginButtonText}
           />
           </View>
-
-          <View style={styles.testAccounts}>
-            <Text style={styles.testAccountsTitle}>Tài khoản test (Nhấn để điền)</Text>
-            {testAccounts.map((account, index) => (
-              <Button
-                key={index}
-                title={`${ROLE_DISPLAY_NAMES[account.role]} - ${account.email}`}
-                onPress={() => handleTestAccount(account)}
-                variant="outline"
-                size="small"
-                style={styles.testAccountButton}
-                textStyle={styles.testAccountButtonText}
-              />
-            ))}
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Chưa có tài khoản?{' '}
-              <Text 
-                style={styles.linkText}
-                onPress={() => navigation.navigate('Register')}
-              >
-                Đăng ký
-              </Text>
-            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -187,12 +154,17 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
+    justifyContent: 'center', 
+    alignItems: 'center',
     padding: SIZES.PADDING.LARGE,
+  },
+  contentContainer: {
+    alignItems: 'center',
+    width: '100%',
   },
   header: {
     alignItems: 'center',
-    marginBottom: SIZES.PADDING.XLARGE,
-    marginTop: SIZES.PADDING.XLARGE,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   logo: {
     width: 200,
@@ -208,7 +180,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   form: {
-    marginBottom: SIZES.PADDING.XLARGE,
+    width: '100%',
   },
   loginButton: {
     marginTop: SIZES.PADDING.MEDIUM,
