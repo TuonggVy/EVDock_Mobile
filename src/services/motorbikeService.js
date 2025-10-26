@@ -145,7 +145,7 @@ class MotorbikeService {
       const response = await axiosInstance.post(`${API_BASE_URL}/appearance/${vehicleId}`, appearanceData);
       return {
         success: true,
-        data: response.data,
+        data: response.data.data || response.data,
         message: 'Appearance created successfully'
       };
     } catch (error) {
@@ -218,7 +218,7 @@ class MotorbikeService {
       const response = await axiosInstance.post(`${API_BASE_URL}/configuration/${vehicleId}`, configData);
       return {
         success: true,
-        data: response.data,
+        data: response.data.data || response.data,
         message: 'Configuration created successfully'
       };
     } catch (error) {
@@ -291,7 +291,7 @@ class MotorbikeService {
       const response = await axiosInstance.post(`${API_BASE_URL}/battery/${vehicleId}`, batteryData);
       return {
         success: true,
-        data: response.data,
+        data: response.data.data || response.data,
         message: 'Battery created successfully'
       };
     } catch (error) {
@@ -364,7 +364,7 @@ class MotorbikeService {
       const response = await axiosInstance.post(`${API_BASE_URL}/safe-feature/${vehicleId}`, safeFeatureData);
       return {
         success: true,
-        data: response.data,
+        data: response.data.data || response.data,
         message: 'Safe feature created successfully'
       };
     } catch (error) {

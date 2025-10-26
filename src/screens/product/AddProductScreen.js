@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
+import { checkAuthStatus } from '../../utils/authUtils';
 
 const AddProductScreen = ({ navigation }) => {
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
@@ -59,6 +60,17 @@ const AddProductScreen = ({ navigation }) => {
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const authStatus = await checkAuthStatus();
+      if (!authStatus.isAuthenticated) {
+        console.warn('User not authenticated, API calls may fail');
+      }
+    };
+    checkAuth();
+  }, []);
 
   // Category removed in this screen
 
@@ -178,8 +190,19 @@ const AddProductScreen = ({ navigation }) => {
         return;
       }
 
-      const vehicleId = motorbikeResponse.data.id;
-      console.log('Created motorbike with ID:', vehicleId);
+      const vehicleId =
+  motorbikeResponse?.id ||
+  motorbikeResponse?.data?.data?.id ||
+  motorbikeResponse?.data?.data?._id ||
+  motorbikeResponse?.data?.id ||
+  motorbikeResponse?.data?._id;
+
+if (!vehicleId) {
+  console.log('CreateMotorbike response:', JSON.stringify(motorbikeResponse, null, 2));
+  showInfo('Error', 'Cannot determine created vehicle ID from response');
+  setLoading(false);
+  return;
+}
 
       // Create all configurations
       const configPromises = [];

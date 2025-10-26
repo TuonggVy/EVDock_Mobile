@@ -29,14 +29,6 @@ const EditProductScreen = ({ navigation, route }) => {
     model: '',
     makeFrom: '',
     version: '',
-    specifications: {
-      battery: '',
-      topSpeed: '',
-      range: '',
-      weight: '',
-      maxLoad: '',
-      chargingTime: ''
-    },
     // Configuration data
     configuration: {
       motorType: '',
@@ -86,14 +78,6 @@ const EditProductScreen = ({ navigation, route }) => {
       model: product.model || '',
       makeFrom: product.makeFrom || '',
       version: product.version || '',
-      specifications: {
-        battery: product.specifications?.battery || '',
-        topSpeed: product.specifications?.topSpeed || '',
-        range: product.specifications?.range || '',
-        weight: product.specifications?.weight || '',
-        maxLoad: product.specifications?.maxLoad || '',
-        chargingTime: product.specifications?.chargingTime || ''
-      },
       image: product.image || null,
     });
 
@@ -103,6 +87,8 @@ const EditProductScreen = ({ navigation, route }) => {
 
   const loadConfigurations = async () => {
     if (!product.id) return;
+    
+    console.log('Loading configurations for product ID:', product.id);
     
     try {
       const [batteryResult, configResult, safeFeatureResult, appearanceResult] = await Promise.all([
@@ -120,6 +106,7 @@ const EditProductScreen = ({ navigation, route }) => {
       };
 
       setConfigurations(configData);
+      console.log('Loaded configuration data:', configData);
 
       // Update form data with loaded configurations
       setFormData(prev => ({
@@ -150,6 +137,8 @@ const EditProductScreen = ({ navigation, route }) => {
           lock: configData.safeFeature?.lock || '',
         },
       }));
+      
+      console.log('Updated formData with configurations');
     } catch (error) {
       console.error('Error loading configurations:', error);
     }
@@ -168,16 +157,6 @@ const EditProductScreen = ({ navigation, route }) => {
         [field]: null
       }));
     }
-  };
-
-  const handleSpecChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      specifications: {
-        ...prev.specifications,
-        [field]: value
-      }
-    }));
   };
 
   const handleConfigChange = (field, value) => {
@@ -248,18 +227,6 @@ const EditProductScreen = ({ navigation, route }) => {
     if (!formData.version.trim()) {
       newErrors.version = 'Version is required';
     }
-
-    // Validate specifications (align with Product Detail fields)
-    if (!formData.specifications.battery.trim()) {
-      newErrors.battery = 'Battery capacity is required';
-    }
-    if (!formData.specifications.topSpeed.trim()) {
-      newErrors.topSpeed = 'Top speed is required';
-    }
-    if (!formData.specifications.range.trim()) {
-      newErrors.range = 'Range is required';
-    }
-    // Optional: weight, maxLoad, chargingTime can be empty
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -352,7 +319,21 @@ const EditProductScreen = ({ navigation, route }) => {
 
       showInfo('Success', 'Motorbike and configurations updated successfully!');
       
-      // Navigate back after a short delay
+      // Update the product object with new data for immediate display
+      const updatedProduct = {
+        ...product,
+        name: formData.name,
+        price: Number(formData.price),
+        description: formData.description,
+        model: formData.model,
+        makeFrom: formData.makeFrom,
+        version: formData.version,
+      };
+      
+      // Refresh the product data to show updated information
+      await loadConfigurations();
+      
+      // Navigate back to ProductManagement after successful update
       setTimeout(() => {
         navigation.goBack();
       }, 1500);
@@ -386,23 +367,6 @@ const EditProductScreen = ({ navigation, route }) => {
         keyboardType={keyboardType}
         multiline={multiline}
         numberOfLines={multiline ? 3 : 1}
-      />
-      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
-    </View>
-  );
-
-  const renderSpecInput = (label, field, value, placeholder) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label} *</Text>
-      <TextInput
-        style={[
-          styles.textInput,
-          errors[field] && styles.textInputError
-        ]}
-        value={value}
-        onChangeText={(text) => handleSpecChange(field, text)}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.TEXT.SECONDARY}
       />
       {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
     </View>
@@ -523,45 +487,19 @@ const EditProductScreen = ({ navigation, route }) => {
           {renderInput('Description', 'description', formData.description, 'Enter product description...', 'default', true)}
         </View>
 
-        {/* Specifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Specifications</Text>
-          
-          <View style={styles.specsGrid}>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Battery Capacity', 'battery', formData.specifications.battery, 'e.g., 36V 10Ah')}
-            </View>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Maximum Speed', 'topSpeed', formData.specifications.topSpeed, 'e.g., 155 mph')}
-            </View>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Distance (WLTP)', 'range', formData.specifications.range, 'e.g., 348 miles')}
-            </View>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Weight', 'weight', formData.specifications.weight, 'e.g., 25 kg')}
-            </View>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Max Load', 'maxLoad', formData.specifications.maxLoad, 'e.g., 150 kg')}
-            </View>
-            <View style={styles.specsGridInputGroup}>
-              {renderSpecInput('Charging Time', 'chargingTime', formData.specifications.chargingTime, 'e.g., 6-8 hours')}
-            </View>
-          </View>
-        </View>
-
         {/* Configuration */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuration</Text>
           
           <View style={styles.specsGrid}>
             <View style={styles.specsGridInputGroup}>
-              {renderConfigInput('Motor Type', 'motorType', formData.configuration.motorType, 'e.g., Brushless DC')}
+              {renderConfigInput('Motor Type', 'motorType', formData.configuration?.motorType || '', 'e.g., Brushless DC')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderConfigInput('Speed Limit', 'speedLimit', formData.configuration.speedLimit, 'e.g., 80km/h')}
+              {renderConfigInput('Speed Limit', 'speedLimit', formData.configuration?.speedLimit || '', 'e.g., 80km/h')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderConfigInput('Maximum Capacity', 'maximumCapacity', formData.configuration.maximumCapacity, 'e.g., 2', 'numeric')}
+              {renderConfigInput('Maximum Capacity', 'maximumCapacity', formData.configuration?.maximumCapacity || '', 'e.g., 2', 'numeric')}
             </View>
           </View>
         </View>
@@ -572,22 +510,22 @@ const EditProductScreen = ({ navigation, route }) => {
           
           <View style={styles.specsGrid}>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Length (mm)', 'length', formData.appearance.length, 'e.g., 2000', 'numeric')}
+              {renderAppearanceInput('Length (mm)', 'length', formData.appearance?.length || '', 'e.g., 2000', 'numeric')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Width (mm)', 'width', formData.appearance.width, 'e.g., 700', 'numeric')}
+              {renderAppearanceInput('Width (mm)', 'width', formData.appearance?.width || '', 'e.g., 700', 'numeric')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Height (mm)', 'height', formData.appearance.height, 'e.g., 1100', 'numeric')}
+              {renderAppearanceInput('Height (mm)', 'height', formData.appearance?.height || '', 'e.g., 1100', 'numeric')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Weight (kg)', 'weight', formData.appearance.weight, 'e.g., 120', 'numeric')}
+              {renderAppearanceInput('Weight (kg)', 'weight', formData.appearance?.weight || '', 'e.g., 120', 'numeric')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Undercarriage Distance (mm)', 'undercarriageDistance', formData.appearance.undercarriageDistance, 'e.g., 150', 'numeric')}
+              {renderAppearanceInput('Undercarriage Distance (mm)', 'undercarriageDistance', formData.appearance?.undercarriageDistance || '', 'e.g., 150', 'numeric')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderAppearanceInput('Storage Limit (L)', 'storageLimit', formData.appearance.storageLimit, 'e.g., 30', 'numeric')}
+              {renderAppearanceInput('Storage Limit (L)', 'storageLimit', formData.appearance?.storageLimit || '', 'e.g., 30', 'numeric')}
             </View>
           </View>
         </View>
@@ -598,22 +536,22 @@ const EditProductScreen = ({ navigation, route }) => {
           
           <View style={styles.specsGrid}>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Type', 'type', formData.battery.type, 'e.g., Lithium-ion')}
+              {renderBatteryInput('Type', 'type', formData.battery?.type || '', 'e.g., Lithium-ion')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Capacity', 'capacity', formData.battery.capacity, 'e.g., 60V 30Ah')}
+              {renderBatteryInput('Capacity', 'capacity', formData.battery?.capacity || '', 'e.g., 60V 30Ah')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Charge Time', 'chargeTime', formData.battery.chargeTime, 'e.g., 4 hours')}
+              {renderBatteryInput('Charge Time', 'chargeTime', formData.battery?.chargeTime || '', 'e.g., 4 hours')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Charge Type', 'chargeType', formData.battery.chargeType, 'e.g., Fast')}
+              {renderBatteryInput('Charge Type', 'chargeType', formData.battery?.chargeType || '', 'e.g., Fast')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Energy Consumption', 'energyConsumption', formData.battery.energyConsumption, 'e.g., 2kWh/100km')}
+              {renderBatteryInput('Energy Consumption', 'energyConsumption', formData.battery?.energyConsumption || '', 'e.g., 2kWh/100km')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderBatteryInput('Range Limit', 'limit', formData.battery.limit, 'e.g., 100km')}
+              {renderBatteryInput('Range Limit', 'limit', formData.battery?.limit || '', 'e.g., 100km')}
             </View>
           </View>
         </View>
@@ -624,10 +562,10 @@ const EditProductScreen = ({ navigation, route }) => {
           
           <View style={styles.specsGrid}>
             <View style={styles.specsGridInputGroup}>
-              {renderSafeFeatureInput('Brake System', 'brake', formData.safeFeature.brake, 'e.g., ABS')}
+              {renderSafeFeatureInput('Brake System', 'brake', formData.safeFeature?.brake || '', 'e.g., ABS')}
             </View>
             <View style={styles.specsGridInputGroup}>
-              {renderSafeFeatureInput('Lock System', 'lock', formData.safeFeature.lock, 'e.g., Smart Lock')}
+              {renderSafeFeatureInput('Lock System', 'lock', formData.safeFeature?.lock || '', 'e.g., Smart Lock')}
             </View>
           </View>
         </View>

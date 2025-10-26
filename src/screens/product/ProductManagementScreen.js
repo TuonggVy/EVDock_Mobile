@@ -52,6 +52,15 @@ const ProductManagementScreen = ({ navigation, route }) => {
     loadProducts();
   }, []);
 
+  // Refresh products when screen comes into focus (after editing)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProducts();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   // Load filter options from motorbike filters API
   useEffect(() => {
     const loadFilterOptions = async () => {
@@ -135,7 +144,10 @@ const ProductManagementScreen = ({ navigation, route }) => {
         isDeleted: motorbike.isDeleted,
       }));
       
-      setProducts(mapped);
+      // Sort products by ID in descending order (newest first)
+      const sorted = mapped.sort((a, b) => b.id - a.id);
+      
+      setProducts(sorted);
       setLoading(false);
     } catch (error) {
       console.error('Error loading products:', error);
