@@ -7,15 +7,15 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SIZES, IMAGES } from '../../constants';
+import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
+import * as ImagePicker from 'expo-image-picker';
 
 const EditProductScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -29,6 +29,8 @@ const EditProductScreen = ({ navigation, route }) => {
     model: '',
     makeFrom: '',
     version: '',
+    colorId: '',
+    colorType: '',
     // Configuration data
     configuration: {
       motorType: '',
@@ -66,6 +68,10 @@ const EditProductScreen = ({ navigation, route }) => {
     configuration: null,
     safeFeature: null,
   });
+  const [colors, setColors] = useState([]);
+  const [selectedColor, setSelectedColor] = useState(null);
+  const [motorbikeImages, setMotorbikeImages] = useState([]);
+  const [colorImage, setColorImage] = useState(null);
 
   // Category removed in this screen
 
@@ -78,11 +84,21 @@ const EditProductScreen = ({ navigation, route }) => {
       model: product.model || '',
       makeFrom: product.makeFrom || '',
       version: product.version || '',
+      colorId: product.colorId || '',
+      colorType: product.colorType || '',
       image: product.image || null,
     });
 
     // Load existing configurations
     loadConfigurations();
+    
+    // Load colors
+    loadColors();
+    
+    // Set selected color if product has a color
+    if (product.colorId && product.colorType) {
+      setSelectedColor({ id: product.colorId, colorType: product.colorType });
+    }
   }, [product]);
 
   const loadConfigurations = async () => {
@@ -144,6 +160,17 @@ const EditProductScreen = ({ navigation, route }) => {
     }
   };
 
+  const loadColors = async () => {
+    try {
+      const result = await motorbikeService.getAllColors();
+      if (result.success) {
+        setColors(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading colors:', error);
+    }
+  };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -197,6 +224,26 @@ const EditProductScreen = ({ navigation, route }) => {
         [field]: value
       }
     }));
+  };
+
+  const handleColorSelect = (color) => {
+    // If clicking the same color, deselect it
+    if (selectedColor?.id === color.id) {
+      setSelectedColor(null);
+      setFormData(prev => ({
+        ...prev,
+        colorId: '',
+        colorType: ''
+      }));
+    } else {
+      // Select the new color
+      setSelectedColor(color);
+      setFormData(prev => ({
+        ...prev,
+        colorId: color.id,
+        colorType: color.colorType
+      }));
+    }
   };
 
   const validateForm = () => {
@@ -317,6 +364,22 @@ const EditProductScreen = ({ navigation, route }) => {
         console.log('Configuration update results:', configResults);
       }
 
+      // Upload motorbike images if any selected
+      if (motorbikeImages.length > 0) {
+        const imageResult = await motorbikeService.uploadMotorbikeImages(product.id, motorbikeImages);
+        if (!imageResult.success) {
+          console.error('Error uploading motorbike images:', imageResult.message);
+        }
+      }
+
+      // Upload color image if selected
+      if (colorImage && selectedColor) {
+        const colorImageResult = await motorbikeService.uploadColorImage(product.id, selectedColor.id, colorImage);
+        if (!colorImageResult.success) {
+          console.error('Error uploading color image:', colorImageResult.message);
+        }
+      }
+
       showInfo('Success', 'Motorbike and configurations updated successfully!');
       
       // Update the product object with new data for immediate display
@@ -346,9 +409,79 @@ const EditProductScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleImageSelect = () => {
-    // TODO: Implement image selection
-    showInfo('Image Selection', 'Image selection feature will be implemented');
+  const requestImagePickerPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showInfo('Permission Required', 'Camera roll permission is required to select images');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSelectMotorbikeImages = async () => {
+    const hasPermission = await requestImagePickerPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages = result.assets.map(asset => ({
+          uri: asset.uri,
+          type: 'image/jpeg',
+          name: asset.fileName || `image_${Date.now()}.jpg`,
+        }));
+        setMotorbikeImages(prev => [...prev, ...newImages]);
+        showInfo('Success', `${newImages.length} image(s) selected`);
+      }
+    } catch (error) {
+      console.error('Error selecting images:', error);
+      showInfo('Error', 'Failed to select images');
+    }
+  };
+
+  const handleSelectColorImage = async () => {
+    if (!selectedColor) {
+      showInfo('Color Required', 'Please select a color first');
+      return;
+    }
+
+    const hasPermission = await requestImagePickerPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        setColorImage({
+          uri: asset.uri,
+          type: 'image/jpeg',
+          name: asset.fileName || `color_${selectedColor.colorType}_${Date.now()}.jpg`,
+        });
+        showInfo('Success', 'Color image selected');
+      }
+    } catch (error) {
+      console.error('Error selecting color image:', error);
+      showInfo('Error', 'Failed to select color image');
+    }
+  };
+
+  const removeImage = (index) => {
+    setMotorbikeImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeColorImage = () => {
+    setColorImage(null);
   };
 
   const renderInput = (label, field, value, placeholder, keyboardType = 'default', multiline = false) => (
@@ -570,22 +703,91 @@ const EditProductScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Image Upload */}
+        {/* Color Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Image</Text>
+          <Text style={styles.sectionTitle}>Color Selection</Text>
+          <View style={styles.colorGrid}>
+            {colors.map((color) => (
+              <TouchableOpacity
+                key={color.id}
+                style={[
+                  styles.colorOption,
+                  selectedColor?.id === color.id && styles.selectedColorOption
+                ]}
+                onPress={() => handleColorSelect(color)}
+              >
+                <View 
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: color.colorType.toLowerCase() }
+                  ]} 
+                />
+                <Text style={[
+                  styles.colorText,
+                  selectedColor?.id === color.id && styles.selectedColorText
+                ]}>
+                  {color.colorType}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {colors.length === 0 && (
+            <Text style={styles.noColorText}>No colors available</Text>
+          )}
+        </View>
+
+        {/* Motorbike Images Upload */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Images</Text>
+          <Text style={styles.sectionSubtitle}>Upload multiple images for the motorbike</Text>
           
-          <TouchableOpacity style={styles.imageUploadContainer} onPress={handleImageSelect}>
-            {formData.image ? (
-              <Image source={formData.image} style={styles.uploadedImage} />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.uploadIcon}>📷</Text>
-                <Text style={styles.uploadText}>Tap to change image</Text>
-                <Text style={styles.uploadSubtext}>Recommended: 400x300px</Text>
-              </View>
-            )}
+          {/* Selected Images Preview */}
+          {motorbikeImages.length > 0 && (
+            <View style={styles.imagesGrid}>
+              {motorbikeImages.map((image, index) => (
+                <View key={index} style={styles.imageItemContainer}>
+                  <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+                  <TouchableOpacity 
+                    style={styles.removeImageButton}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Text style={styles.removeImageButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.imageUploadButton} onPress={handleSelectMotorbikeImages}>
+            <Text style={styles.imageUploadButtonText}>📷 Add Images</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Color Image Upload */}
+        {selectedColor && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Color Image</Text>
+            <Text style={styles.sectionSubtitle}>Upload image for {selectedColor.colorType} color</Text>
+            
+            {colorImage && (
+              <View style={styles.colorImageContainer}>
+                <Image source={{ uri: colorImage.uri }} style={styles.colorImagePreview} />
+                <TouchableOpacity 
+                  style={styles.removeColorImageButton}
+                  onPress={removeColorImage}
+                >
+                  <Text style={styles.removeImageButtonText}>✕ Remove</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!colorImage && (
+              <TouchableOpacity style={styles.imageUploadButton} onPress={handleSelectColorImage}>
+                <Text style={styles.imageUploadButtonText}>📷 Select Color Image</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
@@ -779,38 +981,108 @@ const styles = StyleSheet.create({
     width: '48%',
   },
 
-  // Image upload
-  imageUploadContainer: {
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-    backgroundColor: '#F8F9FA',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
+  // Color selection
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  imagePlaceholder: {
-    height: 200,
-    justifyContent: 'center',
+  colorOption: {
+    width: '48%',
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: SIZES.PADDING.LARGE,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  uploadIcon: {
-    fontSize: 48,
-    marginBottom: SIZES.PADDING.MEDIUM,
+  selectedColorOption: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
   },
-  uploadText: {
+  colorCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: SIZES.PADDING.SMALL,
+  },
+  colorText: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.XSMALL,
+    fontWeight: '500',
   },
-  uploadSubtext: {
+  selectedColorText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  noColorText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontStyle: 'italic',
+  },
+  sectionSubtitle: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
   },
-  uploadedImage: {
+
+  // Image upload
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  imageItemContainer: {
+    width: '48%',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 150,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeImageButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  imageUploadButton: {
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  imageUploadButtonText: {
+    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+  },
+  colorImageContainer: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  colorImagePreview: {
     width: '100%',
     height: 200,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  removeColorImageButton: {
+    backgroundColor: COLORS.ERROR,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    alignItems: 'center',
   },
 
   // Action buttons

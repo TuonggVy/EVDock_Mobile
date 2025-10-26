@@ -1,4 +1,5 @@
 import axiosInstance from './api/axiosInstance';
+import { Platform } from 'react-native';
 
 const API_BASE_URL = '';
 
@@ -427,6 +428,96 @@ class MotorbikeService {
         success: false,
         error: error.response?.data?.message || 'Failed to delete safe feature',
         message: 'Failed to delete safe feature'
+      };
+    }
+  }
+
+  // Color operations
+  async getAllColors() {
+    try {
+      const response = await axiosInstance.get(`${API_BASE_URL}/color`);
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: 'Colors retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Error fetching colors:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to fetch colors',
+        message: 'Failed to fetch colors'
+      };
+    }
+  }
+
+  // Image operations
+  async uploadMotorbikeImages(motorbikeId, images) {
+    try {
+      const formData = new FormData();
+      images.forEach((image, index) => {
+        formData.append('images', {
+          uri: image.uri,
+          type: image.type || 'image/jpeg',
+          name: image.name || `image_${index}.jpg`,
+        });
+      });
+
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/images/motorbike/${motorbikeId}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: 'Images uploaded successfully'
+      };
+    } catch (error) {
+      console.error('Error uploading motorbike images:', error.response?.data || error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to upload images',
+        message: 'Failed to upload images'
+      };
+    }
+  }
+
+  async uploadColorImage(motorbikeId, colorId, image) {
+    try {
+      const formData = new FormData();
+      formData.append('color_image', {
+        uri: image.uri,
+        type: image.type || 'image/jpeg',
+        name: image.name || 'color_image.jpg',
+      });
+
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/images/motorbike-color/${motorbikeId}/${colorId}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: 'Color image uploaded successfully'
+      };
+    } catch (error) {
+      console.error('Error uploading color image:', error.response?.data || error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to upload color image',
+        message: 'Failed to upload color image'
       };
     }
   }
