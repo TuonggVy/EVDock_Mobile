@@ -18,8 +18,6 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import staffService from '../../services/staffService';
-import agencyService from '../../services/agencyService';
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -41,17 +39,10 @@ const StaffManagementScreen = ({ navigation }) => {
     fullname: '',
     email: '',
     phone: '',
-    address: '',
-    role: [5], // Array of role IDs: 3=Dealer Manager (có thể assign), 5=Evm Staff
+    role: 'evm_staff',
+    department: '',
+    position: '',
   });
-
-  // Selected agency for assignment
-  const [selectedAgencyId, setSelectedAgencyId] = useState(null);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageLimit = 1000; // Load all staff at once
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -61,44 +52,53 @@ const StaffManagementScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
-    loadStaffList(currentPage);
-    loadAgencies();
+    loadStaffList();
   }, []);
 
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList, filters]);
 
-  const loadAgencies = async () => {
-    try {
-      const agenciesData = await agencyService.getAgencies({
-        limit: 100,
-        page: 1,
-      });
-      setAgencies(agenciesData || []);
-    } catch (error) {
-      console.error('Error loading agencies:', error);
-      // Set empty array as fallback
-      setAgencies([]);
-    }
-  };
-
-  const loadStaffList = async (page = 1) => {
+  const loadStaffList = async () => {
     try {
       setIsLoading(true);
-      
-      // Call API to get staff list - load all staff at once
-      const result = await staffService.getStaffList({}, page, pageLimit);
-      
-      if (result.success) {
-        setStaffList(result.data || []);
-        setCurrentPage(result.page || page);
-        setTotalPages(1);
-      } else {
-        showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
-        // Fallback to empty array
-        setStaffList([]);
-      }
+      // Mock data - replace with actual API call
+      const mockStaff = [
+        {
+          id: '1',
+          name: 'Nguyễn Văn A',
+          email: 'nguyenvana@evm.com',
+          phone: '0123456789',
+          role: 'evm_staff',
+          department: 'Sales',
+          position: 'Sales Staff',
+          status: 'active',
+          createdAt: '2024-01-15',
+        },
+        {
+          id: '2',
+          name: 'Trần Thị B',
+          email: 'tranthib@evm.com',
+          phone: '0987654321',
+          role: 'evm_staff',
+          department: 'Marketing',
+          position: 'Marketing Staff',
+          status: 'active',
+          createdAt: '2024-01-20',
+        },
+        {
+          id: '3',
+          name: 'Lê Văn C',
+          email: 'levanc@evm.com',
+          phone: '0369258147',
+          role: 'evm_staff',
+          department: 'IT',
+          position: 'IT Staff',
+          status: 'inactive',
+          createdAt: '2024-02-01',
+        },
+      ];
+      setStaffList(mockStaff);
     } catch (error) {
       console.error('Error loading staff list:', error);
       showAlert('Lỗi', 'Không thể tải danh sách nhân viên');
@@ -421,9 +421,10 @@ const StaffManagementScreen = ({ navigation }) => {
             <Text style={styles.inputLabel}>Vai trò *</Text>
             <View style={styles.roleSelector}>
               {[
-                { id: [3], label: 'Dealer Manager' },
-                { id: [5], label: 'Evm Staff' },
-              ].map((role, index) => (
+                { value: 'evm_staff', label: 'EVM Staff' },
+                { value: 'dealer_manager', label: 'Dealer Manager' },
+                { value: 'dealer_staff', label: 'Dealer Staff' },
+              ].map((role) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -437,6 +438,12 @@ const StaffManagementScreen = ({ navigation }) => {
                     JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionTextSelected
                   ]}>
                     {role.label}
+                  </Text>
+                  <Text style={[
+                    styles.roleOptionDesc,
+                    JSON.stringify(newStaff.role) === JSON.stringify(role.id) && styles.roleOptionDescSelected
+                  ]}>
+                    {role.description}
                   </Text>
                 </TouchableOpacity>
               ))}
