@@ -8,12 +8,15 @@ import {
   Image,
   Alert,
   Share,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
+
+const { width: ScreenWidth } = Dimensions.get('window');
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product: initialProduct, refreshData } = route.params;
@@ -29,23 +32,35 @@ const ProductDetailScreen = ({ navigation, route }) => {
     safeFeature: null,
   });
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [productImages, setProductImages] = useState([]);
+  const [colorImages, setColorImages] = useState([]);
+  const [selectedColorIndex, setSelectedColorIndex] = useState(null);
+  const [isShowingColorImage, setIsShowingColorImage] = useState(false);
 
   // Load configurations when component mounts
   useEffect(() => {
     loadConfigurations();
+    loadProductWithImages();
   }, []);
 
   // Update product when refreshData is true
   useEffect(() => {
     if (refreshData && route.params.product) {
       setProduct(route.params.product);
+      // Reload images when product is updated
+      loadProductWithImages();
+      loadConfigurations();
     }
   }, [refreshData, route.params.product]);
 
-  // Refresh configurations when screen comes into focus (after editing)
+  // Refresh configurations and images when screen comes into focus (after editing)
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadConfigurations();
+      loadProductWithImages();
+      // Reset color selection when returning
+      setSelectedColorIndex(null);
+      setIsShowingColorImage(false);
     });
 
     return unsubscribe;
@@ -80,6 +95,27 @@ const ProductDetailScreen = ({ navigation, route }) => {
       console.error('Error loading configurations:', error);
     } finally {
       setLoadingConfigs(false);
+    }
+  };
+
+  const loadProductWithImages = async () => {
+    if (!product.id) return;
+    
+    try {
+      const result = await motorbikeService.getMotorbikeById(product.id);
+      if (result.success && result.data) {
+        const data = result.data.data || result.data;
+        
+        // Extract images and colors from the response
+        if (data.images && Array.isArray(data.images)) {
+          setProductImages(data.images);
+        }
+        if (data.colors && Array.isArray(data.colors)) {
+          setColorImages(data.colors);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading product with images:', error);
     }
   };
 
@@ -391,13 +427,43 @@ const ProductDetailScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Product Image */}
-        <View style={styles.imageContainer}>
-          <Image source={product.image} style={styles.productImage} resizeMode="cover" />
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(product.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(product.status)}</Text>
+        {/* Product Images or Color Image */}
+        {(productImages.length > 0 || (isShowingColorImage && selectedColorIndex !== null)) && (
+          <View style={styles.imageContainer}>
+            {isShowingColorImage && selectedColorIndex !== null && colorImages[selectedColorIndex]?.imageUrl ? (
+              // Show color image
+              <Image 
+                source={{ uri: colorImages[selectedColorIndex].imageUrl }} 
+                style={styles.productImageSingle} 
+                resizeMode="cover" 
+              />
+            ) : (
+              // Show product images
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                pagingEnabled
+                snapToInterval={ScreenWidth}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                style={styles.imageScrollView}
+                contentContainerStyle={styles.imageScrollContent}
+              >
+                {productImages.map((img, index) => (
+                  <Image 
+                    key={img.id || index} 
+                    source={{ uri: img.imageUrl }} 
+                    style={styles.productImage} 
+                    resizeMode="cover" 
+                  />
+                ))}
+              </ScrollView>
+            )}
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(product.status) }]}>
+              <Text style={styles.statusText}>{getStatusText(product.status)}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Product Info */}
         <View style={styles.infoSection}>
@@ -416,16 +482,38 @@ const ProductDetailScreen = ({ navigation, route }) => {
           <Text style={styles.description}>{product.description}</Text>
         </View>
 
-        {/* Colors (from product.colors) */}
-        {Array.isArray(product?.colors) && product.colors.length > 0 && (
+        {/* Colors with Images */}
+        {colorImages.length > 0 && (
           <View style={styles.colorsSection}>
             <Text style={styles.sectionTitle}>Available Colors</Text>
-            <View style={styles.colorsRow}>
-              {product.colors.map((c) => (
-                <View key={c} style={styles.colorChip}>
-                  <View style={[styles.colorDot, { backgroundColor: getSafeBgColor(c) }]} />
-                  <Text style={styles.colorChipText}>{c}</Text>
-                </View>
+            
+            {/* Color Dots */}
+            <View style={styles.colorDotsContainer}>
+              {colorImages.map((colorData, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.colorDotButton,
+                    selectedColorIndex === index && styles.colorDotButtonActive
+                  ]}
+                  onPress={() => {
+                    if (selectedColorIndex === index && isShowingColorImage) {
+                      // Nhấn lại vào màu đang chọn -> quay lại ảnh xe
+                      setIsShowingColorImage(false);
+                    } else {
+                      // Chọn màu mới -> hiện ảnh màu
+                      setSelectedColorIndex(index);
+                      setIsShowingColorImage(true);
+                    }
+                  }}
+                >
+                  <View 
+                    style={[
+                      styles.colorDotLarge,
+                      { backgroundColor: getSafeBgColor(colorData.color?.colorType) }
+                    ]} 
+                  />
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -627,8 +715,14 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
   },
   productImage: {
+    width: ScreenWidth,
+    height: 250,
+    marginRight: 0,
+  },
+  productImageSingle: {
     width: '100%',
     height: '100%',
+    // borderRadius: SIZES.RADIUS.LARGE,
   },
   statusBadge: {
     position: 'absolute',
@@ -739,6 +833,70 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+  },
+  colorDotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  colorDotButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.SURFACE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  colorDotButtonActive: {
+    borderColor: COLORS.PRIMARY,
+    shadowColor: COLORS.PRIMARY,
+    shadowOpacity: 0.3,
+    elevation: 4,
+  },
+  colorDotLarge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  selectedColorContainer: {
+    marginTop: SIZES.PADDING.LARGE,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.MEDIUM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  selectedColorTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    textTransform: 'capitalize',
+  },
+  selectedColorImage: {
+    width: '100%',
+    height: 250,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+  },
+  imageScrollView: {
+    height: 250,
+    width: ScreenWidth,
+  },
+  imageScrollContent: {
+    paddingHorizontal: 0,
   },
   specsContainer: {
     backgroundColor: COLORS.SURFACE,
