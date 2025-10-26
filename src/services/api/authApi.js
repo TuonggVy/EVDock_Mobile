@@ -41,16 +41,12 @@ export const refreshToken = async (refreshToken) => {
 
 /**
  * Logout user account
- * @param {string} accessToken - Current access token
+ * @param {string} accessToken - Current access token (optional, handled by interceptor)
  * @returns {Promise<Object>} Logout response
  */
-export const logout = async (accessToken) => {
+export const logout = async () => {
   try {
-    const response = await api.post("/auth/logout", {}, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    const response = await api.post("/auth/logout");
     return response.data;
   } catch (error) {
     console.error("Logout error:", error.response?.data || error.message);
