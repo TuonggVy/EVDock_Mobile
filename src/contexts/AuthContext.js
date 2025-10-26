@@ -112,10 +112,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Call logout API if we have a token
-      if (token) {
-        await logoutApi(token);
-      }
+      // Call logout API (token is added automatically by axios interceptor)
+      await logoutApi();
     } catch (error) {
       console.error("Logout API error:", error);
       // Continue with local logout even if API call fails
