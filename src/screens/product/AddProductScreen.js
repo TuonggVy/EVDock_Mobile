@@ -6,13 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SIZES, IMAGES } from '../../constants';
+import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
@@ -29,6 +27,8 @@ const AddProductScreen = ({ navigation }) => {
     model: '',
     makeFrom: '',
     version: '',
+    colorId: '',
+    colorType: '',
     // Configuration data
     configuration: {
       motorType: '',
@@ -55,11 +55,12 @@ const AddProductScreen = ({ navigation }) => {
       brake: '',
       lock: ''
     },
-    image: null,
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [colors, setColors] = useState([]);
+  const [selectedColor, setSelectedColor] = useState(null);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -71,6 +72,22 @@ const AddProductScreen = ({ navigation }) => {
     };
     checkAuth();
   }, []);
+
+  // Load colors on component mount
+  useEffect(() => {
+    loadColors();
+  }, []);
+
+  const loadColors = async () => {
+    try {
+      const result = await motorbikeService.getAllColors();
+      if (result.success) {
+        setColors(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading colors:', error);
+    }
+  };
 
   // Category removed in this screen
 
@@ -128,6 +145,26 @@ const AddProductScreen = ({ navigation }) => {
         [field]: value
       }
     }));
+  };
+
+  const handleColorSelect = (color) => {
+    // If clicking the same color, deselect it
+    if (selectedColor?.id === color.id) {
+      setSelectedColor(null);
+      setFormData(prev => ({
+        ...prev,
+        colorId: '',
+        colorType: ''
+      }));
+    } else {
+      // Select the new color
+      setSelectedColor(color);
+      setFormData(prev => ({
+        ...prev,
+        colorId: color.id,
+        colorType: color.colorType
+      }));
+    }
   };
 
   const validateForm = () => {
@@ -275,11 +312,6 @@ if (!vehicleId) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleImageSelect = () => {
-    // TODO: Implement image selection
-    showInfo('Image Selection', 'Image selection feature will be implemented');
   };
 
   const renderInput = (label, field, value, placeholder, keyboardType = 'default', multiline = false) => (
@@ -503,21 +535,37 @@ if (!vehicleId) {
           </View>
         </View>
 
-        {/* Image Upload */}
+        {/* Color Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Image</Text>
-          
-          <TouchableOpacity style={styles.imageUploadContainer} onPress={handleImageSelect}>
-            {formData.image ? (
-              <Image source={formData.image} style={styles.uploadedImage} />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.uploadIcon}>📷</Text>
-                <Text style={styles.uploadText}>Tap to add image</Text>
-                <Text style={styles.uploadSubtext}>Recommended: 400x300px</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Color Selection</Text>
+          <View style={styles.colorGrid}>
+            {colors.map((color) => (
+              <TouchableOpacity
+                key={color.id}
+                style={[
+                  styles.colorOption,
+                  selectedColor?.id === color.id && styles.selectedColorOption
+                ]}
+                onPress={() => handleColorSelect(color)}
+              >
+                <View 
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: color.colorType.toLowerCase() }
+                  ]} 
+                />
+                <Text style={[
+                  styles.colorText,
+                  selectedColor?.id === color.id && styles.selectedColorText
+                ]}>
+                  {color.colorType}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {colors.length === 0 && (
+            <Text style={styles.noColorText}>No colors available</Text>
+          )}
         </View>
 
         {/* Action Buttons */}
@@ -710,6 +758,46 @@ const styles = StyleSheet.create({
   },
   specsGridInputGroup: {
     width: '48%',
+  },
+
+  // Color selection
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.SMALL,
+  },
+  colorOption: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  selectedColorOption: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  colorCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: SIZES.PADDING.SMALL,
+  },
+  colorText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+  },
+  selectedColorText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  noColorText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontStyle: 'italic',
   },
 
   // Image upload
