@@ -16,7 +16,8 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
 
 const ProductDetailScreen = ({ navigation, route }) => {
-  const { product } = route.params;
+  const { product: initialProduct, refreshData } = route.params;
+  const [product, setProduct] = useState(initialProduct);
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
   
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,22 @@ const ProductDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     loadConfigurations();
   }, []);
+
+  // Update product when refreshData is true
+  useEffect(() => {
+    if (refreshData && route.params.product) {
+      setProduct(route.params.product);
+    }
+  }, [refreshData, route.params.product]);
+
+  // Refresh configurations when screen comes into focus (after editing)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadConfigurations();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const loadConfigurations = async () => {
     if (!product.id) return;
