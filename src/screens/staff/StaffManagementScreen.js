@@ -51,7 +51,7 @@ const StaffManagementScreen = ({ navigation }) => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageLimit = 10;
+  const pageLimit = 1000; // Load all staff at once
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -87,15 +87,13 @@ const StaffManagementScreen = ({ navigation }) => {
     try {
       setIsLoading(true);
       
-      // Call API to get staff list with pagination
+      // Call API to get staff list - load all staff at once
       const result = await staffService.getStaffList({}, page, pageLimit);
       
       if (result.success) {
         setStaffList(result.data || []);
         setCurrentPage(result.page || page);
-        // Calculate total pages based on total items
-        const calculatedTotalPages = result.total ? Math.ceil(result.total / pageLimit) : 1;
-        setTotalPages(calculatedTotalPages);
+        setTotalPages(1);
       } else {
         showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
         // Fallback to empty array
