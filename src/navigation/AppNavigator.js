@@ -50,6 +50,10 @@ import CreatePreOrderScreen from '../screens/deposit/CreatePreOrderScreen';
 import DepositDetailScreen from '../screens/deposit/DepositDetailScreen';
 import PreOrderTasksScreen from '../screens/evm/PreOrderTasksScreen';
 import StaffManagementScreen from '../screens/staff/StaffManagementScreen';
+import WarehouseManagementScreen from '../screens/warehouse/WarehouseManagementScreen';
+import WarehouseDetailScreen from '../screens/warehouse/WarehouseDetailScreen';
+import AddWarehouseScreen from '../screens/warehouse/AddWarehouseScreen';
+import EditWarehouseScreen from '../screens/warehouse/EditWarehouseScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -227,6 +231,26 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="StaffManagement" 
           component={StaffManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="WarehouseManagement" 
+          component={WarehouseManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="WarehouseDetail" 
+          component={WarehouseDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="AddWarehouse" 
+          component={AddWarehouseScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditWarehouse" 
+          component={EditWarehouseScreen} 
           options={{ headerShown: false }}
         />
             <Stack.Screen 
