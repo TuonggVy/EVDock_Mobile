@@ -54,6 +54,9 @@ import WarehouseManagementScreen from '../screens/warehouse/WarehouseManagementS
 import WarehouseDetailScreen from '../screens/warehouse/WarehouseDetailScreen';
 import AddWarehouseScreen from '../screens/warehouse/AddWarehouseScreen';
 import EditWarehouseScreen from '../screens/warehouse/EditWarehouseScreen';
+import DiscountManagementScreen from '../screens/discount/DiscountManagementScreen';
+import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
+import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -338,9 +341,24 @@ const AppNavigator = () => {
               component={CreatePreOrderScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
-              name="DepositDetail"
-              component={DepositDetailScreen}
+            <Stack.Screen 
+              name="DepositDetail" 
+              component={DepositDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DiscountManagement" 
+              component={DiscountManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AddDiscount" 
+              component={AddDiscountScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditDiscount" 
+              component={EditDiscountScreen} 
               options={{ headerShown: false }}
             />
           </>
