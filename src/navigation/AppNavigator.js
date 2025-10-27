@@ -215,11 +215,11 @@ const AppNavigator = () => {
               component={EditInventoryScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
-              name="DealerManagement"
-              component={DealerManagementScreen}
-              options={{ headerShown: false }}
-            />
+             <Stack.Screen
+               name="DealerManagement"
+               component={DealerManagementScreen}
+               options={{ headerShown: false }}
+             />
             <Stack.Screen
               name="PricingManagement"
               component={PricingManagementScreen}
