@@ -98,7 +98,7 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('PricingManagement'),
     },
     {
-      title: 'Dealers',
+      title: 'Agencies',
       gradient: COLORS.GRADIENT.PINK,
       icon: '🏢',
       onPress: () => navigation.navigate('DealerManagement'),
