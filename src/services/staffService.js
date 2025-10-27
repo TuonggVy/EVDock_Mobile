@@ -201,13 +201,20 @@ class StaffService {
     try {
       const token = await this.getAuthTokenAsync();
       
-      const response = await fetch(`${this.baseURL}/${staffId}`, {
-        method: 'PUT',
+      // Use the correct endpoint according to the API documentation: PATCH /admin/staff/{staffId}
+      const response = await fetch(`${API_BASE_URL}/admin/staff/${staffId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(staffData),
+        body: JSON.stringify({
+          username: staffData.username,
+          fullname: staffData.fullname,
+          email: staffData.email,
+          phone: staffData.phone,
+          address: staffData.address,
+        }),
       });
 
       if (!response.ok) {
