@@ -16,71 +16,56 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import dealerService from '../../services/dealerService';
+import agencyService from '../../services/agencyService';
 
 const { width } = Dimensions.get('window');
 
 const DealerManagementScreen = ({ navigation }) => {
-  const [dealers, setDealers] = useState([]);
+  const [agencies, setAgencies] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'suspended'
+  const [activeTab, setActiveTab] = useState('Active'); // 'Active' or 'Inactive'
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDealer, setEditingDealer] = useState(null);
-  const [newDealer, setNewDealer] = useState({
+  const [editingAgency, setEditingAgency] = useState(null);
+  const [newAgency, setNewAgency] = useState({
     name: '',
-    code: '',
-    contactPerson: '',
-    phone: '',
-    email: '',
+    location: '',
     address: '',
-    city: '',
-    status: 'active',
-    contractStartDate: '',
-    contractEndDate: '',
-    commissionRate: '',
-    notes: '',
+    contactInfo: '',
+    status: 'Active',
   });
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm, showInfo } = useCustomAlert();
 
-  // No hardcoded dealers; load from service/storage
-
-  // Derived cities from dealer data
-  const cities = Array.from(new Set((dealers || []).map(d => d.city).filter(Boolean)));
-
-  // Mock status options
+  // Status options
   const statusOptions = [
-    { value: 'active', label: 'Hoạt động', color: COLORS.SUCCESS },
-    { value: 'suspended', label: 'Tạm dừng', color: COLORS.WARNING },
-    { value: 'inactive', label: 'Không hoạt động', color: COLORS.ERROR },
-    { value: 'pending', label: 'Chờ duyệt', color: COLORS.INFO },
+    { value: 'Active', label: 'Hoạt động', color: COLORS.SUCCESS },
+    { value: 'Inactive', label: 'Không hoạt động', color: COLORS.ERROR },
   ];
 
   useEffect(() => {
-    loadDealers();
+    loadAgencies();
   }, []);
 
-  const loadDealers = async () => {
+  const loadAgencies = async () => {
     try {
-      const res = await dealerService.getDealers();
-      if (res?.success) setDealers(res.data || []);
+      const res = await agencyService.getAgencies();
+      if (res?.success) setAgencies(res.data || []);
       else showError('Lỗi', res?.error || 'Không thể tải danh sách đại lý');
     } catch (error) {
       showError('Lỗi', 'Không thể tải danh sách đại lý');
     }
   };
 
-  const filteredDealers = dealers.filter(dealer => {
-    const matchesSearch = dealer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dealer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dealer.contactPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dealer.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dealer.phone.includes(searchQuery);
+  const filteredAgencies = agencies.filter(agency => {
+    const matchesSearch = agency.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agency.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agency.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      agency.contactInfo?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesTab = activeTab === 'active' 
-      ? dealer.status === 'active'
-      : dealer.status === 'suspended';
+    const matchesTab = activeTab === 'Active' 
+      ? agency.status === 'Active'
+      : agency.status === 'Inactive';
     
     return matchesSearch && matchesTab;
   });
@@ -97,77 +82,58 @@ const DealerManagementScreen = ({ navigation }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'active': return '✅';
-      case 'suspended': return '⚠️';
-      case 'inactive': return '❌';
-      case 'pending': return '⏳';
+      case 'Active': return '✅';
+      case 'Inactive': return '❌';
       default: return '❓';
     }
   };
 
   const handleAddDealer = () => {
-    setNewDealer({
+    setNewAgency({
       name: '',
-      code: '',
-      contactPerson: '',
-      phone: '',
-      email: '',
+      location: '',
       address: '',
-      city: '',
-      status: 'active',
-      contractStartDate: '',
-      contractEndDate: '',
-      commissionRate: '',
-      notes: '',
+      contactInfo: '',
+      status: 'Active',
     });
     setShowAddModal(true);
   };
 
-  const handleEditDealer = (dealer) => {
-    setEditingDealer(dealer);
-    setNewDealer({
-      name: dealer.name,
-      code: dealer.code,
-      contactPerson: dealer.contactPerson,
-      phone: dealer.phone,
-      email: dealer.email,
-      address: dealer.address,
-      city: dealer.city,
-      status: dealer.status,
-      contractStartDate: dealer.contractStartDate,
-      contractEndDate: dealer.contractEndDate,
-      commissionRate: dealer.commissionRate.toString(),
-      notes: dealer.notes,
+  const handleEditDealer = (agency) => {
+    setEditingAgency(agency);
+    setNewAgency({
+      name: agency.name,
+      location: agency.location,
+      address: agency.address,
+      contactInfo: agency.contactInfo,
+      status: agency.status,
     });
     setShowEditModal(true);
   };
 
   const handleSaveDealer = async () => {
-    if (!newDealer.name || !newDealer.code || !newDealer.contactPerson || !newDealer.phone || !newDealer.email) {
+    if (!newAgency.name || !newAgency.location || !newAgency.address || !newAgency.contactInfo) {
       showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
       return;
     }
 
     try {
-      const dealerData = {
-        ...newDealer,
-        id: editingDealer ? editingDealer.id : `DLR${Date.now()}${Math.random().toString(36).substr(2, 5)}`,
-        commissionRate: parseFloat(newDealer.commissionRate) || 0,
-        totalSales: editingDealer ? editingDealer.totalSales : 0,
-        totalVehicles: editingDealer ? editingDealer.totalVehicles : 0,
-        lastOrderDate: editingDealer ? editingDealer.lastOrderDate : null,
-        rating: editingDealer ? editingDealer.rating : 0,
+      const agencyData = {
+        name: newAgency.name,
+        location: newAgency.location,
+        address: newAgency.address,
+        contactInfo: newAgency.contactInfo,
       };
 
-      const res = editingDealer
-        ? await dealerService.updateDealer(editingDealer.id, dealerData)
-        : await dealerService.createDealer(dealerData);
+      const res = editingAgency
+        ? await agencyService.updateAgency(editingAgency.id, agencyData)
+        : await agencyService.createAgency(agencyData);
 
       if (res?.success) {
-        await loadDealers();
-        if (editingDealer) {
+        await loadAgencies();
+        if (editingAgency) {
           setShowEditModal(false);
-          setEditingDealer(null);
+          setEditingAgency(null);
           showSuccess('Thành công', 'Cập nhật đại lý thành công!');
         } else {
           setShowAddModal(false);
@@ -177,34 +143,27 @@ const DealerManagementScreen = ({ navigation }) => {
         showError('Lỗi', res?.error || 'Không thể lưu thông tin đại lý');
       }
 
-      setNewDealer({
+      setNewAgency({
         name: '',
-        code: '',
-        contactPerson: '',
-        phone: '',
-        email: '',
+        location: '',
         address: '',
-        city: '',
-        status: 'active',
-        contractStartDate: '',
-        contractEndDate: '',
-        commissionRate: '',
-        notes: '',
+        contactInfo: '',
+        status: 'Active',
       });
     } catch (error) {
-      console.error('Error saving dealer:', error);
+      console.error('Error saving agency:', error);
       showError('Lỗi', 'Không thể lưu thông tin đại lý');
     }
   };
 
-  const handleDeleteDealer = (dealerId) => {
+  const handleDeleteDealer = (agencyId) => {
     showConfirm(
       'Xác nhận xóa',
       'Bạn có chắc chắn muốn xóa đại lý này?',
       async () => {
-        const res = await dealerService.deleteDealer(dealerId);
+        const res = await agencyService.deleteAgency(agencyId);
         if (res?.success) {
-          await loadDealers();
+          await loadAgencies();
           showSuccess('Thành công', 'Xóa đại lý thành công!');
         } else {
           showError('Lỗi', res?.error || 'Không thể xóa đại lý');
@@ -213,14 +172,14 @@ const DealerManagementScreen = ({ navigation }) => {
     );
   };
 
-  const handleStatusChange = (dealerId, newStatus) => {
+  const handleStatusChange = (agencyId, newStatus) => {
     showConfirm(
       'Xác nhận thay đổi trạng thái',
       `Bạn có chắc chắn muốn thay đổi trạng thái đại lý thành "${getStatusText(newStatus)}"?`,
       async () => {
-        const res = await dealerService.updateDealerStatus(dealerId, newStatus);
+        const res = await agencyService.updateAgencyStatus(agencyId, newStatus);
         if (res?.success) {
-          await loadDealers();
+          await loadAgencies();
           showSuccess('Thành công', 'Cập nhật trạng thái thành công!');
         } else {
           showError('Lỗi', res?.error || 'Không thể cập nhật trạng thái');
@@ -236,81 +195,51 @@ const DealerManagementScreen = ({ navigation }) => {
     }).format(price);
   };
 
-  const renderDealerCard = (dealer) => (
-    <View key={dealer.id} style={styles.dealerCard}>
+  const renderDealerCard = (agency) => (
+    <View key={agency.id} style={styles.dealerCard}>
       <View style={styles.cardHeader}>
         <View style={styles.dealerInfo}>
-          <Text style={styles.dealerCode}>{dealer.code}</Text>
-          <Text style={styles.dealerName}>{dealer.name}</Text>
-          <Text style={styles.dealerCity}>{dealer.city}</Text>
+          <Text style={styles.dealerName}>{agency.name}</Text>
+          <Text style={styles.dealerCity}>{agency.location}</Text>
         </View>
         <View style={styles.statusContainer}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(dealer.status) }]}>
-            <Text style={styles.statusIcon}>{getStatusIcon(dealer.status)}</Text>
-            <Text style={styles.statusText}>{getStatusText(dealer.status)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(agency.status) }]}>
+            <Text style={styles.statusIcon}>{getStatusIcon(agency.status)}</Text>
+            <Text style={styles.statusText}>{getStatusText(agency.status)}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.cardContent}>
         <View style={styles.contactInfo}>
-          <Text style={styles.contactLabel}>Liên hệ:</Text>
-          <Text style={styles.contactValue}>{dealer.contactPerson}</Text>
-          <Text style={styles.contactDetail}>{dealer.phone}</Text>
-          <Text style={styles.contactDetail}>{dealer.email}</Text>
+          <Text style={styles.contactLabel}>Địa chỉ:</Text>
+          <Text style={styles.contactValue}>{agency.address}</Text>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{formatPrice(dealer.totalSales)}</Text>
-            <Text style={styles.statLabel}>Doanh thu</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{dealer.totalVehicles}</Text>
-            <Text style={styles.statLabel}>Xe bán</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{dealer.rating}⭐</Text>
-            <Text style={styles.statLabel}>Đánh giá</Text>
-          </View>
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactLabel}>Thông tin liên hệ:</Text>
+          <Text style={styles.contactDetail}>{agency.contactInfo}</Text>
         </View>
-
-        <View style={styles.contractInfo}>
-          <Text style={styles.contractLabel}>Hợp đồng:</Text>
-          <Text style={styles.contractValue}>
-            {dealer.contractStartDate} - {dealer.contractEndDate}
-          </Text>
-          <Text style={styles.commissionRate}>
-            Hoa hồng: {dealer.commissionRate}%
-          </Text>
-        </View>
-
-        {dealer.notes && (
-          <View style={styles.notesContainer}>
-            <Text style={styles.notesLabel}>Ghi chú:</Text>
-            <Text style={styles.notesValue}>{dealer.notes}</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.editButton}
-          onPress={() => handleEditDealer(dealer)}
+          onPress={() => handleEditDealer(agency)}
         >
           <Text style={styles.editButtonText}>Chỉnh sửa</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.statusButton}
-          onPress={() => handleStatusChange(dealer.id, dealer.status === 'active' ? 'suspended' : 'active')}
+          onPress={() => handleStatusChange(agency.id, agency.status === 'Active' ? 'Inactive' : 'Active')}
         >
           <Text style={styles.statusButtonText}>
-            {dealer.status === 'active' ? 'Tạm dừng' : 'Kích hoạt'}
+            {agency.status === 'Active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={() => handleDeleteDealer(dealer.id)}
+          onPress={() => handleDeleteDealer(agency.id)}
         >
           <Text style={styles.deleteButtonText}>Xóa</Text>
         </TouchableOpacity>
@@ -331,27 +260,20 @@ const DealerManagementScreen = ({ navigation }) => {
             onPress={() => {
               setShowAddModal(false);
               setShowEditModal(false);
-              setEditingDealer(null);
-              setNewDealer({
+              setEditingAgency(null);
+              setNewAgency({
                 name: '',
-                code: '',
-                contactPerson: '',
-                phone: '',
-                email: '',
+                location: '',
                 address: '',
-                city: '',
-                status: 'active',
-                contractStartDate: '',
-                contractEndDate: '',
-                commissionRate: '',
-                notes: '',
+                contactInfo: '',
+                status: 'Active',
               });
             }}
           >
             <Text style={styles.modalCloseText}>Hủy</Text>
           </TouchableOpacity>
           <Text style={styles.modalTitle}>
-            {editingDealer ? 'Chỉnh sửa đại lý' : 'Thêm mới đại lý'}
+            {editingAgency ? 'Chỉnh sửa đại lý' : 'Thêm mới đại lý'}
           </Text>
           <TouchableOpacity
             style={styles.modalSaveButton}
@@ -366,65 +288,30 @@ const DealerManagementScreen = ({ navigation }) => {
             <Text style={styles.inputLabel}>Tên đại lý *</Text>
             <TextInput
               style={styles.textInput}
-              value={newDealer.name}
-              onChangeText={(text) => setNewDealer({ ...newDealer, name: text })}
+              value={newAgency.name}
+              onChangeText={(text) => setNewAgency({ ...newAgency, name: text })}
               placeholder="Nhập tên đại lý"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mã đại lý *</Text>
+            <Text style={styles.inputLabel}>Khu vực *</Text>
             <TextInput
               style={styles.textInput}
-              value={newDealer.code}
-              onChangeText={(text) => setNewDealer({ ...newDealer, code: text.toUpperCase() })}
-              placeholder="Nhập mã đại lý"
+              value={newAgency.location}
+              onChangeText={(text) => setNewAgency({ ...newAgency, location: text })}
+              placeholder="Nhập khu vực"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Người liên hệ *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newDealer.contactPerson}
-              onChangeText={(text) => setNewDealer({ ...newDealer, contactPerson: text })}
-              placeholder="Nhập tên người liên hệ"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Số điện thoại *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newDealer.phone}
-              onChangeText={(text) => setNewDealer({ ...newDealer, phone: text })}
-              placeholder="Nhập số điện thoại"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newDealer.email}
-              onChangeText={(text) => setNewDealer({ ...newDealer, email: text })}
-              placeholder="Nhập email"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="email-address"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Địa chỉ</Text>
+            <Text style={styles.inputLabel}>Địa chỉ *</Text>
             <TextInput
               style={[styles.textInput, styles.textArea]}
-              value={newDealer.address}
-              onChangeText={(text) => setNewDealer({ ...newDealer, address: text })}
+              value={newAgency.address}
+              onChangeText={(text) => setNewAgency({ ...newAgency, address: text })}
               placeholder="Nhập địa chỉ"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
               multiline
@@ -433,95 +320,14 @@ const DealerManagementScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Thành phố</Text>
-            <View style={styles.citySelector}>
-              {cities.map((city) => (
-                <TouchableOpacity
-                  key={city}
-                  style={[
-                    styles.cityOption,
-                    newDealer.city === city && styles.selectedCityOption
-                  ]}
-                  onPress={() => setNewDealer({ ...newDealer, city: city })}
-                >
-                  <Text style={[
-                    styles.cityOptionText,
-                    newDealer.city === city && styles.selectedCityOptionText
-                  ]}>
-                    {city}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Trạng thái</Text>
-            <View style={styles.statusSelector}>
-              {statusOptions.map((status) => (
-                <TouchableOpacity
-                  key={status.value}
-                  style={[
-                    styles.statusOption,
-                    newDealer.status === status.value && styles.selectedStatusOption
-                  ]}
-                  onPress={() => setNewDealer({ ...newDealer, status: status.value })}
-                >
-                  <Text style={[
-                    styles.statusOptionText,
-                    newDealer.status === status.value && styles.selectedStatusOptionText
-                  ]}>
-                    {status.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Ngày bắt đầu hợp đồng</Text>
+            <Text style={styles.inputLabel}>Thông tin liên hệ *</Text>
             <TextInput
               style={styles.textInput}
-              value={newDealer.contractStartDate}
-              onChangeText={(text) => setNewDealer({ ...newDealer, contractStartDate: text })}
-              placeholder="YYYY-MM-DD"
+              value={newAgency.contactInfo}
+              onChangeText={(text) => setNewAgency({ ...newAgency, contactInfo: text })}
+              placeholder="Nhập thông tin liên hệ"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Ngày kết thúc hợp đồng</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newDealer.contractEndDate}
-              onChangeText={(text) => setNewDealer({ ...newDealer, contractEndDate: text })}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Tỷ lệ hoa hồng (%)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newDealer.commissionRate}
-              onChangeText={(text) => setNewDealer({ ...newDealer, commissionRate: text })}
-              placeholder="Nhập tỷ lệ hoa hồng"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Ghi chú</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={newDealer.notes}
-              onChangeText={(text) => setNewDealer({ ...newDealer, notes: text })}
-              placeholder="Nhập ghi chú (nếu có)"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              multiline
-              numberOfLines={3}
+              keyboardType="email-address"
             />
           </View>
         </ScrollView>
@@ -530,11 +336,9 @@ const DealerManagementScreen = ({ navigation }) => {
   );
 
   // Calculate statistics
-  const totalDealers = dealers.length;
-  const activeDealers = dealers.filter(dealer => dealer.status === 'active').length;
-  const suspendedDealers = dealers.filter(dealer => dealer.status === 'suspended').length;
-  const totalSales = dealers.reduce((sum, dealer) => sum + dealer.totalSales, 0);
-  const totalVehicles = dealers.reduce((sum, dealer) => sum + dealer.totalVehicles, 0);
+  const totalAgencies = agencies.length;
+  const activeAgencies = agencies.filter(agency => agency.status === 'Active').length;
+  const inactiveAgencies = agencies.filter(agency => agency.status === 'Inactive').length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -546,7 +350,7 @@ const DealerManagementScreen = ({ navigation }) => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý đại lý</Text>
+        <Text style={styles.headerTitle}>Quản lý Agencies</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddDealer}
@@ -570,27 +374,17 @@ const DealerManagementScreen = ({ navigation }) => {
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalDealers}</Text>
+          <Text style={styles.statNumber}>{totalAgencies}</Text>
           <Text style={styles.statLabel}>Tổng đại lý</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{activeDealers}</Text>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{activeAgencies}</Text>
           <Text style={styles.statLabel}>Hoạt động</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>{suspendedDealers}</Text>
-          <Text style={styles.statLabel}>Tạm dừng</Text>
+          <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{inactiveAgencies}</Text>
+          <Text style={styles.statLabel}>Không hoạt động</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.PRIMARY }]}>{totalVehicles}</Text>
-          <Text style={styles.statLabel}>Xe bán</Text>
-        </View>
-      </View>
-
-      {/* Total Sales Card */}
-      <View style={styles.salesCard}>
-        <Text style={styles.salesLabel}>Tổng doanh thu từ đại lý</Text>
-        <Text style={styles.salesAmount}>{formatPrice(totalSales)}</Text>
       </View>
 
       {/* Tab Navigation */}
@@ -598,29 +392,29 @@ const DealerManagementScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === 'active' && styles.activeTabButton
+            activeTab === 'Active' && styles.activeTabButton
           ]}
-          onPress={() => setActiveTab('active')}
+          onPress={() => setActiveTab('Active')}
         >
           <Text style={[
             styles.tabText,
-            activeTab === 'active' && styles.activeTabText
+            activeTab === 'Active' && styles.activeTabText
           ]}>
-            Đang hoạt động ({activeDealers})
+            Đang hoạt động ({activeAgencies})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === 'suspended' && styles.activeTabButton
+            activeTab === 'Inactive' && styles.activeTabButton
           ]}
-          onPress={() => setActiveTab('suspended')}
+          onPress={() => setActiveTab('Inactive')}
         >
           <Text style={[
             styles.tabText,
-            activeTab === 'suspended' && styles.activeTabText
+            activeTab === 'Inactive' && styles.activeTabText
           ]}>
-            Tạm dừng ({suspendedDealers})
+            Không hoạt động ({inactiveAgencies})
           </Text>
         </TouchableOpacity>
       </View>
@@ -631,22 +425,22 @@ const DealerManagementScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.dealersContent}
       >
-        {filteredDealers.length > 0 ? (
-          filteredDealers.map(renderDealerCard)
+        {filteredAgencies.length > 0 ? (
+          filteredAgencies.map(renderDealerCard)
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>
-              {activeTab === 'active' ? '🏢' : '⚠️'}
+              {activeTab === 'Active' ? '🏢' : '⚠️'}
             </Text>
             <Text style={styles.emptyTitle}>
-              {activeTab === 'active' 
+              {activeTab === 'Active' 
                 ? 'Không có đại lý đang hoạt động' 
-                : 'Không có đại lý tạm dừng'
+                : 'Không có đại lý không hoạt động'
               }
             </Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'active'
-                ? 'Tất cả đại lý đều đang tạm dừng hoặc chưa có đại lý nào'
+              {activeTab === 'Active'
+                ? 'Tất cả đại lý đều không hoạt động hoặc chưa có đại lý nào'
                 : 'Tất cả đại lý đều đang hoạt động'
               }
             </Text>
