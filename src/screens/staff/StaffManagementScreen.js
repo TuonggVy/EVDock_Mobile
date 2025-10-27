@@ -205,6 +205,11 @@ const StaffManagementScreen = ({ navigation }) => {
            staff.roleNames.some(name => name && name.includes('Dealer Manager'));
   };
 
+  const isEvmStaff = (staff) => {
+    return staff.roleNames && Array.isArray(staff.roleNames) && 
+           staff.roleNames.some(name => name && (name.includes('Evm Staff') || name.includes('EVM Staff')));
+  };
+
   const handleAssignAgency = (staff) => {
     setAssigningStaff(staff);
     setSelectedAgencyId(null);

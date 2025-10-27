@@ -9,10 +9,13 @@ const mapApiRoleToUserRole = (apiRole) => {
   switch (apiRole) {
     case "Admin":
       return USER_ROLES.EVM_ADMIN;
+    case "Evm Staff":
     case "Staff":
       return USER_ROLES.EVM_STAFF;
+    case "Dealer Manager":
     case "DealerManager":
       return USER_ROLES.DEALER_MANAGER;
+    case "Dealer Staff":
     case "DealerStaff":
       return USER_ROLES.DEALER_STAFF;
     default:
