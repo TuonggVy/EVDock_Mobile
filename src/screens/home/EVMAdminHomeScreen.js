@@ -110,6 +110,12 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('VehicleManagement'),
     },
     {
+      title: 'Warehouse',
+      gradient: COLORS.GRADIENT.PURPLE,
+      icon: '🏭',
+      onPress: () => navigation.navigate('WarehouseManagement'),
+    },
+    {
       title: 'Staff',
       gradient: COLORS.GRADIENT.ORANGE,
       icon: '👥',
