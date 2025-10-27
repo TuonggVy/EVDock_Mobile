@@ -128,6 +128,12 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('B2BPromotionManagement'),
     },
     {
+      title: 'Inventory',
+      gradient: COLORS.GRADIENT.CYAN,
+      icon: '📦',
+      onPress: () => navigation.navigate('InventoryManagement'),
+    },
+    {
       title: 'Reports',
       gradient: COLORS.GRADIENT.PURPLE,
       icon: '📊',

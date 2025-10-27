@@ -1,16 +1,15 @@
-import { API_BASE_URL } from '../config/api';
-import storageService from './storage/storageService';
-import { STORAGE_KEYS } from '../constants';
+import api from './api/axiosInstance';
 
-// In-memory fallback is removed; data persists in storage under INVENTORY key
-let MEMORY_CACHE = null;
-
-// Utility function to simulate API delay
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Utility function to generate unique ID
-const generateUniqueId = (prefix) => {
-  return `${prefix}${Date.now()}${Math.random().toString(36).substr(2, 5)}`;
+// Utility function to get auth token
+const getAuthToken = async () => {
+  try {
+    const { getItem } = await import('./storage/storageService');
+    const token = await getItem('auth_token');
+    return token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
 };
 
 // Utility function to update item status based on quantity
@@ -24,82 +23,58 @@ const updateItemStatus = (item) => {
   return { ...item, status };
 };
 
-// Helpers
-const loadFromStorage = async () => {
-  const arr = (await storageService.getItem(STORAGE_KEYS.INVENTORY)) || [];
-  return Array.isArray(arr) ? arr : [];
-};
-
-const saveToStorage = async (items) => {
-  MEMORY_CACHE = items;
-  await storageService.setItem(STORAGE_KEYS.INVENTORY, items);
-  return items;
-};
-
-const getInventoryArray = async () => {
-  if (Array.isArray(MEMORY_CACHE)) return MEMORY_CACHE;
-  const stored = await loadFromStorage();
-  MEMORY_CACHE = stored;
-  return stored;
-};
-
 // Inventory Service
 export const inventoryService = {
   // Get all inventory items
   getInventory: async () => {
     try {
-      await delay(200);
-      const data = (await getInventoryArray()).map(updateItemStatus);
-      return { success: true, data };
+      // Request a large limit to get all items at once
+      const response = await api.get('/inventory/list?limit=1000&page=1');
+      const data = response.data.data || [];
+      
+      // Add status to each item
+      const inventoryWithStatus = data.map(item => updateItemStatus(item));
+      
+      return {
+        success: true,
+        data: inventoryWithStatus,
+        paginationInfo: response.data.paginationInfo
+      };
     } catch (error) {
       console.error('Error fetching inventory:', error);
       return {
         success: false,
-        error: 'Không thể tải danh sách tồn kho'
+        error: error.response?.data?.message || 'Không thể tải danh sách tồn kho',
+        data: []
       };
     }
   },
 
-  // Get inventory by warehouse location
-  getInventoryByWarehouse: async (warehouseLocation) => {
+  // Get inventory detail
+  getInventoryDetail: async (motorbikeId, warehouseId) => {
     try {
-      await delay(300);
-      
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory?warehouse=${warehouseLocation}`);
-      // const data = await response.json();
-      
-      const all = await getInventoryArray();
-      const filteredInventory = all.filter(item => 
-        item.warehouseLocation === warehouseLocation
-      );
+      const response = await api.get(`/inventory/detail/${motorbikeId}/${warehouseId}`);
+      const data = response.data.data;
       
       return {
         success: true,
-        data: filteredInventory.map(item => updateItemStatus(item))
+        data: data
       };
     } catch (error) {
-      console.error('Error fetching inventory by warehouse:', error);
+      console.error('Error fetching inventory detail:', error);
       return {
         success: false,
-        error: 'Không thể tải tồn kho theo kho'
+        error: error.response?.data?.message || 'Không thể tải chi tiết tồn kho'
       };
     }
   },
 
-  // Get available inventory for allocation (only in_stock and low_stock items)
+  // Get available inventory for allocation (only items with quantity > 0)
   getAvailableInventory: async () => {
     try {
-      await delay(300);
-      
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/available`);
-      // const data = await response.json();
-      
-      const all = await getInventoryArray();
-      const availableInventory = all.filter(item => 
-        item.quantity > 0
-      );
+      const response = await api.get('/inventory/list');
+      const data = response.data.data || [];
+      const availableInventory = data.filter(item => item.quantity > 0);
       
       return {
         success: true,
@@ -109,259 +84,130 @@ export const inventoryService = {
       console.error('Error fetching available inventory:', error);
       return {
         success: false,
-        error: 'Không thể tải tồn kho có sẵn'
+        error: error.response?.data?.message || 'Không thể tải tồn kho có sẵn',
+        data: []
       };
     }
   },
 
   // Create new inventory item
-  createInventoryItem: async (itemData) => {
-    try {
-      await delay(500);
-      
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(itemData)
-      // });
-      // const data = await response.json();
-      
-      const newItem = {
-        id: generateUniqueId('INV'),
-        ...itemData,
-        quantity: parseInt(itemData.quantity),
-        price: parseInt(itemData.price),
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-      
-      const updatedItem = updateItemStatus(newItem);
-      const arr = await getInventoryArray();
-      arr.unshift(updatedItem);
-      await saveToStorage(arr);
-      
-      return {
-        success: true,
-        data: updatedItem
-      };
-    } catch (error) {
-      console.error('Error creating inventory item:', error);
-      return {
-        success: false,
-        error: 'Không thể tạo mục tồn kho'
-      };
+  // Create new inventory item
+createInventoryItem: async (motorbikeId, warehouseId, quantity) => {
+  try {
+    const parsedQuantity = parseInt(quantity);
+    if (isNaN(parsedQuantity) || parsedQuantity < 0) {
+      return { success: false, error: 'Số lượng không hợp lệ. Vui lòng nhập số dương.' };
     }
-  },
+
+    const stockDate = new Date().toISOString(); // 👈 thêm dòng này
+
+    const response = await api.post(
+      `/inventory/${motorbikeId}/${warehouseId}`,
+      {
+        quantity: parsedQuantity,
+        stockDate, // 👈 và gửi lên
+      }
+    );
+
+    const createdItem = response.data.data;
+    const itemWithStatus = updateItemStatus(createdItem);
+
+    return { success: true, data: itemWithStatus, message: response.data.message };
+  } catch (error) {
+    console.error('Error creating inventory item:', error);
+    console.error('Error response:', error.response?.data);
+
+    let errorMessage = 'Không thể tạo mục tồn kho';
+
+    // Parse dạng message mảng { field, error[] }
+    const errData = error.response?.data;
+    if (Array.isArray(errData?.message)) {
+      const first = errData.message[0];
+      if (first?.field && first?.error?.[0]) {
+        errorMessage = `${first.field}: ${first.error[0]}`;
+      }
+    } else if (errData?.message) {
+      errorMessage = errData.message;
+    } else if (typeof errData === 'string') {
+      errorMessage = errData;
+    }
+
+    return { success: false, error: errorMessage };
+  }
+},
+
 
   // Update inventory item
-  updateInventoryItem: async (itemId, updateData) => {
+  updateInventoryItem: async (motorbikeId, warehouseId, updateData) => {
     try {
-      await delay(500);
+      const response = await api.patch(`/inventory/${motorbikeId}/${warehouseId}`, updateData);
       
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/${itemId}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(updateData)
-      // });
-      // const data = await response.json();
-      
-      const arr = await getInventoryArray();
-      const itemIndex = arr.findIndex(item => item.id === itemId);
-      if (itemIndex === -1) {
-        return {
-          success: false,
-          error: 'Không tìm thấy mục tồn kho'
-        };
-      }
-      
-      const updatedItem = {
-        ...arr[itemIndex],
-        ...updateData,
-        quantity: parseInt(updateData.quantity),
-        price: parseInt(updateData.price),
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-      
-      const finalItem = updateItemStatus(updatedItem);
-      arr[itemIndex] = finalItem;
-      await saveToStorage(arr);
+      const updatedItem = response.data.data;
+      const itemWithStatus = updateItemStatus(updatedItem);
       
       return {
         success: true,
-        data: finalItem
+        data: itemWithStatus,
+        message: response.data.message
       };
     } catch (error) {
       console.error('Error updating inventory item:', error);
+      
+      // Handle different error response formats
+      let errorMessage = 'Không thể cập nhật mục tồn kho';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle validation errors
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map(e => e.message || e.msg || e).join(', ');
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      }
+      
       return {
         success: false,
-        error: 'Không thể cập nhật mục tồn kho'
+        error: errorMessage
       };
     }
   },
 
   // Delete inventory item
-  deleteInventoryItem: async (itemId) => {
+  deleteInventoryItem: async (motorbikeId, warehouseId) => {
     try {
-      await delay(300);
-      
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/${itemId}`, {
-      //   method: 'DELETE'
-      // });
-      // const data = await response.json();
-      
-      const arr = await getInventoryArray();
-      const itemIndex = arr.findIndex(item => item.id === itemId);
-      if (itemIndex === -1) {
-        return {
-          success: false,
-          error: 'Không tìm thấy mục tồn kho'
-        };
-      }
-      
-      arr.splice(itemIndex, 1);
-      await saveToStorage(arr);
+      const response = await api.delete(`/inventory/${motorbikeId}/${warehouseId}`);
       
       return {
         success: true,
-        data: { id: itemId }
+        data: response.data.data,
+        message: response.data.message
       };
     } catch (error) {
       console.error('Error deleting inventory item:', error);
-      return {
-        success: false,
-        error: 'Không thể xóa mục tồn kho'
-      };
-    }
-  },
-
-  // CRITICAL: Reduce inventory quantity when allocating vehicles
-  reduceInventoryQuantity: async (vehicleModel, color, warehouseLocation, quantityToReduce) => {
-    try {
-      await delay(300);
       
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/reduce`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     vehicleModel,
-      //     color,
-      //     warehouseLocation,
-      //     quantityToReduce
-      //   })
-      // });
-      // const data = await response.json();
+      // Handle different error response formats
+      let errorMessage = 'Không thể xóa mục tồn kho';
       
-      // Find the matching inventory item
-      const arr = await getInventoryArray();
-      const itemIndex = arr.findIndex(item => 
-        item.vehicleModel === vehicleModel &&
-        item.color === color &&
-        item.warehouseLocation === warehouseLocation
-      );
-      
-      if (itemIndex === -1) {
-        return {
-          success: false,
-          error: 'Không tìm thấy xe trong tồn kho'
-        };
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle validation errors
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map(e => e.message || e.msg || e).join(', ');
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
       }
       
-      const currentItem = arr[itemIndex];
-      
-      // Check if there's enough quantity
-      if (currentItem.quantity < quantityToReduce) {
-        return {
-          success: false,
-          error: `Không đủ xe trong kho. Hiện có: ${currentItem.quantity} xe`
-        };
-      }
-      
-      // Reduce the quantity
-      const updatedItem = {
-        ...currentItem,
-        quantity: currentItem.quantity - quantityToReduce,
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-      
-      const finalItem = updateItemStatus(updatedItem);
-      arr[itemIndex] = finalItem;
-      await saveToStorage(arr);
-      
-      console.log(`Reduced inventory: ${vehicleModel} ${color} from ${currentItem.quantity} to ${finalItem.quantity}`);
-      
-      return {
-        success: true,
-        data: finalItem
-      };
-    } catch (error) {
-      console.error('Error reducing inventory quantity:', error);
       return {
         success: false,
-        error: 'Không thể giảm số lượng tồn kho'
-      };
-    }
-  },
-
-  // Restore inventory quantity when allocation is cancelled
-  restoreInventoryQuantity: async (vehicleModel, color, warehouseLocation, quantityToRestore) => {
-    try {
-      await delay(300);
-      
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/restore`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     vehicleModel,
-      //     color,
-      //     warehouseLocation,
-      //     quantityToRestore
-      //   })
-      // });
-      // const data = await response.json();
-      
-      // Find the matching inventory item
-      const arr = await getInventoryArray();
-      const itemIndex = arr.findIndex(item => 
-        item.vehicleModel === vehicleModel &&
-        item.color === color &&
-        item.warehouseLocation === warehouseLocation
-      );
-      
-      if (itemIndex === -1) {
-        return {
-          success: false,
-          error: 'Không tìm thấy xe trong tồn kho'
-        };
-      }
-      
-      const currentItem = arr[itemIndex];
-      
-      // Restore the quantity
-      const updatedItem = {
-        ...currentItem,
-        quantity: currentItem.quantity + quantityToRestore,
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-      
-      const finalItem = updateItemStatus(updatedItem);
-      arr[itemIndex] = finalItem;
-      await saveToStorage(arr);
-      
-      console.log(`Restored inventory: ${vehicleModel} ${color} from ${currentItem.quantity} to ${finalItem.quantity}`);
-      
-      return {
-        success: true,
-        data: finalItem
-      };
-    } catch (error) {
-      console.error('Error restoring inventory quantity:', error);
-      return {
-        success: false,
-        error: 'Không thể khôi phục số lượng tồn kho'
+        error: errorMessage
       };
     }
   },
@@ -369,18 +215,14 @@ export const inventoryService = {
   // Get inventory statistics
   getInventoryStats: async () => {
     try {
-      await delay(200);
+      const response = await api.get('/inventory/list');
+      const data = response.data.data || [];
       
-      // TODO: Replace with real API call
-      // const response = await fetch(`${API_BASE_URL}/inventory/stats`);
-      // const data = await response.json();
-      
-      const arr = await getInventoryArray();
-      const totalItems = arr.length;
-      const inStockItems = arr.filter(item => updateItemStatus(item).status === 'in_stock').length;
-      const lowStockItems = arr.filter(item => updateItemStatus(item).status === 'low_stock').length;
-      const outOfStockItems = arr.filter(item => updateItemStatus(item).status === 'out_of_stock').length;
-      const totalValue = arr.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const totalItems = data.length;
+      const inStockItems = data.filter(item => updateItemStatus(item).status === 'in_stock').length;
+      const lowStockItems = data.filter(item => updateItemStatus(item).status === 'low_stock').length;
+      const outOfStockItems = data.filter(item => updateItemStatus(item).status === 'out_of_stock').length;
+      const totalValue = data.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0);
       
       return {
         success: true,
@@ -396,7 +238,7 @@ export const inventoryService = {
       console.error('Error fetching inventory stats:', error);
       return {
         success: false,
-        error: 'Không thể tải thống kê tồn kho'
+        error: error.response?.data?.message || 'Không thể tải thống kê tồn kho'
       };
     }
   }

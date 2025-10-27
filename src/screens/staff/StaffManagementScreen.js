@@ -29,10 +29,12 @@ const StaffManagementScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningStaff, setAssigningStaff] = useState(null);
   const [agencies, setAgencies] = useState([]);
+  const [editingStaff, setEditingStaff] = useState(null);
   
   // Form states for creating new staff
   const [newStaff, setNewStaff] = useState({
@@ -45,13 +47,22 @@ const StaffManagementScreen = ({ navigation }) => {
     role: [5], // Array of role IDs: 3=Dealer Manager (có thể assign), 5=Evm Staff
   });
 
+  // Form states for editing staff
+  const [editStaffForm, setEditStaffForm] = useState({
+    username: '',
+    fullname: '',
+    email: '',
+    phone: '',
+    address: '',
+  });
+
   // Selected agency for assignment
   const [selectedAgencyId, setSelectedAgencyId] = useState(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageLimit = 10;
+  const pageLimit = 1000; // Load all staff at once
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -87,15 +98,13 @@ const StaffManagementScreen = ({ navigation }) => {
     try {
       setIsLoading(true);
       
-      // Call API to get staff list with pagination
+      // Call API to get staff list - load all staff at once
       const result = await staffService.getStaffList({}, page, pageLimit);
       
       if (result.success) {
         setStaffList(result.data || []);
         setCurrentPage(result.page || page);
-        // Calculate total pages based on total items
-        const calculatedTotalPages = result.total ? Math.ceil(result.total / pageLimit) : 1;
-        setTotalPages(calculatedTotalPages);
+        setTotalPages(1);
       } else {
         showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
         // Fallback to empty array
@@ -162,7 +171,38 @@ const StaffManagementScreen = ({ navigation }) => {
   };
 
   const handleEditStaff = (staff) => {
-    showAlert('Thông báo', 'Tính năng chỉnh sửa đang được phát triển');
+    setEditingStaff(staff);
+    setEditStaffForm({
+      username: staff.username || '',
+      fullname: staff.fullname || staff.name || '',
+      email: staff.email || '',
+      phone: staff.phone || '',
+      address: staff.address || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStaff = async () => {
+    try {
+      if (!editStaffForm.username || !editStaffForm.fullname || !editStaffForm.email || !editStaffForm.phone) {
+        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+        return;
+      }
+
+      const result = await staffService.updateStaff(editingStaff.id, editStaffForm);
+      
+      if (result.success) {
+        setShowEditModal(false);
+        setEditingStaff(null);
+        showAlert('Thành công', result.message || 'Cập nhật thông tin nhân viên thành công');
+        loadStaffList(); // Reload the staff list
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể cập nhật thông tin nhân viên');
+      }
+    } catch (error) {
+      console.error('Error updating staff:', error);
+      showAlert('Lỗi', 'Không thể cập nhật thông tin nhân viên');
+    }
   };
 
   const handleDeleteStaff = (staff) => {
@@ -205,6 +245,11 @@ const StaffManagementScreen = ({ navigation }) => {
   const isDealerManager = (staff) => {
     return staff.roleNames && Array.isArray(staff.roleNames) && 
            staff.roleNames.some(name => name && name.includes('Dealer Manager'));
+  };
+
+  const isEvmStaff = (staff) => {
+    return staff.roleNames && Array.isArray(staff.roleNames) && 
+           staff.roleNames.some(name => name && (name.includes('Evm Staff') || name.includes('EVM Staff')));
   };
 
   const handleAssignAgency = (staff) => {
@@ -452,6 +497,79 @@ const StaffManagementScreen = ({ navigation }) => {
     </Modal>
   );
 
+  const renderEditModal = () => (
+    <Modal
+      visible={showEditModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Chỉnh sửa thông tin nhân viên</Text>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => {
+              setShowEditModal(false);
+              setEditingStaff(null);
+            }}
+          >
+            <Text style={styles.closeButtonText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <ScrollView style={styles.modalContent}>
+          <Input
+            label="Username *"
+            value={editStaffForm.username}
+            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, username: text }))}
+            placeholder="Nhập username"
+            autoCapitalize="none"
+            editable={false}
+          />
+          
+          <Input
+            label="Họ và tên *"
+            value={editStaffForm.fullname}
+            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, fullname: text }))}
+            placeholder="Nhập họ và tên"
+          />
+          
+          <Input
+            label="Email *"
+            value={editStaffForm.email}
+            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, email: text }))}
+            placeholder="Nhập email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          
+          <Input
+            label="Số điện thoại *"
+            value={editStaffForm.phone}
+            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, phone: text }))}
+            placeholder="Nhập số điện thoại"
+            keyboardType="phone-pad"
+          />
+          
+          <Input
+            label="Địa chỉ"
+            value={editStaffForm.address}
+            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, address: text }))}
+            placeholder="Nhập địa chỉ"
+          />
+        </ScrollView>
+        
+        <View style={styles.modalFooter}>
+          <Button
+            title="Cập nhật thông tin"
+            onPress={handleUpdateStaff}
+            style={styles.createButton}
+          />
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -533,6 +651,7 @@ const StaffManagementScreen = ({ navigation }) => {
       </View>
 
       {renderCreateModal()}
+      {renderEditModal()}
       {renderAssignModal()}
     </View>
   );
