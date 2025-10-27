@@ -103,6 +103,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('AllocationManagement'),
     },
     {
+      title: 'Warehouse',
+      gradient: COLORS.GRADIENT.GREEN,
+      icon: '🏭',
+      onPress: () => navigation.navigate('WarehouseManagement'),
+    },
+    {
       title: 'Pre-order Tasks',
       gradient: COLORS.GRADIENT.ORANGE,
       icon: '📥',
