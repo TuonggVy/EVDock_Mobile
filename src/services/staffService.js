@@ -94,6 +94,7 @@ class StaffService {
         isDeleted: staff.isDeleted || false,
         roleNames: staff.roleNames || staff.roles || [],
         role: staff.role || [], // Role IDs
+        agencyId: staff.agencyId || staff.agency_id || staff.AgencyId || null, // Agency ID (check multiple possible field names)
         status: staff.isActive ? 'active' : 'inactive',
         createdAt: staff.createdAt || staff.created_at,
         updatedAt: staff.updatedAt || staff.updated_at,
@@ -328,6 +329,39 @@ class StaffService {
       };
     } catch (error) {
       console.error('Error resetting password:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Assign staff to agency
+  async assignStaffToAgency(staffId, agencyId) {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      const response = await fetch(`${API_BASE_URL}/admin/staff/${staffId}/assign/${agencyId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data,
+        message: 'Đã gán nhân viên vào đại lý thành công',
+      };
+    } catch (error) {
+      console.error('Error assigning staff to agency:', error);
       return {
         success: false,
         error: error.message,
