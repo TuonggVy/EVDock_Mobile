@@ -67,10 +67,15 @@ const AddDiscountScreen = ({ navigation }) => {
 
   const loadAgencies = async () => {
     try {
-      const data = await agencyService.getAgencies({ limit: 100 });
-      setAgencies(data || []);
+      const response = await agencyService.getAgencies();
+      if (response.success && Array.isArray(response.data)) {
+        setAgencies(response.data);
+      } else {
+        setAgencies([]);
+      }
     } catch (error) {
       console.error('Error loading agencies:', error);
+      setAgencies([]);
     }
   };
 
