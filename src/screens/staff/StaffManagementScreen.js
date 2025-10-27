@@ -86,6 +86,8 @@ const StaffManagementScreen = ({ navigation }) => {
         limit: 100,
         page: 1,
       });
+      console.log('Loaded agencies:', agenciesData?.length || 0, 'agencies');
+      console.log('Agencies data:', agenciesData);
       setAgencies(agenciesData || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
@@ -284,6 +286,15 @@ const StaffManagementScreen = ({ navigation }) => {
   const renderStaffItem = ({ item }) => {
     const isDM = isDealerManager(item);
     
+    // Find agency by agencyId
+    const staffAgency = item.agencyId ? agencies.find(a => a.id === item.agencyId) : null;
+    
+    // Debug logs
+    if (item.agencyId) {
+      console.log(`Staff ${item.fullname} has agencyId:`, item.agencyId);
+      console.log('Found agency:', staffAgency);
+    }
+    
     return (
     <View style={styles.staffCard}>
       <View style={styles.staffInfo}>
@@ -295,6 +306,11 @@ const StaffManagementScreen = ({ navigation }) => {
         <Text style={styles.staffPhone}>{item.phone}</Text>
         {item.address && (
           <Text style={styles.staffAddress}>{item.address}</Text>
+        )}
+        {staffAgency && (
+          <Text style={styles.staffAgency}>
+            🏢 {staffAgency.name}{staffAgency.location ? ` - ${staffAgency.location}` : ''}
+          </Text>
         )}
         <View style={styles.staffDetails}>
           {item.roleNames && item.roleNames.length > 0 && (
@@ -824,6 +840,12 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
     marginBottom: SIZES.PADDING.SMALL,
     opacity: 0.8,
+  },
+  staffAgency: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.SUCCESS,
+    marginBottom: SIZES.PADDING.SMALL,
+    fontWeight: '500',
   },
   staffDetails: {
     flexDirection: 'row',
