@@ -280,7 +280,7 @@ const DiscountManagementScreen = ({ navigation }) => {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🎁</Text>
-            <Text style={styles.emptyTitle}>Không có discount</Text>
+            <Text style={styles.emptyTitle}>Không có discounts</Text>
             <Text style={styles.emptySubtitle}>Hãy tạo discount mới để bắt đầu</Text>
           </View>
         )}
