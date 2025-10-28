@@ -18,15 +18,8 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-<<<<<<< HEAD
-=======
 import staffService from '../../services/staffService';
-<<<<<<< HEAD
-import dealerService from '../../services/dealerService';
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
-=======
 import agencyService from '../../services/agencyService';
->>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
 
 const StaffManagementScreen = ({ navigation }) => {
   const { showAlert } = useCustomAlert();
@@ -50,13 +43,6 @@ const StaffManagementScreen = ({ navigation }) => {
     fullname: '',
     email: '',
     phone: '',
-<<<<<<< HEAD
-    role: 'evm_staff',
-    department: '',
-    position: '',
-  });
-
-=======
     address: '',
     role: [5], // Array of role IDs: 3=Dealer Manager (có thể assign), 5=Evm Staff
   });
@@ -76,9 +62,8 @@ const StaffManagementScreen = ({ navigation }) => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageLimit = 10;
+  const pageLimit = 1000; // Load all staff at once
 
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
   // Filter states
   const [filters, setFilters] = useState({
     role: '',
@@ -87,21 +72,14 @@ const StaffManagementScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
-<<<<<<< HEAD
-    loadStaffList();
-=======
     loadStaffList(currentPage);
     loadAgencies();
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
   }, []);
 
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList, filters]);
 
-<<<<<<< HEAD
-  const loadStaffList = async () => {
-=======
   const loadAgencies = async () => {
     try {
       const agenciesData = await agencyService.getAgencies({
@@ -119,46 +97,21 @@ const StaffManagementScreen = ({ navigation }) => {
   };
 
   const loadStaffList = async (page = 1) => {
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
     try {
       setIsLoading(true);
-      // Mock data - replace with actual API call
-      const mockStaff = [
-        {
-          id: '1',
-          name: 'Nguyễn Văn A',
-          email: 'nguyenvana@evm.com',
-          phone: '0123456789',
-          role: 'evm_staff',
-          department: 'Sales',
-          position: 'Sales Staff',
-          status: 'active',
-          createdAt: '2024-01-15',
-        },
-        {
-          id: '2',
-          name: 'Trần Thị B',
-          email: 'tranthib@evm.com',
-          phone: '0987654321',
-          role: 'evm_staff',
-          department: 'Marketing',
-          position: 'Marketing Staff',
-          status: 'active',
-          createdAt: '2024-01-20',
-        },
-        {
-          id: '3',
-          name: 'Lê Văn C',
-          email: 'levanc@evm.com',
-          phone: '0369258147',
-          role: 'evm_staff',
-          department: 'IT',
-          position: 'IT Staff',
-          status: 'inactive',
-          createdAt: '2024-02-01',
-        },
-      ];
-      setStaffList(mockStaff);
+      
+      // Call API to get staff list - load all staff at once
+      const result = await staffService.getStaffList({}, page, pageLimit);
+      
+      if (result.success) {
+        setStaffList(result.data || []);
+        setCurrentPage(result.page || page);
+        setTotalPages(1);
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể tải danh sách nhân viên');
+        // Fallback to empty array
+        setStaffList([]);
+      }
     } catch (error) {
       console.error('Error loading staff list:', error);
       showAlert('Lỗi', 'Không thể tải danh sách nhân viên');
@@ -296,14 +249,11 @@ const StaffManagementScreen = ({ navigation }) => {
            staff.roleNames.some(name => name && name.includes('Dealer Manager'));
   };
 
-<<<<<<< HEAD
   const isEvmStaff = (staff) => {
     return staff.roleNames && Array.isArray(staff.roleNames) && 
            staff.roleNames.some(name => name && (name.includes('Evm Staff') || name.includes('EVM Staff')));
   };
 
-=======
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
   const handleAssignAgency = (staff) => {
     setAssigningStaff(staff);
     setSelectedAgencyId(null);
@@ -423,21 +373,9 @@ const StaffManagementScreen = ({ navigation }) => {
         </View>
         
         <ScrollView style={styles.modalContent}>
-<<<<<<< HEAD
-<<<<<<< HEAD
           <Text style={styles.inputLabel}>Chọn agency</Text>
           <ScrollView style={styles.agencySelector}>
             {agencies.length > 0 ? agencies.map((agency) => (
-=======
-          <Text style={styles.inputLabel}>Chọn đại lý</Text>
-          <ScrollView style={styles.agencySelector}>
-            {agencies.map((agency) => (
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
-=======
-          <Text style={styles.inputLabel}>Chọn agency</Text>
-          <ScrollView style={styles.agencySelector}>
-            {agencies.length > 0 ? agencies.map((agency) => (
->>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
               <TouchableOpacity
                 key={agency.id}
                 style={[
@@ -450,8 +388,6 @@ const StaffManagementScreen = ({ navigation }) => {
                   styles.agencyOptionText,
                   selectedAgencyId === agency.id && styles.agencyOptionTextSelected
                 ]}>
-<<<<<<< HEAD
-<<<<<<< HEAD
                   {agency.name} - {agency.location}
                 </Text>
               </TouchableOpacity>
@@ -460,22 +396,6 @@ const StaffManagementScreen = ({ navigation }) => {
                 <Text style={styles.emptyText}>Không có agency nào</Text>
               </View>
             )}
-=======
-                  {agency.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
-=======
-                  {agency.name} - {agency.location}
-                </Text>
-              </TouchableOpacity>
-            )) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>Không có agency nào</Text>
-              </View>
-            )}
->>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
           </ScrollView>
         </ScrollView>
         
@@ -559,16 +479,9 @@ const StaffManagementScreen = ({ navigation }) => {
             <Text style={styles.inputLabel}>Vai trò *</Text>
             <View style={styles.roleSelector}>
               {[
-<<<<<<< HEAD
-                { value: 'evm_staff', label: 'EVM Staff' },
-                { value: 'dealer_manager', label: 'Dealer Manager' },
-                { value: 'dealer_staff', label: 'Dealer Staff' },
-              ].map((role) => (
-=======
                 { id: [3], label: 'Dealer Manager' },
                 { id: [5], label: 'Evm Staff' },
               ].map((role, index) => (
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -1102,10 +1015,6 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
   },
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1115,11 +1024,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
   },
-<<<<<<< HEAD
-=======
->>>>>>> 4efaa91 (Add agency assignment functionality in StaffManagementScreen. Introduce modal for assigning staff to agencies, integrate dealerService to load agencies, and enhance staffService with token refresh logic for improved API interaction. Update UI to support agency selection and assignment confirmation.)
-=======
->>>>>>> 2027379 (Refactor DealerAssignmentModal and AddPromotionScreen to use agency terminology. Update API integration to fetch agencies instead of dealers, enhancing the agency assignment functionality. Modify UI elements to reflect agency selection and improve data handling in StaffManagementScreen for agency management.)
 });
 
 export default StaffManagementScreen;

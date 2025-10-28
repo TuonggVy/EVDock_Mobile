@@ -65,16 +65,6 @@ export const API_ENDPOINTS = {
     BASE: '/agency',
     BY_ID: (id) => `/agency/${id}`,
   },
-
-  // Discounts
-  DISCOUNTS: {
-    BASE: '/discount',
-    LIST: '/discount/list',
-    BY_ID: (id) => `/discount/${id}`,
-    DETAIL: (id) => `/discount/detail/${id}`,
-    BY_AGENCY: (agencyId) => `/discount/agency/list/${agencyId}`,
-    BY_MOTORBIKE: (motorbikeId) => `/discount/agency/motorbike/list/${motorbikeId}`,
-  },
 };
 
 // HTTP Headers

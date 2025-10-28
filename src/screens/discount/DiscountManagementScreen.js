@@ -61,15 +61,10 @@ const DiscountManagementScreen = ({ navigation }) => {
 
   const loadAgencies = async () => {
     try {
-      const response = await agencyService.getAgencies();
-      if (response.success && Array.isArray(response.data)) {
-        setAgencies(response.data);
-      } else {
-        setAgencies([]);
-      }
+      const data = await agencyService.getAgencies({ limit: 100 });
+      setAgencies(data || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
-      setAgencies([]);
     }
   };
 
