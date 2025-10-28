@@ -82,13 +82,13 @@ const StaffManagementScreen = ({ navigation }) => {
 
   const loadAgencies = async () => {
     try {
-      const agenciesData = await agencyService.getAgencies({
+      const result = await agencyService.getAgencies({
         limit: 100,
         page: 1,
       });
-      console.log('Loaded agencies:', agenciesData?.length || 0, 'agencies');
-      console.log('Agencies data:', agenciesData);
-      setAgencies(agenciesData || []);
+      console.log('Loaded agencies:', result?.data?.length || 0, 'agencies');
+      console.log('Agencies data:', result?.data);
+      setAgencies(result?.data || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
       // Set empty array as fallback
