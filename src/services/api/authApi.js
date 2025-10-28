@@ -13,6 +13,11 @@ export const login = async (email, password) => {
       email,
       password,
     });
+    console.log("=== AUTH API LOGIN ===");
+    console.log("response:", response);
+    console.log("response.data:", response.data);
+    console.log("response.data.data:", response.data.data);
+    console.log("response.data keys:", Object.keys(response.data || {}));
     return response.data; 
   } catch (error) {
     console.error("Login error:", error.response?.data || error.message);

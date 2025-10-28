@@ -548,6 +548,154 @@ class StaffService {
     const phoneRegex = /^[0-9]{10,11}$/;
     return phoneRegex.test(phone.replace(/\s/g, ''));
   }
+
+  // ============ Dealer Staff APIs ============
+
+  // Create Dealer Staff account (for Dealer Manager)
+  async createDealerStaff(staffData) {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      const response = await fetch(`${API_BASE_URL}/manager/staff`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: staffData.username,
+          password: staffData.password,
+          fullname: staffData.fullname,
+          email: staffData.email,
+          phone: staffData.phone,
+          address: staffData.address || '',
+          avatar: staffData.avatar || '',
+          roleId: staffData.roleId,
+          agencyId: staffData.agencyId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data,
+        message: 'Tài khoản Dealer Staff đã được tạo thành công',
+      };
+    } catch (error) {
+      console.error('Error creating dealer staff:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Get Dealer Staff role information
+  async getDealerStaffRole() {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      const response = await fetch(`${API_BASE_URL}/manager/staff/role`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error fetching dealer staff role:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      };
+    }
+  }
+
+  // Get Dealer Staff list for specific agency
+  async getDealerStaffList(agencyId) {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      const response = await fetch(`${API_BASE_URL}/manager/staff/list/${agencyId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Dealer Staff API response:', data);
+      
+      // Parse staff list - ensure we always have an array to map
+      let staffArray = [];
+      
+      if (Array.isArray(data)) {
+        // If data is already an array
+        staffArray = data;
+      } else if (data.staff && Array.isArray(data.staff)) {
+        // If data.staff exists and is an array
+        staffArray = data.staff;
+      } else if (data.data && Array.isArray(data.data)) {
+        // If data.data exists and is an array
+        staffArray = data.data;
+      } else if (Array.isArray(data.staffList)) {
+        // If data.staffList exists and is an array
+        staffArray = data.staffList;
+      }
+      
+      console.log('Extracted staff array length:', staffArray.length);
+      
+      // Map staff array to desired format
+      const staffList = staffArray.map(staff => ({
+        id: staff.id,
+        username: staff.username,
+        fullname: staff.fullname,
+        email: staff.email || '',
+        phone: staff.phone || '',
+        address: staff.address || '',
+        avatar: staff.avatar || '',
+        agencyId: staff.agencyId,
+        isActive: staff.isActive !== undefined ? staff.isActive : true,
+        isDeleted: staff.isDeleted || false,
+        createAt: staff.createAt || staff.createdAt,
+      }));
+
+      return {
+        success: true,
+        data: staffList,
+      };
+    } catch (error) {
+      console.error('Error fetching dealer staff list:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

@@ -40,10 +40,11 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthState = async () => {
     try {
-      const [storedToken, storedRefreshToken, storedUser] = await AsyncStorage.multiGet([
+      const [storedToken, storedRefreshToken, storedUser, storedAgencyId] = await AsyncStorage.multiGet([
         "token",
         "refreshToken", 
-        "user"
+        "user",
+        "agencyId"
       ]);
       
       // Set token if available
@@ -58,13 +59,19 @@ export const AuthProvider = ({ children }) => {
       
       // Set user if available
       if (storedUser[1]) {
-        setUser(JSON.parse(storedUser[1]));
+        const userData = JSON.parse(storedUser[1]);
+        // Restore agencyId from AsyncStorage if not in userData
+        if (!userData.agencyId && storedAgencyId[1]) {
+          userData.agencyId = storedAgencyId[1];
+        }
+        setUser(userData);
       }
       
       console.log('Auth state restored:', {
         hasToken: !!storedToken[1],
         hasRefreshToken: !!storedRefreshToken[1],
-        hasUser: !!storedUser[1]
+        hasUser: !!storedUser[1],
+        hasAgencyId: !!storedAgencyId[1]
       });
     } catch (error) {
       console.error("Error checking auth state:", error);
@@ -76,13 +83,28 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const res = await loginApi(email, password);
-      console.log("Login response:", res);
+      console.log("=== LOGIN RESPONSE ===");
+      console.log("Full response:", JSON.stringify(res, null, 2));
+      console.log("res?.agencyId:", res?.agencyId);
+      console.log("res?.data?.agencyId:", res?.data?.agencyId);
+      console.log("res keys:", Object.keys(res || {}));
 
-      const accessToken = res.data?.accessToken;
-      const refreshTokenValue = res.data?.refreshToken;
-      const apiRole = res.data?.role?.[0];
+      // Try to extract from both possible structures: res.data or res directly
+      const accessToken = res?.data?.accessToken || res?.accessToken;
+      const refreshTokenValue = res?.data?.refreshToken || res?.refreshToken;
+      const apiRole = (res?.data?.role || res?.role)?.[0];
       const mappedRole = mapApiRoleToUserRole(apiRole);
-      const userId = res.data?.userId;
+      const userId = res?.data?.userId || res?.userId;
+      const agencyId = res?.data?.agencyId || res?.agencyId;
+
+      console.log("Login response:", res);
+      console.log("Extracted values:", {
+        accessToken: !!accessToken,
+        refreshToken: !!refreshTokenValue,
+        userId,
+        agencyId,
+        role: apiRole
+      });
 
       // Lưu tokens
       if (accessToken) {
@@ -95,10 +117,20 @@ export const AuthProvider = ({ children }) => {
         await AsyncStorage.setItem("refreshToken", refreshTokenValue);
       }
 
+      // Lưu agencyId nếu có (cho Dealer Manager)
+      if (agencyId) {
+        await AsyncStorage.setItem("agencyId", agencyId.toString());
+        console.log("Saved agencyId to AsyncStorage:", agencyId);
+      } else {
+        console.warn("No agencyId in login response");
+      }
+
       // Lưu user info
-      const userData = { id: userId, role: mappedRole };
+      const userData = { id: userId, role: mappedRole, agencyId: agencyId };
+      console.log("User data to save:", userData);
       setUser(userData);
       await AsyncStorage.setItem("user", JSON.stringify(userData));
+      console.log("User data saved to AsyncStorage");
 
       return { success: true, data: userData };
     } catch (err) {
@@ -122,7 +154,7 @@ export const AuthProvider = ({ children }) => {
       // Continue with local logout even if API call fails
     } finally {
       // Clear local storage and state
-      await AsyncStorage.multiRemove(["token", "refreshToken", "user"]);
+      await AsyncStorage.multiRemove(["token", "refreshToken", "user", "agencyId"]);
       setUser(null);
       setToken(null);
       setRefreshToken(null);

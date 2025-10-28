@@ -135,6 +135,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       icon: '🏭',
       onPress: () => navigation.navigate('ManufacturerDebtManagement'),
     },
+    {
+      title: 'Dealer Staff',
+      gradient: COLORS.GRADIENT.BLUE,
+      icon: '👥',
+      onPress: () => navigation.navigate('DealerStaffManagement'),
+    },
   ];
 
 
