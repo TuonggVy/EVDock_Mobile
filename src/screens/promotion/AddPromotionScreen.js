@@ -6,446 +6,466 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
-  KeyboardAvoidingView,
+  Modal,
+  ActivityIndicator,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
-import DealerAssignmentModal from '../../components/common/DealerAssignmentModal';
-import { useCustomAlert } from '../../hooks/useCustomAlert';
-import agencyService from '../../services/agencyService';
+import promotionService from '../../services/promotionService';
+import motorbikeService from '../../services/motorbikeService';
+import { Calendar } from 'lucide-react-native';
 
-const AddPromotionScreen = ({ navigation }) => {
-  const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+const AddPromotionScreen = ({ navigation, route }) => {
+  const promotion = route?.params?.promotion;
+  const isEditMode = !!promotion;
   
-  // Form state
+  const [loading, setLoading] = useState(false);
+  const [motorbikes, setMotorbikes] = useState([]);
+  const [motorbikeModalVisible, setMotorbikeModalVisible] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [selectedStartDate, setSelectedStartDate] = useState(new Date());
+  const [selectedEndDate, setSelectedEndDate] = useState(new Date());
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     description: '',
-    type: 'percentage',
+    valueType: 'PERCENT',
     value: '',
-    minOrderValue: '',
-    maxDiscount: '',
-    startDate: '',
-    endDate: '',
-    usageLimit: '',
-    applicableDealers: [],
+    startAt: '',
+    endAt: '',
+    status: 'ACTIVE',
+    motorbikeId: null,
+    motorbikeScope: 'system', // 'system' or 'specific'
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [showDealerModal, setShowDealerModal] = useState(false);
-  const [agencies, setAgencies] = useState([]);
-  const [loadingAgencies, setLoadingAgencies] = useState(false);
 
-  // Fetch agencies from API
   useEffect(() => {
-    const fetchAgencies = async () => {
-      setLoadingAgencies(true);
-      try {
-        const result = await agencyService.getAgencies({
-          limit: 100,
-          page: 1,
-        });
-        setAgencies(result?.data || []);
-      } catch (error) {
-        console.error('Error fetching agencies:', error);
-        // Don't show alert on initial load if it fails
-        // User can retry by going back and returning to the screen
-      } finally {
-        setLoadingAgencies(false);
-      }
-    };
-
-    fetchAgencies();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const promotionTypes = [
-    { id: 'percentage', name: 'Percentage', icon: '%' },
-    { id: 'fixed', name: 'Fixed Amount', icon: '$' },
-  ];
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    loadMotorbikes();
     
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
+    if (isEditMode && promotion) {
+      // Pre-fill form with promotion data
+      setFormData({
+        name: promotion.name || '',
+        description: promotion.description || '',
+        valueType: promotion.valueType || 'PERCENT',
+        value: promotion.value?.toString() || '',
+        startAt: promotion.startAt || '',
+        endAt: promotion.endAt || '',
+        status: promotion.status || 'ACTIVE',
+        motorbikeId: promotion.motorbikeId || null,
+        motorbikeScope: promotion.motorbikeId ? 'specific' : 'system',
+      });
+      
+      if (promotion.startAt) {
+        setSelectedStartDate(new Date(promotion.startAt));
+      }
+      if (promotion.endAt) {
+        setSelectedEndDate(new Date(promotion.endAt));
+      }
+    } else {
+      // Set default dates for new promotion
+      const today = new Date();
+      setSelectedStartDate(today);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setSelectedEndDate(tomorrow);
+      setFormData(prev => ({
         ...prev,
-        [field]: null
+        startAt: formatDate(today),
+        endAt: formatDate(tomorrow),
       }));
     }
+  }, [promotion]);
+
+  const loadMotorbikes = async () => {
+    try {
+      const response = await motorbikeService.getAllMotorbikes({ limit: 100 });
+      if (response.success && Array.isArray(response.data)) {
+        setMotorbikes(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading motorbikes:', error);
+    }
   };
 
-  const handleDealerToggle = (dealerId) => {
+  const formatDate = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString();
+  };
+
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleStartDateChange = (event, selectedDate) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setSelectedStartDate(selectedDate);
+      setFormData(prev => ({ ...prev, startAt: formatDate(selectedDate) }));
+    }
+  };
+
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setSelectedEndDate(selectedDate);
+      setFormData(prev => ({ ...prev, endAt: formatDate(selectedDate) }));
+    }
+  };
+
+  const handleScopeChange = (scope) => {
     setFormData(prev => ({
       ...prev,
-      applicableDealers: prev.applicableDealers.includes(dealerId)
-        ? prev.applicableDealers.filter(id => id !== dealerId)
-        : [...prev.applicableDealers, dealerId]
+      motorbikeScope: scope,
+      motorbikeId: scope === 'system' ? null : prev.motorbikeId,
     }));
   };
 
-  const handleSelectAllDealers = () => {
-    setFormData(prev => ({
-      ...prev,
-      applicableDealers: agencies.map(agency => agency.id)
-    }));
-  };
-
-  const handleClearAllDealers = () => {
-    setFormData(prev => ({
-      ...prev,
-      applicableDealers: []
-    }));
-  };
-
-  const handleDealerModalOpen = () => {
-    setShowDealerModal(true);
-  };
-
-  const handleDealerModalClose = () => {
-    setShowDealerModal(false);
-  };
-
-  const handleDealersChange = (selectedDealerIds) => {
-    setFormData(prev => ({
-      ...prev,
-      applicableDealers: selectedDealerIds
-    }));
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.code.trim()) {
-      newErrors.code = 'Promotion code is required';
-    } else if (formData.code.length < 3) {
-      newErrors.code = 'Code must be at least 3 characters';
-    }
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Promotion name is required';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-
-    if (!formData.value.trim()) {
-      newErrors.value = 'Discount value is required';
-    } else if (isNaN(Number(formData.value)) || Number(formData.value) <= 0) {
-      newErrors.value = 'Please enter a valid discount value';
-    }
-
-    if (!formData.minOrderValue.trim()) {
-      newErrors.minOrderValue = 'Minimum order value is required';
-    } else if (isNaN(Number(formData.minOrderValue)) || Number(formData.minOrderValue) < 0) {
-      newErrors.minOrderValue = 'Please enter a valid minimum order value';
-    }
-
-    if (formData.maxDiscount && (isNaN(Number(formData.maxDiscount)) || Number(formData.maxDiscount) < 0)) {
-      newErrors.maxDiscount = 'Please enter a valid maximum discount';
-    }
-
-    if (!formData.startDate.trim()) {
-      newErrors.startDate = 'Start date is required';
-    }
-
-    if (!formData.endDate.trim()) {
-      newErrors.endDate = 'End date is required';
-    } else if (formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      newErrors.endDate = 'End date must be after start date';
-    }
-
-    if (!formData.usageLimit.trim()) {
-      newErrors.usageLimit = 'Usage limit is required';
-    } else if (isNaN(Number(formData.usageLimit)) || Number(formData.usageLimit) <= 0) {
-      newErrors.usageLimit = 'Please enter a valid usage limit';
-    }
-
-    if (formData.applicableDealers.length === 0) {
-      newErrors.applicableDealers = 'Please select at least one agency';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleMotorbikeSelect = (motorbike) => {
+    setFormData(prev => ({ ...prev, motorbikeId: motorbike.id }));
+    setMotorbikeModalVisible(false);
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      showInfo('Validation Error', 'Please fill in all required fields correctly');
+    setErrors({});
+    
+    const submissionData = {
+      ...formData,
+      value: parseFloat(formData.value),
+      motorbikeId: formData.motorbikeScope === 'system' ? null : formData.motorbikeId,
+    };
+
+    const validation = promotionService.validatePromotion(submissionData);
+    
+    if (!validation.isValid) {
+      setErrors(validation.errors);
       return;
     }
 
     setLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      // const response = await promotionService.createPromotion({
-      //   ...formData,
-      //   value: Number(formData.value),
-      //   minOrderValue: Number(formData.minOrderValue),
-      //   maxDiscount: formData.maxDiscount ? Number(formData.maxDiscount) : null,
-      //   usageLimit: Number(formData.usageLimit),
-      //   status: 'scheduled'
-      // });
+      let response;
+      if (isEditMode) {
+        response = await promotionService.updatePromotion(promotion.id, submissionData);
+      } else {
+        response = await promotionService.createPromotion(submissionData);
+      }
 
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      showInfo('Success', 'Promotion created successfully!');
-      
-      // Navigate back after a short delay
-      setTimeout(() => {
-        navigation.goBack();
-      }, 1500);
-      
+      if (response.success) {
+        setAlertConfig({
+          title: 'Success',
+          message: isEditMode ? 'Promotion updated successfully!' : 'Promotion created successfully!',
+          type: 'success'
+        });
+        setShowAlert(true);
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
+      } else {
+        const errorMessage = typeof response.error === 'string' 
+          ? response.error 
+          : (response.error?.message || JSON.stringify(response.error) || 'Failed to save promotion');
+        setAlertConfig({
+          title: 'Error',
+          message: errorMessage,
+          type: 'error'
+        });
+        setShowAlert(true);
+      }
     } catch (error) {
-      console.error('Error creating promotion:', error);
-      showInfo('Error', 'Failed to create promotion. Please try again.');
+      console.error('Error saving promotion:', error);
+      setAlertConfig({
+        title: 'Error',
+        message: 'An unexpected error occurred',
+        type: 'error'
+      });
+      setShowAlert(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderInput = (label, field, value, placeholder, keyboardType = 'default', multiline = false) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label} *</Text>
-      <TextInput
-        style={[
-          styles.textInput,
-          multiline && styles.textInputMultiline,
-          errors[field] && styles.textInputError
-        ]}
-        value={value}
-        onChangeText={(text) => handleInputChange(field, text)}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.TEXT.SECONDARY}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        numberOfLines={multiline ? 3 : 1}
-      />
-      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
-    </View>
-  );
-
-  const renderDateInput = (label, field, value) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label} *</Text>
-      <TouchableOpacity
-        style={[
-          styles.dateInput,
-          errors[field] && styles.textInputError
-        ]}
-        onPress={() => {
-          // TODO: Implement date picker
-          showInfo('Date Picker', 'Date picker will be implemented');
-        }}
-      >
-        <Text style={[styles.dateInputText, !value && styles.placeholderText]}>
-          {value || 'Select date'}
-        </Text>
-        <Text style={styles.dateIcon}>📅</Text>
-      </TouchableOpacity>
-      {errors[field] && <Text style={styles.errorText}>{errors[field]}</Text>}
-    </View>
-  );
+  const selectedMotorbike = motorbikes.find(m => m.id === formData.motorbikeId);
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <View style={styles.headerTitle}>
-            <Text style={styles.headerTitleText}>Create Promotion</Text>
-            <Text style={styles.headerSubtitle}>Set up a new promotional campaign</Text>
-          </View>
-          <View style={styles.placeholder} />
-        </View>
-      </View>
-
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Basic Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Basic Information</Text>
-          
-          {renderInput('Promotion Code', 'code', formData.code, 'e.g., SUMMER2024')}
-          {renderInput('Promotion Name', 'name', formData.name, 'e.g., Summer Sale 2024')}
-          {renderInput('Description', 'description', formData.description, 'Describe the promotion...', 'default', true)}
-        </View>
-
-        {/* Discount Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Discount Settings</Text>
-          
-          {/* Promotion Type */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Discount Type *</Text>
-            <View style={styles.typeContainer}>
-              {promotionTypes.map((type) => (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[
-                    styles.typeOption,
-                    formData.type === type.id && styles.selectedTypeOption
-                  ]}
-                  onPress={() => handleInputChange('type', type.id)}
-                >
-                  <Text style={styles.typeIcon}>{type.icon}</Text>
-                  <Text style={[
-                    styles.typeText,
-                    formData.type === type.id && styles.selectedTypeText
-                  ]}>
-                    {type.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {renderInput(
-            formData.type === 'percentage' ? 'Discount Percentage (%)' : 'Discount Amount ($)',
-            'value',
-            formData.value,
-            formData.type === 'percentage' ? 'e.g., 15' : 'e.g., 5000',
-            'numeric'
-          )}
-          {renderInput('Minimum Order Value ($)', 'minOrderValue', formData.minOrderValue, 'e.g., 50000', 'numeric')}
-          {renderInput('Maximum Discount ($)', 'maxDiscount', formData.maxDiscount, 'e.g., 10000 (optional)', 'numeric')}
-        </View>
-
-        {/* Validity Period */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Validity Period</Text>
-          
-          {renderDateInput('Start Date', 'startDate', formData.startDate)}
-          {renderDateInput('End Date', 'endDate', formData.endDate)}
-          {renderInput('Usage Limit', 'usageLimit', formData.usageLimit, 'e.g., 1000', 'numeric')}
-        </View>
-
-        {/* Dealer Assignment */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Agency Assignment</Text>
-            <Text style={styles.sectionSubtitle}>
-              Select which agencies this promotion applies to
-            </Text>
-          </View>
-          
-          {/* Dealer Assignment Button */}
-          <TouchableOpacity
-            style={styles.dealerAssignmentButton}
-            onPress={handleDealerModalOpen}
-            activeOpacity={0.7}
-          >
-            <View style={styles.dealerAssignmentContent}>
-              <View style={styles.dealerAssignmentInfo}>
-                <Text style={styles.dealerAssignmentTitle}>Agency Assignment</Text>
-                <Text style={styles.dealerAssignmentSubtitle}>
-                  {formData.applicableDealers.length} of {agencies.length} agencies selected
-                </Text>
-                {formData.applicableDealers.length > 0 && (
-                  <View style={styles.selectedDealersPreview}>
-                    {formData.applicableDealers.slice(0, 3).map((agencyId, index) => {
-                      const agency = agencies.find(a => a.id === agencyId);
-                      return (
-                        <View key={agencyId} style={styles.dealerChip}>
-                          <Text style={styles.dealerChipText}>{agency?.name}</Text>
-                        </View>
-                      );
-                    })}
-                    {formData.applicableDealers.length > 3 && (
-                      <View style={styles.dealerChip}>
-                        <Text style={styles.dealerChipText}>
-                          +{formData.applicableDealers.length - 3} more
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
-              <View style={styles.dealerAssignmentIcon}>
-                <Text style={styles.dealerAssignmentIconText}>›</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          
-          {errors.applicableDealers && (
-            <Text style={styles.errorText}>{errors.applicableDealers}</Text>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : (COLORS.GRADIENT.GREEN || ['#4CAF50', '#66BB6A'])}
-              style={styles.submitGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.submitButtonText}>
-                {loading ? 'Creating...' : 'Create Promotion'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
+    <View style={styles.container}>
       <CustomAlert
-        visible={alertConfig.visible}
+        visible={showAlert}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        showCancel={alertConfig.showCancel}
-        confirmText={alertConfig.confirmText}
-        cancelText={alertConfig.cancelText}
-        onConfirm={alertConfig.onConfirm}
-        onCancel={alertConfig.onCancel}
-        onClose={hideAlert}
+        onClose={() => setShowAlert(false)}
       />
 
-      <DealerAssignmentModal
-        visible={showDealerModal}
-        onClose={handleDealerModalClose}
-        dealers={agencies}
-        selectedDealers={formData.applicableDealers}
-        onDealersChange={handleDealersChange}
-        title="Agency Assignment"
-      />
-    </KeyboardAvoidingView>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>← Cancel</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Promotion' : 'Add Promotion'}</Text>
+        <TouchableOpacity onPress={handleSubmit} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+          ) : (
+            <Text style={styles.saveButton}>Save</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Name */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Promotion Name *</Text>
+          <TextInput
+            style={[styles.input, errors.name && styles.inputError]}
+            value={formData.name}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+            placeholder="Enter promotion name"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+          />
+          {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+        </View>
+
+        {/* Description */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Description *</Text>
+          <TextInput
+            style={[styles.textArea, errors.description && styles.inputError]}
+            value={formData.description}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+            placeholder="Enter promotion description"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            multiline
+            numberOfLines={4}
+          />
+          {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+        </View>
+
+        {/* Value Type */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Discount Type *</Text>
+          <View style={styles.typeButtons}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                formData.valueType === 'PERCENT' && styles.typeButtonActive
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, valueType: 'PERCENT' }))}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                formData.valueType === 'PERCENT' && styles.typeButtonTextActive
+              ]}>
+                Percentage
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                formData.valueType === 'FIXED' && styles.typeButtonActive
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, valueType: 'FIXED' }))}
+            >
+              <Text style={[
+                styles.typeButtonText,
+                formData.valueType === 'FIXED' && styles.typeButtonTextActive
+              ]}>
+                Fixed Amount
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Value */}
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Discount Value * {formData.valueType === 'PERCENT' ? '(0-100)' : '(VND)'}
+          </Text>
+          <TextInput
+            style={[styles.input, errors.value && styles.inputError]}
+            value={formData.value}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
+            placeholder={formData.valueType === 'PERCENT' ? 'e.g., 10' : 'e.g., 50000'}
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            keyboardType="numeric"
+          />
+          {errors.value && <Text style={styles.errorText}>{errors.value}</Text>}
+        </View>
+
+        {/* Start Date */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Start Date *</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowStartDatePicker(true)}
+          >
+            <Text style={styles.dateButtonText}>
+              {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Select start date'}
+            </Text>
+            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
+          </TouchableOpacity>
+          {showStartDatePicker && (
+            <DateTimePicker
+              value={selectedStartDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleStartDateChange}
+            />
+          )}
+        </View>
+
+        {/* End Date */}
+        <View style={styles.section}>
+          <Text style={styles.label}>End Date *</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowEndDatePicker(true)}
+          >
+            <Text style={styles.dateButtonText}>
+              {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Select end date'}
+            </Text>
+            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
+          </TouchableOpacity>
+          {showEndDatePicker && (
+            <DateTimePicker
+              value={selectedEndDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleEndDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+        </View>
+
+        {/* Scope */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Apply To *</Text>
+          <View style={styles.scopeButtons}>
+            <TouchableOpacity
+              style={[
+                styles.scopeButton,
+                formData.motorbikeScope === 'system' && styles.scopeButtonActive
+              ]}
+              onPress={() => handleScopeChange('system')}
+            >
+              <Text style={[
+                styles.scopeButtonText,
+                formData.motorbikeScope === 'system' && styles.scopeButtonTextActive
+              ]}>
+                System-wide
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.scopeButton,
+                formData.motorbikeScope === 'specific' && styles.scopeButtonActive
+              ]}
+              onPress={() => handleScopeChange('specific')}
+            >
+              <Text style={[
+                styles.scopeButtonText,
+                formData.motorbikeScope === 'specific' && styles.scopeButtonTextActive
+              ]}>
+                Specific Motorbike
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Motorbike Selection */}
+        {formData.motorbikeScope === 'specific' && (
+          <View style={styles.section}>
+            <Text style={styles.label}>Select Motorbike *</Text>
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={() => setMotorbikeModalVisible(true)}
+            >
+              <Text style={styles.selectButtonText}>
+                {selectedMotorbike ? selectedMotorbike.name : 'Select motorbike'}
+              </Text>
+              <Text style={styles.selectIcon}>▼</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Status */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Status *</Text>
+          <View style={styles.statusButtons}>
+            <TouchableOpacity
+              style={[
+                styles.statusButton,
+                formData.status === 'ACTIVE' && [styles.statusButtonActive, { backgroundColor: COLORS.SUCCESS }]
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, status: 'ACTIVE' }))}
+            >
+              <Text style={[
+                styles.statusButtonText,
+                formData.status === 'ACTIVE' && styles.statusButtonTextActive
+              ]}>
+                Active
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.statusButton,
+                formData.status === 'INACTIVE' && [styles.statusButtonActive, { backgroundColor: COLORS.TEXT.SECONDARY }]
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, status: 'INACTIVE' }))}
+            >
+              <Text style={[
+                styles.statusButtonText,
+                formData.status === 'INACTIVE' && styles.statusButtonTextActive
+              ]}>
+                Inactive
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Motorbike Selection Modal */}
+      <Modal
+        visible={motorbikeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setMotorbikeModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Motorbike</Text>
+              <TouchableOpacity onPress={() => setMotorbikeModalVisible(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {motorbikes.map((motorbike) => (
+                <TouchableOpacity
+                  key={motorbike.id}
+                  style={styles.modalItem}
+                  onPress={() => handleMotorbikeSelect(motorbike)}
+                >
+                  <Text style={styles.modalItemText}>{motorbike.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -454,98 +474,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
-  
-  // Header styles
   header: {
-    paddingTop: SIZES.PADDING.XXXLARGE,
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.LARGE,
-  },
-  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.XXXLARGE,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   headerTitle: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitleText: {
     fontSize: SIZES.FONT.HEADER,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
-  headerSubtitle: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginTop: 2,
+  saveButton: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
   },
-  placeholder: {
-    width: 40,
-  },
-
-  // Content
   content: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
-    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    padding: SIZES.PADDING.LARGE,
   },
-  scrollContent: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.XXXLARGE,
-  },
-
-  // Sections
   section: {
-    marginBottom: SIZES.PADDING.XLARGE,
-  },
-  sectionTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.LARGE,
   },
-
-  // Form inputs
-  inputGroup: {
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  inputLabel: {
+  label: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
+    color: COLORS.TEXT.WHITE,
     marginBottom: SIZES.PADDING.SMALL,
+    fontWeight: '600',
   },
-  textInput: {
+  input: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
-  textInputMultiline: {
-    height: 80,
+  textArea: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
-  textInputError: {
+  inputError: {
+    borderWidth: 1,
     borderColor: COLORS.ERROR,
   },
   errorText: {
@@ -553,174 +535,141 @@ const styles = StyleSheet.create({
     color: COLORS.ERROR,
     marginTop: SIZES.PADDING.XSMALL,
   },
-
-  // Date input
-  dateInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+  typeButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateInputText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  placeholderText: {
-    color: COLORS.TEXT.SECONDARY,
-  },
-  dateIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-  },
-
-  // Type selection
-  typeContainer: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
-  },
-  typeOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    justifyContent: 'center',
-  },
-  selectedTypeOption: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
-  },
-  typeIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    marginRight: SIZES.PADDING.XSMALL,
-  },
-  typeText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '500',
-  },
-  selectedTypeText: {
-    color: COLORS.TEXT.WHITE,
-  },
-
-  // Section header
-  sectionHeader: {
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  sectionSubtitle: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginTop: 4,
-  },
-
-
-  // Action buttons
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SIZES.PADDING.XLARGE,
     gap: SIZES.PADDING.MEDIUM,
   },
-  cancelButton: {
+  typeButton: {
     flex: 1,
     backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cancelButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  submitButton: {
-    flex: 2,
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitGradient: {
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-  },
-
-  // Dealer Assignment Button Styles
-  dealerAssignmentButton: {
-    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
   },
-  dealerAssignmentContent: {
+  typeButtonActive: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  typeButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  typeButtonTextActive: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
   },
-  dealerAssignmentInfo: {
-    flex: 1,
-  },
-  dealerAssignmentTitle: {
+  dateButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
-    marginBottom: 4,
   },
-  dealerAssignmentSubtitle: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.SMALL,
+  dateIcon: {
+    fontSize: SIZES.FONT.LARGE,
   },
-  selectedDealersPreview: {
+  scopeButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZES.PADDING.XSMALL,
+    gap: SIZES.PADDING.MEDIUM,
   },
-  dealerChip: {
-    backgroundColor: COLORS.PRIMARY + '20',
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: SIZES.PADDING.XSMALL,
-    borderRadius: SIZES.RADIUS.SMALL,
-    borderWidth: 1,
-    borderColor: COLORS.PRIMARY + '40',
-  },
-  dealerChipText: {
-    fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.PRIMARY,
-    fontWeight: '500',
-  },
-  dealerAssignmentIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.BACKGROUND,
-    justifyContent: 'center',
+  scopeButton: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.MEDIUM,
   },
-  dealerAssignmentIconText: {
+  scopeButtonActive: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  scopeButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  scopeButtonTextActive: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+  },
+  selectButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  selectIcon: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  statusButtons: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  statusButton: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  statusButtonActive: {
+    opacity: 0.8,
+  },
+  statusButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  statusButtonTextActive: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XLARGE,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SIZES.PADDING.LARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  modalClose: {
     fontSize: SIZES.FONT.LARGE,
     color: COLORS.TEXT.SECONDARY,
-    fontWeight: 'bold',
+  },
+  modalItem: {
+    padding: SIZES.PADDING.LARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  modalItemText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
   },
 });
 
 export default AddPromotionScreen;
+

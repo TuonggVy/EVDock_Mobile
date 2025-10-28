@@ -22,7 +22,6 @@ import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
 import CustomerManagementScreen from '../screens/customer/CustomerManagementScreen';
-import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
 import OrderManagementScreen from '../screens/order/OrderManagementScreen';
 import AllocationManagementScreen from '../screens/allocation/AllocationManagementScreen';
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
@@ -36,13 +35,6 @@ import AddProductScreen from '../screens/product/AddProductScreen';
 import EditProductScreen from '../screens/product/EditProductScreen';
 import ProductDetailScreen from '../screens/product/ProductDetailScreen';
 import ProductManagementScreen from '../screens/product/ProductManagementScreen';
-import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
-import EditPromotionScreen from '../screens/promotion/EditPromotionScreen';
-import PromotionDetailScreen from '../screens/promotion/PromotionDetailScreen';
-import DealerPromotionManagementScreen from '../screens/promotion/DealerPromotionManagementScreen';
-import AddDealerPromotionScreen from '../screens/promotion/AddDealerPromotionScreen';
-import EditDealerPromotionScreen from '../screens/promotion/EditDealerPromotionScreen';
-import DealerPromotionDetailScreen from '../screens/promotion/DealerPromotionDetailScreen';
 import CustomerDebtManagementScreen from '../screens/debt/CustomerDebtManagementScreen';
 import ManufacturerDebtManagementScreen from '../screens/debt/ManufacturerDebtManagementScreen';
 import InstallmentManagementScreen from '../screens/installment/InstallmentManagementScreen';
@@ -60,6 +52,8 @@ import EditWarehouseScreen from '../screens/warehouse/EditWarehouseScreen';
 import DiscountManagementScreen from '../screens/discount/DiscountManagementScreen';
 import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
 import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
+import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
+import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -185,16 +179,6 @@ const AppNavigator = () => {
           options={{ headerShown: false }}
         />
             <Stack.Screen
-              name="B2BPromotionManagement"
-              component={PromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="PromotionManagement"
-              component={PromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
               name="OrderManagement"
               component={OrderManagementScreen}
               options={{ headerShown: false }}
@@ -290,41 +274,6 @@ const AppNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="B2CPromotionManagement"
-              component={DealerPromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="AddB2BPromotion"
-              component={AddPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="EditB2BPromotion"
-              component={EditPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="B2BPromotionDetail"
-              component={PromotionDetailScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="AddB2CPromotion"
-              component={AddDealerPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="EditB2CPromotion"
-              component={EditDealerPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="B2CPromotionDetail"
-              component={DealerPromotionDetailScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
               name="CustomerDebtManagement"
               component={CustomerDebtManagementScreen}
               options={{ headerShown: false }}
@@ -377,6 +326,16 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="EditDiscount" 
               component={EditDiscountScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="PromotionManagement" 
+              component={PromotionManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AddPromotion" 
+              component={AddPromotionScreen} 
               options={{ headerShown: false }}
             />
           </>
