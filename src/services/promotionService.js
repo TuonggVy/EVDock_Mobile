@@ -1,470 +1,231 @@
-// Promotion Service - Service for managing promotions
-// This service handles both mock data and real API calls for backend integration
+// Promotion Service - Real API integration for promotion management
+// Used by EVM Admin to manage promotions for motorbikes
 
-import { API_BASE_URL } from '../config/api';
+import axiosInstance from './api/axiosInstance';
 
-// Mock promotion data - will be replaced with API calls
-const MOCK_PROMOTIONS = [
-  {
-    id: '1',
-    code: 'SUMMER2024',
-    name: 'Summer Sale 2024',
-    description: 'Giảm giá mùa hè cho tất cả xe điện',
-    discountType: 'percentage', // 'percentage' or 'fixed'
-    discountValue: 15,
-    minOrderAmount: 1000000,
-    maxDiscount: 5000000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 100,
-    usedCount: 23,
-    isActive: true,
-    createdAt: '2024-05-15',
-  },
-  {
-    id: '2',
-    code: 'NEWCUSTOMER',
-    name: 'Khách hàng mới',
-    description: 'Ưu đãi đặc biệt cho khách hàng lần đầu',
-    discountType: 'fixed',
-    discountValue: 2000000,
-    minOrderAmount: 2000000,
-    maxDiscount: 2000000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 50,
-    usedCount: 12,
-    isActive: true,
-    createdAt: '2024-01-01',
-  },
-  {
-    id: '3',
-    code: 'VIP2024',
-    name: 'VIP Customer',
-    description: 'Dành cho khách hàng VIP',
-    discountType: 'percentage',
-    discountValue: 20,
-    minOrderAmount: 5000000,
-    maxDiscount: 10000000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 20,
-    usedCount: 8,
-    isActive: true,
-    createdAt: '2024-02-15',
-  },
-  {
-    id: '4',
-    code: 'BULK2024',
-    name: 'Mua số lượng lớn',
-    description: 'Giảm giá cho đơn hàng từ 5 xe trở lên',
-    discountType: 'percentage',
-    discountValue: 12,
-    minOrderAmount: 10000000,
-    maxDiscount: 8000000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 30,
-    usedCount: 5,
-    isActive: true,
-    createdAt: '2024-01-01',
-  },
-  {
-    id: '5',
-    code: 'EARLYBIRD',
-    name: 'Đặt hàng sớm',
-    description: 'Giảm giá cho khách hàng đặt hàng trước 30 ngày',
-    discountType: 'fixed',
-    discountValue: 1500000,
-    minOrderAmount: 3000000,
-    maxDiscount: 1500000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 100,
-    usedCount: 15,
-    isActive: true,
-    createdAt: '2024-01-01',
-  },
-  {
-    id: '6',
-    code: 'TEST50',
-    name: 'Test 50%',
-    description: 'Mã test giảm 50%',
-    discountType: 'percentage',
-    discountValue: 50,
-    minOrderAmount: 0,
-    maxDiscount: 100000000,
-    validFrom: '2024-01-01',
-    validTo: '2024-12-31',
-    usageLimit: 1000,
-    usedCount: 0,
-    isActive: true,
-    createdAt: '2024-01-01',
-  },
-];
+const API_BASE_URL = '';
 
-// Service functions - designed for easy backend integration
-export const promotionService = {
-  // Get all active promotions
-  async getActivePromotions() {
+class PromotionService {
+  // Get all promotions
+  async getAllPromotions(page = 1, limit = 10) {
     try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions/active`);
-      // const data = await response.json();
-      // return data;
-      
-      // Mock implementation for now
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const response = await axiosInstance.get(`${API_BASE_URL}/promotion/list`, {
+        params: { page, limit }
+      });
       return {
         success: true,
-        data: MOCK_PROMOTIONS.filter(promo => promo.isActive),
-        total: MOCK_PROMOTIONS.filter(promo => promo.isActive).length,
+        data: response.data.data || [],
+        pagination: response.data.paginationInfo,
+        message: response.data.message || 'Get promotion list successfully!'
       };
     } catch (error) {
-      console.error('Error fetching active promotions:', error);
+      console.error('Error fetching promotions:', error);
       return {
         success: false,
-        error: 'Failed to fetch promotions',
+        error: error.response?.data?.message || 'Failed to fetch promotions',
         data: [],
-        total: 0,
+        message: 'Failed to fetch promotions'
       };
     }
-  },
+  }
 
-  // Get all promotions (for management)
-  async getAllPromotions() {
+  // Get promotion detail by ID
+  async getPromotionDetail(promotionId) {
     try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions`);
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const response = await axiosInstance.get(`${API_BASE_URL}/promotion/detail/${promotionId}`);
       return {
         success: true,
-        data: MOCK_PROMOTIONS,
-        total: MOCK_PROMOTIONS.length,
+        data: response.data.data,
+        message: response.data.message || 'Get promotion detail successfully!'
       };
     } catch (error) {
-      console.error('Error fetching all promotions:', error);
+      console.error('Error fetching promotion detail:', error);
       return {
         success: false,
-        error: 'Failed to fetch promotions',
-        data: [],
-        total: 0,
+        error: error.response?.data?.message || 'Failed to fetch promotion detail',
+        message: 'Failed to fetch promotion detail'
       };
     }
-  },
+  }
 
-  // Get promotion by code
-  async getPromotionByCode(code) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const promotion = MOCK_PROMOTIONS.find(p => p.code.toLowerCase() === code.toLowerCase());
-    if (!promotion) {
-      return {
-        success: false,
-        error: 'Promotion not found',
-      };
-    }
-
-    return {
-      success: true,
-      data: promotion,
-    };
-  },
-
-  // Validate promotion code
-  async validatePromotionCode(code, orderAmount = 0) {
-    try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions/validate`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ code, orderAmount }),
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      const safeCode = String(code || '').trim();
-      const amount = Number(orderAmount) || 0;
-
-      const promotion = MOCK_PROMOTIONS.find(p => 
-        p.code.toLowerCase() === safeCode.toLowerCase() && p.isActive
-      );
-      
-      if (!promotion) {
-        return {
-          success: false,
-          error: 'Mã khuyến mãi không tồn tại hoặc đã hết hạn',
-        };
-      }
-
-      // Check if promotion is still valid
-      const now = new Date();
-      const validFrom = new Date(promotion.validFrom);
-      const validTo = new Date(promotion.validTo);
-      
-      if (now < validFrom || now > validTo) {
-        return {
-          success: false,
-          error: 'Mã khuyến mãi đã hết hạn',
-        };
-      }
-
-      // Check usage limit
-      if (promotion.usedCount >= promotion.usageLimit) {
-        return {
-          success: false,
-          error: 'Mã khuyến mãi đã hết lượt sử dụng',
-        };
-      }
-
-      // Check minimum order amount
-      if (amount < promotion.minOrderAmount) {
-        return {
-          success: false,
-          error: `Đơn hàng tối thiểu ${formatPrice(promotion.minOrderAmount)} để sử dụng mã này`,
-        };
-      }
-
-      return {
-        success: true,
-        data: promotion,
-      };
-    } catch (error) {
-      console.error('Error validating promotion code:', error);
-      return {
-        success: false,
-        error: 'Lỗi khi kiểm tra mã khuyến mãi',
-      };
-    }
-  },
-
-  // Calculate discount amount
-  calculateDiscount(promotion, orderAmount) {
-    if (!promotion || !promotion.isActive) {
-      return 0;
-    }
-
-    let discountAmount = 0;
-
-    if (promotion.discountType === 'percentage') {
-      discountAmount = (orderAmount * promotion.discountValue) / 100;
-    } else if (promotion.discountType === 'fixed') {
-      discountAmount = promotion.discountValue;
-    }
-
-    // Apply maximum discount limit
-    if (promotion.maxDiscount && discountAmount > promotion.maxDiscount) {
-      discountAmount = promotion.maxDiscount;
-    }
-
-    return Math.round(discountAmount);
-  },
-
-  // Use promotion (increment usage count) - for quotation creation
-  async usePromotion(promotionId, quotationId) {
-    try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions/${promotionId}/use`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ quotationId }),
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const promotionIndex = MOCK_PROMOTIONS.findIndex(p => p.id === promotionId);
-      if (promotionIndex === -1) {
-        return {
-          success: false,
-          error: 'Promotion not found',
-        };
-      }
-
-      MOCK_PROMOTIONS[promotionIndex].usedCount += 1;
-
-      return {
-        success: true,
-        data: MOCK_PROMOTIONS[promotionIndex],
-      };
-    } catch (error) {
-      console.error('Error using promotion:', error);
-      return {
-        success: false,
-        error: 'Failed to use promotion',
-      };
-    }
-  },
-
-  // Create new promotion (for Dealer Manager)
+  // Create new promotion
   async createPromotion(promotionData) {
     try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(promotionData),
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const newPromotion = {
-        ...promotionData,
-        id: Date.now().toString(),
-        usedCount: 0,
-        createdAt: new Date().toISOString().split('T')[0],
+      // Use valueType as returned by the API (camelCase)
+      const requestData = {
+        name: promotionData.name,
+        description: promotionData.description,
+        valueType: promotionData.valueType, // PERCENT or FIXED
+        value: promotionData.value,
+        startAt: promotionData.startAt,
+        endAt: promotionData.endAt,
+        status: promotionData.status, // ACTIVE or INACTIVE
       };
-      
-      MOCK_PROMOTIONS.unshift(newPromotion);
-      
+
+      // Only add motorbikeId if it's not null/undefined (for specific motorbike promotions)
+      if (promotionData.motorbikeId) {
+        requestData.motorbikeId = promotionData.motorbikeId;
+      }
+
+      console.log('Creating promotion with data:', JSON.stringify(requestData, null, 2));
+
+      const response = await axiosInstance.post(`${API_BASE_URL}/promotion`, requestData);
       return {
         success: true,
-        data: newPromotion,
+        data: response.data.data,
+        message: response.data.message || 'Create promotion successfully!'
       };
     } catch (error) {
       console.error('Error creating promotion:', error);
+      console.error('Error details:', error.response?.data);
       return {
         success: false,
-        error: 'Failed to create promotion',
+        error: error.response?.data?.message || error.message || 'Failed to create promotion',
+        errorDetails: error.response?.data,
+        message: 'Failed to create promotion'
       };
     }
-  },
+  }
 
-  // Update promotion (for Dealer Manager)
+  // Update promotion
   async updatePromotion(promotionId, promotionData) {
     try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions/${promotionId}`, {
-      //   method: 'PUT',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(promotionData),
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const promotionIndex = MOCK_PROMOTIONS.findIndex(p => p.id === promotionId);
-      if (promotionIndex === -1) {
-        return {
-          success: false,
-          error: 'Promotion not found',
-        };
+      // Use valueType as returned by the API (camelCase)
+      const requestData = {
+        name: promotionData.name,
+        description: promotionData.description,
+        valueType: promotionData.valueType,
+        value: promotionData.value,
+        startAt: promotionData.startAt,
+        endAt: promotionData.endAt,
+        status: promotionData.status,
+      };
+
+      // Only add motorbikeId if it's not null/undefined (for specific motorbike promotions)
+      if (promotionData.motorbikeId) {
+        requestData.motorbikeId = promotionData.motorbikeId;
       }
 
-      MOCK_PROMOTIONS[promotionIndex] = {
-        ...MOCK_PROMOTIONS[promotionIndex],
-        ...promotionData,
-        id: promotionId, // Keep original ID
-      };
-      
+      console.log('Updating promotion with data:', JSON.stringify(requestData, null, 2));
+
+      const response = await axiosInstance.patch(`${API_BASE_URL}/promotion/${promotionId}`, requestData);
       return {
         success: true,
-        data: MOCK_PROMOTIONS[promotionIndex],
+        data: response.data.data,
+        message: response.data.message || 'Update promotion successfully!'
       };
     } catch (error) {
       console.error('Error updating promotion:', error);
+      console.error('Error details:', error.response?.data);
       return {
         success: false,
-        error: 'Failed to update promotion',
+        error: error.response?.data?.message || error.message || 'Failed to update promotion',
+        errorDetails: error.response?.data,
+        message: 'Failed to update promotion'
       };
     }
-  },
+  }
 
-  // Delete promotion (for Dealer Manager)
+  // Delete promotion
   async deletePromotion(promotionId) {
     try {
-      // TODO: Replace with real API call when backend is ready
-      // const response = await fetch(`${API_BASE_URL}/promotions/${promotionId}`, {
-      //   method: 'DELETE',
-      // });
-      // const data = await response.json();
-      // return data;
-      
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const promotionIndex = MOCK_PROMOTIONS.findIndex(p => p.id === promotionId);
-      if (promotionIndex === -1) {
-        return {
-          success: false,
-          error: 'Promotion not found',
-        };
-      }
-
-      MOCK_PROMOTIONS.splice(promotionIndex, 1);
-      
+      const response = await axiosInstance.delete(`${API_BASE_URL}/promotion/${promotionId}`);
       return {
         success: true,
-        message: 'Promotion deleted successfully',
+        data: response.data.data,
+        message: response.data.message || 'Delete promotion successfully!'
       };
     } catch (error) {
       console.error('Error deleting promotion:', error);
       return {
         success: false,
-        error: 'Failed to delete promotion',
+        error: error.response?.data?.message || 'Failed to delete promotion',
+        message: 'Failed to delete promotion'
       };
     }
-  },
-
-  // Search promotions
-  async searchPromotions(query) {
-    await new Promise(resolve => setTimeout(resolve, 250));
-    
-    const filteredPromotions = MOCK_PROMOTIONS.filter(promo => 
-      promo.code.toLowerCase().includes(query.toLowerCase()) ||
-      promo.name.toLowerCase().includes(query.toLowerCase()) ||
-      promo.description.toLowerCase().includes(query.toLowerCase())
-    );
-
-    return {
-      success: true,
-      data: filteredPromotions,
-      total: filteredPromotions.length,
-      query,
-    };
-  },
-};
-
-// Helper functions
-export const formatPrice = (price) => {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(price);
-};
-
-export const formatDiscountValue = (promotion) => {
-  if (promotion.discountType === 'percentage') {
-    return `${promotion.discountValue}%`;
-  } else {
-    return formatPrice(promotion.discountValue);
   }
-};
 
-export const isPromotionValid = (promotion) => {
-  if (!promotion || !promotion.isActive) return false;
-  
-  const now = new Date();
-  const validFrom = new Date(promotion.validFrom);
-  const validTo = new Date(promotion.validTo);
-  
-  return now >= validFrom && now <= validTo && promotion.usedCount < promotion.usageLimit;
-};
+  // Get promotions for agency (dealer view)
+  async getAgencyPromotions(page = 1, limit = 10) {
+    try {
+      const response = await axiosInstance.get(`${API_BASE_URL}/promotion/agency/list`, {
+        params: { page, limit }
+      });
+      return {
+        success: true,
+        data: response.data.data || [],
+        pagination: response.data.paginationInfo,
+        message: response.data.message || 'Get promotion list for agency successfully!'
+      };
+    } catch (error) {
+      console.error('Error fetching agency promotions:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to fetch agency promotions',
+        data: [],
+        message: 'Failed to fetch agency promotions'
+      };
+    }
+  }
 
-export default promotionService;
+  // Format value display based on type
+  formatValue(value, valueType) {
+    if (valueType === 'PERCENT') {
+      return `${value}%`;
+    } else if (valueType === 'FIXED') {
+      return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+      }).format(value);
+    }
+    return value;
+  }
+
+  // Validate promotion data before submission
+  validatePromotion(promotionData) {
+    const errors = {};
+    
+    if (!promotionData.name || promotionData.name.trim().length === 0) {
+      errors.name = 'Promotion name is required';
+    }
+    
+    if (!promotionData.description || promotionData.description.trim().length === 0) {
+      errors.description = 'Description is required';
+    }
+    
+    if (!promotionData.valueType || !['PERCENT', 'FIXED'].includes(promotionData.valueType)) {
+      errors.valueType = 'Value type must be PERCENT or FIXED';
+    }
+    
+    if (!promotionData.value || promotionData.value <= 0) {
+      errors.value = 'Value must be greater than 0';
+    }
+    
+    if (promotionData.valueType === 'PERCENT' && promotionData.value > 100) {
+      errors.value = 'Percentage cannot exceed 100%';
+    }
+    
+    if (!promotionData.startAt) {
+      errors.startAt = 'Start date is required';
+    }
+    
+    if (!promotionData.endAt) {
+      errors.endAt = 'End date is required';
+    }
+    
+    if (promotionData.startAt && promotionData.endAt && new Date(promotionData.startAt) >= new Date(promotionData.endAt)) {
+      errors.endAt = 'End date must be after start date';
+    }
+    
+    if (!promotionData.status || !['ACTIVE', 'INACTIVE'].includes(promotionData.status)) {
+      errors.status = 'Status must be ACTIVE or INACTIVE';
+    }
+    
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  }
+}
+
+export default new PromotionService();
