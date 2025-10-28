@@ -17,6 +17,7 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { discountService } from '../../services/discountService';
 import motorbikeService from '../../services/motorbikeService';
 import agencyService from '../../services/agencyService';
+import { Calendar, Lock } from 'lucide-react-native';
 
 const EditDiscountScreen = ({ navigation, route }) => {
   const discount = route.params?.discount;
@@ -123,7 +124,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
     if (selectedDate) {
       // Ensure end date is not before start date
       if (selectedDate < startDate) {
-        showError('Ngày không hợp lệ', 'Ngày kết thúc phải sau ngày bắt đầu');
+        showError('Invalid Date', 'End date must be after start date');
         return;
       }
       setEndDate(selectedDate);
@@ -135,17 +136,17 @@ const EditDiscountScreen = ({ navigation, route }) => {
   const handleSave = async () => {
     // Validation
     if (!formData.name || !formData.value || !formData.min_quantity || !formData.startAt || !formData.endAt) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
     if (formData.type === 'SPECIAL' && !formData.agencyId) {
-      showError('Lỗi', 'Vui lòng chọn đại lý cho discount đặc biệt');
+      showError('Error', 'Please select an agency for special discount');
       return;
     }
 
     if (!formData.motorbikeId) {
-      showError('Lỗi', 'Vui lòng chọn xe máy');
+      showError('Error', 'Please select a motorbike');
       return;
     }
 
@@ -170,17 +171,17 @@ const EditDiscountScreen = ({ navigation, route }) => {
       const response = await discountService.updateDiscount(discount.id, dataToSubmit);
 
       if (response.success) {
-        showSuccess('Thành công', 'Cập nhật discount thành công!');
+        showSuccess('Success', 'Discount updated successfully!');
         // Wait a moment for alert to show before navigating back
         setTimeout(() => {
           navigation.goBack();
         }, 500);
       } else {
-        showError('Lỗi', response.error || 'Không thể cập nhật discount');
+        showError('Error', response.error || 'Unable to update discount');
       }
     } catch (error) {
       console.error('Error updating discount:', error);
-      showError('Lỗi', 'Không thể cập nhật discount');
+      showError('Error', 'Unable to update discount');
     } finally {
       setLoading(false);
     }
@@ -196,30 +197,30 @@ const EditDiscountScreen = ({ navigation, route }) => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chỉnh sửa Discount</Text>
+        <Text style={styles.headerTitle}>Edit Discount</Text>
         <TouchableOpacity
           style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           onPress={handleSave}
           disabled={loading}
         >
-          <Text style={styles.saveButtonText}>Lưu</Text>
+          <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Tên discount *</Text>
+          <Text style={styles.inputLabel}>Discount Name *</Text>
           <TextInput
             style={styles.textInput}
             value={formData.name}
             onChangeText={(text) => setFormData({ ...formData, name: text })}
-            placeholder="Nhập tên discount"
+            placeholder="Enter discount name"
             placeholderTextColor={COLORS.TEXT.SECONDARY}
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Loại *</Text>
+          <Text style={styles.inputLabel}>Type *</Text>
           <View style={styles.typeSelector}>
             {['VOLUME', 'SPECIAL'].map((type) => (
               <TouchableOpacity
@@ -234,7 +235,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
                   styles.typeOptionText,
                   formData.type === type && styles.selectedTypeOptionText
                 ]}>
-                  {type === 'VOLUME' ? 'Khối lượng' : 'Đặc biệt'}
+                  {type === 'VOLUME' ? 'Volume' : 'Special'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -242,43 +243,37 @@ const EditDiscountScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Đại lý {formData.type === 'SPECIAL' ? '*' : ''}</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setAgencyModalVisible(true)}
-          >
+          <Text style={styles.inputLabel}>Agency {formData.type === 'SPECIAL' ? '*' : ''}</Text>
+          <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
             <Text style={[
               styles.dropdownButtonText,
               !formData.agencyId && styles.dropdownButtonTextPlaceholder
             ]}>
               {formData.agencyId 
                 ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
-                : 'Chọn đại lý'}
+                : 'Select agency'}
             </Text>
-            <Text style={styles.dropdownIcon}>▼</Text>
-          </TouchableOpacity>
+            <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Xe máy *</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setMotorbikeModalVisible(true)}
-          >
+          <Text style={styles.inputLabel}>Motorbike *</Text>
+          <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
             <Text style={[
               styles.dropdownButtonText,
               !formData.motorbikeId && styles.dropdownButtonTextPlaceholder
             ]}>
               {formData.motorbikeId 
                 ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
-                : 'Chọn xe máy'}
+                : 'Select motorbike'}
             </Text>
-            <Text style={styles.dropdownIcon}>▼</Text>
-          </TouchableOpacity>
+            <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Giá trị *</Text>
+          <Text style={styles.inputLabel}>Value *</Text>
           <View style={styles.valueTypeSelector}>
             {['PERCENT', 'FIXED'].map((vt) => (
               <TouchableOpacity
@@ -293,7 +288,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
                   styles.valueTypeOptionText,
                   formData.valueType === vt && styles.selectedValueTypeOptionText
                 ]}>
-                  {vt === 'PERCENT' ? 'Phần trăm (%)' : 'Cố định (VND)'}
+                  {vt === 'PERCENT' ? 'Percent (%)' : 'Fixed (VND)'}x
                 </Text>
               </TouchableOpacity>
             ))}
@@ -302,52 +297,52 @@ const EditDiscountScreen = ({ navigation, route }) => {
             style={styles.textInput}
             value={formData.value}
             onChangeText={(text) => setFormData({ ...formData, value: text })}
-            placeholder={formData.valueType === 'PERCENT' ? 'Ví dụ: 10' : 'Ví dụ: 50000'}
+            placeholder={formData.valueType === 'PERCENT' ? 'Example: 10' : 'Example: 50000'}
             placeholderTextColor={COLORS.TEXT.SECONDARY}
             keyboardType="numeric"
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Số lượng tối thiểu *</Text>
+          <Text style={styles.inputLabel}>Minimum Quantity *</Text>
           <TextInput
             style={styles.textInput}
             value={formData.min_quantity}
             onChangeText={(text) => setFormData({ ...formData, min_quantity: text })}
-            placeholder="Nhập số lượng tối thiểu"
+            placeholder="Enter minimum quantity"
             placeholderTextColor={COLORS.TEXT.SECONDARY}
             keyboardType="numeric"
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Ngày bắt đầu *</Text>
+          <Text style={styles.inputLabel}>Start Date *</Text>
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => setShowStartDatePicker(true)}
           >
             <Text style={[styles.dateInputText, !formData.startAt && styles.dateInputTextPlaceholder]}>
-              {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Chọn ngày bắt đầu'}
+              {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Select start date'}
             </Text>
-            <Text style={styles.dateIcon}>📅</Text>
+            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Ngày kết thúc *</Text>
+          <Text style={styles.inputLabel}>End Date *</Text>
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => setShowEndDatePicker(true)}
           >
             <Text style={[styles.dateInputText, !formData.endAt && styles.dateInputTextPlaceholder]}>
-              {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Chọn ngày kết thúc'}
+              {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Select end date'}
             </Text>
-            <Text style={styles.dateIcon}>📅</Text>
+            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Trạng thái *</Text>
+          <Text style={styles.inputLabel}>Status *</Text>
           <View style={styles.statusSelector}>
             {['ACTIVE', 'INACTIVE'].map((status) => (
               <TouchableOpacity
@@ -362,7 +357,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
                   styles.statusOptionText,
                   formData.status === status && styles.selectedStatusOptionText
                 ]}>
-                  {status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                  {status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -380,7 +375,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn đại lý</Text>
+              <Text style={styles.modalTitle}>Select Agency</Text>
               <TouchableOpacity onPress={() => setAgencyModalVisible(false)}>
                 <Text style={styles.modalCloseIcon}>✕</Text>
               </TouchableOpacity>
@@ -393,7 +388,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
                   setAgencyModalVisible(false);
                 }}
               >
-                <Text style={styles.dropdownOptionText}>Không chọn</Text>
+                <Text style={styles.dropdownOptionText}>None</Text>
               </TouchableOpacity>
               {agencies.map((agency) => (
                 <TouchableOpacity
@@ -424,7 +419,7 @@ const EditDiscountScreen = ({ navigation, route }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn xe máy</Text>
+              <Text style={styles.modalTitle}>Select Motorbike</Text>
               <TouchableOpacity onPress={() => setMotorbikeModalVisible(false)}>
                 <Text style={styles.modalCloseIcon}>✕</Text>
               </TouchableOpacity>
@@ -587,6 +582,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 48,
   },
+  dropdownButtonReadOnly: {
+    backgroundColor: '#BABABA',
+  },
   dropdownButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
@@ -597,6 +595,9 @@ const styles = StyleSheet.create({
   dropdownIcon: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+  },
+  readOnlyLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
   },
   modalOverlay: {
     flex: 1,
