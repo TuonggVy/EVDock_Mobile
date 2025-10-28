@@ -208,7 +208,7 @@ const AppNavigator = () => {
               component={InventoryManagementScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
+                        <Stack.Screen
               name="AddInventory"
               component={AddInventoryScreen}
               options={{ headerShown: false }}
@@ -218,11 +218,11 @@ const AppNavigator = () => {
               component={EditInventoryScreen}
               options={{ headerShown: false }}
             />
-             <Stack.Screen
-               name="DealerManagement"
-               component={DealerManagementScreen}
-               options={{ headerShown: false }}
-             />
+            <Stack.Screen
+              name="DealerManagement"
+              component={DealerManagementScreen}
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="PricingManagement"
               component={PricingManagementScreen}
@@ -353,26 +353,26 @@ const AppNavigator = () => {
               component={CreatePreOrderScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="DepositDetail" 
-              component={DepositDetailScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="DiscountManagement" 
-              component={DiscountManagementScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="AddDiscount" 
-              component={AddDiscountScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="EditDiscount" 
-              component={EditDiscountScreen} 
-              options={{ headerShown: false }}
-            />
+        <Stack.Screen 
+          name="DepositDetail" 
+          component={DepositDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="DiscountManagement" 
+          component={DiscountManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="AddDiscount" 
+          component={AddDiscountScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditDiscount" 
+          component={EditDiscountScreen} 
+          options={{ headerShown: false }}
+        />
           </>
         )}
       </Stack.Navigator>
