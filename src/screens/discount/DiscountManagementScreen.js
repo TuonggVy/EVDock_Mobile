@@ -49,11 +49,11 @@ const DiscountManagementScreen = ({ navigation }) => {
         const sortedDiscounts = response.data.sort((a, b) => b.id - a.id);
         setDiscounts(sortedDiscounts);
       } else {
-        showError('Lỗi', response.error || 'Không thể tải danh sách discount');
+        showError('Error', response.error || 'Unable to load discount list');
       }
     } catch (error) {
       console.error('Error loading discounts:', error);
-      showError('Lỗi', 'Không thể tải danh sách discount');
+      showError('Error', 'Unable to load discount list');
     } finally {
       setLoading(false);
     }
@@ -89,20 +89,20 @@ const DiscountManagementScreen = ({ navigation }) => {
 
   const handleDeleteDiscount = (discount) => {
     showConfirm(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa discount này?',
+      'Confirm Delete',
+      'Are you sure you want to delete this discount?',
       async () => {
         try {
           const response = await discountService.deleteDiscount(discount.id);
           if (response.success) {
             await loadDiscounts();
-            showSuccess('Thành công', 'Xóa discount thành công!');
+            showSuccess('Success', 'Discount deleted successfully!');
           } else {
-            showError('Lỗi', response.error || 'Không thể xóa discount');
+            showError('Error', response.error || 'Unable to delete discount');
           }
         } catch (error) {
           console.error('Error deleting discount:', error);
-          showError('Lỗi', 'Không thể xóa discount');
+          showError('Error', 'Unable to delete discount');
         }
       }
     );
@@ -127,36 +127,36 @@ const DiscountManagementScreen = ({ navigation }) => {
       <View style={styles.cardHeader}>
         <Text style={styles.discountName}>{discount.name}</Text>
         <View style={[styles.statusBadge, { backgroundColor: discount.status === 'ACTIVE' ? COLORS.SUCCESS : COLORS.ERROR }]}>
-          <Text style={styles.statusText}>{discount.status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng hoạt động'}</Text>
+          <Text style={styles.statusText}>{discount.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Text>
         </View>
       </View>
 
       <View style={styles.cardContent}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Loại:</Text>
-          <Text style={styles.detailValue}>{discount.type === 'VOLUME' ? 'Khối lượng' : 'Đặc biệt'}</Text>
+          <Text style={styles.detailLabel}>Type:</Text>
+          <Text style={styles.detailValue}>{discount.type === 'VOLUME' ? 'Volume' : 'Special'}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Giá trị:</Text>
+          <Text style={styles.detailLabel}>Value:</Text>
           <Text style={styles.detailValue}>
             {discount.valueType === 'PERCENT' ? `${discount.value}%` : `${discount.value} VND`}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Số lượng tối thiểu:</Text>
-          <Text style={styles.detailValue}>{discount.min_quantity} xe</Text>
+          <Text style={styles.detailLabel}>Minimum Quantity:</Text>
+          <Text style={styles.detailValue}>{discount.min_quantity} units</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Từ ngày:</Text>
+          <Text style={styles.detailLabel}>From Date:</Text>
           <Text style={styles.detailValue}>{formatDate(discount.startAt)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Đến ngày:</Text>
+          <Text style={styles.detailLabel}>To Date:</Text>
           <Text style={styles.detailValue}>{formatDate(discount.endAt)}</Text>
         </View>
         {discount.agencyId && (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Đại lý:</Text>
+            <Text style={styles.detailLabel}>Agency:</Text>
             <Text style={styles.detailValue}>
               {agencies.find(a => a.id === discount.agencyId)?.name || `ID: ${discount.agencyId}`}
             </Text>
@@ -164,7 +164,7 @@ const DiscountManagementScreen = ({ navigation }) => {
         )}
         {discount.motorbikeId && (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Xe máy:</Text>
+            <Text style={styles.detailLabel}>Motorbike:</Text>
             <Text style={styles.detailValue}>
               {motorbikes.find(b => b.id === discount.motorbikeId)?.name || `ID: ${discount.motorbikeId}`}
             </Text>
@@ -177,13 +177,13 @@ const DiscountManagementScreen = ({ navigation }) => {
           style={styles.editButton}
           onPress={() => handleEditDiscount(discount)}
         >
-          <Text style={styles.editButtonText}>Sửa</Text>
+          <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDeleteDiscount(discount)}
         >
-          <Text style={styles.deleteButtonText}>Xóa</Text>
+          <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -199,7 +199,7 @@ const DiscountManagementScreen = ({ navigation }) => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý Discount</Text>
+        <Text style={styles.headerTitle}>Discount Management</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddDiscount}
@@ -213,7 +213,7 @@ const DiscountManagementScreen = ({ navigation }) => {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm tên discount..."
+          placeholder="Search discount name..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -223,7 +223,7 @@ const DiscountManagementScreen = ({ navigation }) => {
       {/* Filters */}
       <View style={styles.filtersContainer}>
         <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Trạng thái:</Text>
+          <Text style={styles.filterLabel}>Status:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {['all', 'ACTIVE', 'INACTIVE'].map((status) => (
               <TouchableOpacity
@@ -238,7 +238,7 @@ const DiscountManagementScreen = ({ navigation }) => {
                   styles.filterChipText,
                   filterStatus === status && styles.filterChipTextActive
                 ]}>
-                  {status === 'all' ? 'Tất cả' : status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                  {status === 'all' ? 'All' : status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -246,7 +246,7 @@ const DiscountManagementScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Loại:</Text>
+          <Text style={styles.filterLabel}>Type:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {['all', 'VOLUME', 'SPECIAL'].map((type) => (
               <TouchableOpacity
@@ -261,7 +261,7 @@ const DiscountManagementScreen = ({ navigation }) => {
                   styles.filterChipText,
                   filterType === type && styles.filterChipTextActive
                 ]}>
-                  {type === 'all' ? 'Tất cả' : type === 'VOLUME' ? 'Khối lượng' : 'Đặc biệt'}
+                  {type === 'all' ? 'All' : type === 'VOLUME' ? 'Volume' : 'Special'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -280,8 +280,8 @@ const DiscountManagementScreen = ({ navigation }) => {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🎁</Text>
-            <Text style={styles.emptyTitle}>Không có discounts</Text>
-            <Text style={styles.emptySubtitle}>Hãy tạo discount mới để bắt đầu</Text>
+            <Text style={styles.emptyTitle}>No discounts</Text>
+            <Text style={styles.emptySubtitle}>Create a new discount to get started</Text>
           </View>
         )}
       </ScrollView>
