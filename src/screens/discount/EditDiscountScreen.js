@@ -75,8 +75,8 @@ const EditDiscountScreen = ({ navigation, route }) => {
 
   const loadAgencies = async () => {
     try {
-      const data = await agencyService.getAgencies({ limit: 100 });
-      setAgencies(data || []);
+      const result = await agencyService.getAgencies({ limit: 100 });
+      setAgencies(result?.data || []);
     } catch (error) {
       console.error('Error loading agencies:', error);
     }

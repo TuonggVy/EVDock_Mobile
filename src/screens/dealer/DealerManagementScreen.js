@@ -50,9 +50,17 @@ const DealerManagementScreen = ({ navigation }) => {
   const loadAgencies = async () => {
     try {
       const res = await agencyService.getAgencies();
-      if (res?.success) setAgencies(res.data || []);
-      else showError('Lỗi', res?.error || 'Không thể tải danh sách đại lý');
+      console.log('Load agencies response:', res);
+      console.log('Agencies data:', res?.data);
+      
+      if (res?.success) {
+        console.log('Setting agencies:', res.data);
+        setAgencies(res.data || []);
+      } else {
+        showError('Lỗi', res?.error || 'Không thể tải danh sách đại lý');
+      }
     } catch (error) {
+      console.error('Error loading agencies:', error);
       showError('Lỗi', 'Không thể tải danh sách đại lý');
     }
   };
@@ -125,9 +133,16 @@ const DealerManagementScreen = ({ navigation }) => {
         contactInfo: newAgency.contactInfo,
       };
 
+      // If editing and status exists, include it
+      if (editingAgency && newAgency.status) {
+        agencyData.status = newAgency.status;
+      }
+
       const res = editingAgency
         ? await agencyService.updateAgency(editingAgency.id, agencyData)
         : await agencyService.createAgency(agencyData);
+      
+      console.log('Save agency response:', res);
 
       if (res?.success) {
         await loadAgencies();

@@ -46,11 +46,11 @@ const AddPromotionScreen = ({ navigation }) => {
     const fetchAgencies = async () => {
       setLoadingAgencies(true);
       try {
-        const agenciesData = await agencyService.getAgencies({
+        const result = await agencyService.getAgencies({
           limit: 100,
           page: 1,
         });
-        setAgencies(agenciesData);
+        setAgencies(result?.data || []);
       } catch (error) {
         console.error('Error fetching agencies:', error);
         // Don't show alert on initial load if it fails
