@@ -556,31 +556,53 @@ class StaffService {
     try {
       const token = await this.getAuthTokenAsync();
 
+      const payload = {
+        username: staffData.username,
+        password: staffData.password,
+        fullname: staffData.fullname,
+        email: staffData.email,
+        phone: staffData.phone,
+        address: staffData.address || '',
+        avatar: staffData.avatar || '',
+        roleId: staffData.roleId,
+        agencyId: staffData.agencyId,
+      };
+
+      console.log('🔧 Create Dealer Staff Request:', {
+        url: `${API_BASE_URL}/manager/staff`,
+        payload,
+        hasToken: !!token,
+      });
+
       const response = await fetch(`${API_BASE_URL}/manager/staff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          username: staffData.username,
-          password: staffData.password,
-          fullname: staffData.fullname,
-          email: staffData.email,
-          phone: staffData.phone,
-          address: staffData.address || '',
-          avatar: staffData.avatar || '',
-          roleId: staffData.roleId,
-          agencyId: staffData.agencyId,
-        }),
+        body: JSON.stringify(payload),
+      });
+
+      console.log('📥 Create Dealer Staff Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.error('❌ Create Dealer Staff Error:', errorText);
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+        }
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('✅ Create Dealer Staff Success:', data);
       return {
         success: true,
         data: data,
@@ -588,6 +610,160 @@ class StaffService {
       };
     } catch (error) {
       console.error('Error creating dealer staff:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Update Dealer Staff information (PATCH /manager/staff/{staffId})
+  async updateDealerStaff(staffId, staffData) {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      // Build payload with only defined fields
+      const rawPayload = {
+        username: staffData.username,
+        fullname: staffData.fullname,
+        email: staffData.email,
+        phone: staffData.phone,
+        address: staffData.address,
+        avatar: staffData.avatar,
+        roleId: staffData.roleId,
+        agencyId: staffData.agencyId,
+      };
+
+      const payload = Object.keys(rawPayload).reduce((acc, key) => {
+        const value = rawPayload[key];
+        if (value !== undefined && value !== null && value !== '') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
+      console.log('🔧 Update Dealer Staff Request:', {
+        staffId,
+        payload,
+        url: `${API_BASE_URL}/manager/staff/${staffId}`,
+        hasToken: !!token,
+      });
+
+      const isAvatarFile =
+        payload.avatar &&
+        (typeof payload.avatar === 'object' ||
+          (typeof payload.avatar === 'string' && payload.avatar.startsWith('file')));
+
+      let fetchOptions = {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      };
+
+      if (isAvatarFile) {
+        const form = new FormData();
+        Object.entries(payload).forEach(([k, v]) => {
+          if (k === 'avatar') {
+            if (typeof v === 'object') {
+              form.append('avatar', v);
+            } else {
+              form.append('avatar', { uri: v, name: 'avatar.jpg', type: 'image/jpeg' });
+            }
+          } else {
+            form.append(k, String(v));
+          }
+        });
+        fetchOptions.body = form;
+        // Do NOT set Content-Type for FormData; let fetch add boundary
+      } else {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+        fetchOptions.body = JSON.stringify(payload);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/manager/staff/${staffId}`, fetchOptions);
+
+      console.log('📥 Update Dealer Staff Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Update Dealer Staff Error:', errorText);
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+        }
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.text().then(t => (t ? JSON.parse(t) : {})).catch(() => ({}));
+      console.log('✅ Update Dealer Staff Success:', data);
+      return {
+        success: true,
+        data,
+        message: 'Thông tin Dealer Staff đã được cập nhật',
+      };
+    } catch (error) {
+      console.error('Error updating dealer staff:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Delete Dealer Staff (DELETE /manager/staff/{staffId})
+  async deleteDealerStaff(staffId) {
+    try {
+      const token = await this.getAuthTokenAsync();
+
+      console.log('🔧 Delete Dealer Staff Request:', {
+        url: `${API_BASE_URL}/manager/staff/${staffId}`,
+        staffId,
+        hasToken: !!token,
+      });
+
+      const response = await fetch(`${API_BASE_URL}/manager/staff/${staffId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      console.log('📥 Delete Dealer Staff Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Delete Dealer Staff Error:', errorText);
+        let errorData = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+        }
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Some DELETE endpoints return 204 No Content
+      const data = await response.text().then(t => (t ? JSON.parse(t) : {})).catch(() => ({}));
+      console.log('✅ Delete Dealer Staff Success:', data);
+      return {
+        success: true,
+        data,
+        message: 'Tài khoản Dealer Staff đã được xóa',
+      };
+    } catch (error) {
+      console.error('Error deleting dealer staff:', error);
       return {
         success: false,
         error: error.message,
@@ -669,7 +845,7 @@ class StaffService {
       console.log('Extracted staff array length:', staffArray.length);
       
       // Map staff array to desired format
-      const staffList = staffArray.map(staff => ({
+      const mapped = staffArray.map(staff => ({
         id: staff.id,
         username: staff.username,
         fullname: staff.fullname,
@@ -682,6 +858,9 @@ class StaffService {
         isDeleted: staff.isDeleted || false,
         createAt: staff.createAt || staff.createdAt,
       }));
+
+      // Exclude soft-deleted records to reflect actual visible data
+      const staffList = mapped.filter(s => !s.isDeleted);
 
       return {
         success: true,
