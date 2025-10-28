@@ -90,12 +90,12 @@ class StaffService {
         email: staff.email || '',
         phone: staff.phone || '',
         address: staff.address || '',
-        isActive: staff.isActive !== undefined ? staff.isActive : true,
-        isDeleted: staff.isDeleted || false,
+        isActive: staff.isActive !== undefined ? staff.isActive : (staff.status ? staff.status === 'active' : true),
+        isDeleted: staff.isDeleted || staff.deleted || false,
         roleNames: staff.roleNames || staff.roles || [],
         role: staff.role || [], // Role IDs
         agencyId: staff.agencyId || staff.agency_id || staff.AgencyId || null, // Agency ID (check multiple possible field names)
-        status: staff.isActive ? 'active' : 'inactive',
+        status: (staff.isActive !== undefined ? staff.isActive : (staff.status ? staff.status === 'active' : true)) ? 'active' : 'inactive',
         createdAt: staff.createdAt || staff.created_at,
         updatedAt: staff.updatedAt || staff.updated_at,
       }));
