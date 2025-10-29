@@ -6,6 +6,7 @@ import api from './api/axiosInstance';
  */
 const ORDER_RESTOCK_ENDPOINTS = {
   LIST: '/order-restock-management/list',
+  LIST_BY_AGENCY: (agencyId) => `/order-restock/list/${agencyId}`,
   DETAIL: (orderId) => `/order-restock-management/detail/${orderId}`,
   UPDATE_STATUS: (orderId) => `/order-restock-management/status/${orderId}`,
   DELETE: (orderId) => `/order-restock-management/${orderId}`,
@@ -42,6 +43,36 @@ export const getOrderRestockList = async (params = {}) => {
       error: error.response?.data?.message || 'Không thể tải danh sách đơn hàng',
       data: [],
       paginationInfo: {}
+    };
+  }
+};
+
+/**
+ * Get list of orders by agency ID
+ * @param {number} agencyId - Agency ID
+ * @returns {Promise<Object>} Orders data
+ */
+export const getOrderRestockListByAgency = async (agencyId) => {
+  try {
+    if (!agencyId) {
+      return {
+        success: false,
+        error: 'Agency ID is required',
+        data: []
+      };
+    }
+
+    const response = await api.get(ORDER_RESTOCK_ENDPOINTS.LIST_BY_AGENCY(agencyId));
+    return {
+      success: true,
+      data: response.data.data || response.data || []
+    };
+  } catch (error) {
+    console.error('Error fetching order restock list by agency:', error);
+    return {
+      success: false,
+      error: error.response?.data?.message || 'Không thể tải danh sách đơn hàng',
+      data: []
     };
   }
 };
@@ -115,6 +146,7 @@ export const deleteOrderRestock = async (orderId) => {
 
 const orderRestockService = {
   getOrderRestockList,
+  getOrderRestockListByAgency,
   getOrderRestockDetail,
   updateOrderRestockStatus,
   deleteOrderRestock,

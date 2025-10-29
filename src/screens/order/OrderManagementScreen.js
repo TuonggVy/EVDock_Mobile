@@ -17,10 +17,10 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { orderService } from '../../services/orderService';
+import orderRestockService from '../../services/orderRestockService';
 import { vehicleService } from '../../services/vehicleService';
 import warehouseService from '../../services/warehouseService';
 import agencyService from '../../services/agencyService';
-import pricePolicyService from '../../services/pricePolicyService';
 import promotionService from '../../services/promotionService';
 import { discountService } from '../../services/discountService';
 import motorbikeService from '../../services/motorbikeService';
@@ -32,12 +32,12 @@ const OrderManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [availableVehicles, setAvailableVehicles] = useState([]); // Synced names from Catalog
   const [editingOrder, setEditingOrder] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
   const [agencies, setAgencies] = useState([]);
-  const [pricePolicies, setPricePolicies] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [discounts, setDiscounts] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
@@ -45,7 +45,6 @@ const OrderManagementScreen = ({ navigation }) => {
     vehicleModel: '',
     quantity: '',
     color: '',
-    pricePolicyId: '',
     discountId: '',
     promotionId: '',
     warehouseId: '',
@@ -58,7 +57,6 @@ const OrderManagementScreen = ({ navigation }) => {
   const [permissionErrors, setPermissionErrors] = useState({
     warehouses: null,
     agencies: null,
-    pricePolicies: null,
     promotions: null,
     discounts: null,
     motorbikes: null,
@@ -113,7 +111,18 @@ const OrderManagementScreen = ({ navigation }) => {
         // Load warehouses
         const warehousesResponse = await warehouseService.getWarehousesList();
         if (warehousesResponse.success) {
-          setWarehouses(warehousesResponse.data || []);
+          const warehousesList = warehousesResponse.data || [];
+          setWarehouses(warehousesList);
+          
+          // Auto-select first warehouse if user has access and no warehouse selected yet
+          if (warehousesList.length > 0 && !newOrder.warehouseId) {
+            const firstWarehouse = warehousesList[0];
+            setNewOrder(prev => ({
+              ...prev,
+              warehouseId: String(firstWarehouse.id),
+            }));
+            console.log('🔄 [OrderManagement] Auto-selected warehouse:', firstWarehouse.id, firstWarehouse.name);
+          }
         }
 
         // Load agencies
@@ -122,22 +131,29 @@ const OrderManagementScreen = ({ navigation }) => {
           setAgencies(agenciesResponse.data || []);
         }
 
-        // Load price policies
-        const pricePoliciesResponse = await pricePolicyService.getAllPricePolicies(1, 100);
-        if (pricePoliciesResponse.success) {
-          setPricePolicies(pricePoliciesResponse.data || []);
-        }
-
         // Load promotions
         const promotionsResponse = await promotionService.getAllPromotions(1, 100);
         if (promotionsResponse.success) {
           setPromotions(promotionsResponse.data || []);
         }
 
-        // Load discounts
-        const discountsResponse = await discountService.getDiscounts(1, 100);
-        if (discountsResponse.success) {
-          setDiscounts(discountsResponse.data || []);
+        // Load discounts for current agency
+        if (user?.agencyId) {
+          const discountsResponse = await discountService.getAgencyDiscounts(
+            parseInt(user.agencyId),
+            1,
+            100
+          );
+          if (discountsResponse.success) {
+            setDiscounts(discountsResponse.data || []);
+          } else {
+            console.warn('⚠️ [OrderManagement] Cannot load discounts:', discountsResponse.error);
+            // Still allow creating order without discounts
+            setDiscounts([]);
+          }
+        } else {
+          console.warn('⚠️ [OrderManagement] No agencyId, skipping discount load');
+          setDiscounts([]);
         }
 
         // Load motorbikes
@@ -159,74 +175,77 @@ const OrderManagementScreen = ({ navigation }) => {
           agencyId: String(user.agencyId),
         }));
       }
+      // Warehouse will be auto-selected in loadOptions after warehouses load
     }
   }, [showCreateModal, user]);
 
-  // Mock orders data
-  const mockOrders = [
-    {
-      id: 'ORD001',
-      vehicleModel: 'Model X',
-      quantity: 5,
-      color: 'Black',
-      status: 'pending',
-      orderDate: '2024-01-15',
-      expectedDelivery: '2024-02-15',
-      totalValue: 600000000,
-      priority: 'high',
-    },
-    {
-      id: 'ORD002',
-      vehicleModel: 'Model Y',
-      quantity: 3,
-      color: 'White',
-      status: 'confirmed',
-      orderDate: '2024-01-10',
-      expectedDelivery: '2024-02-10',
-      totalValue: 285000000,
-      priority: 'normal',
-    },
-    {
-      id: 'ORD003',
-      vehicleModel: 'Model V',
-      quantity: 2,
-      color: 'Silver',
-      status: 'shipped',
-      orderDate: '2024-01-05',
-      expectedDelivery: '2024-01-25',
-      totalValue: 170000000,
-      priority: 'low',
-    },
-  ];
-
   useEffect(() => {
+    console.log('📱 [OrderManagement] Component mounted, gọi loadOrders()');
     loadOrders();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('📱 [OrderManagement] Screen focused, refresh orders');
+      loadOrders();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const loadOrders = async () => {
     try {
-      // TODO: Get dealerId from auth context or props
-      const dealerId = 'DEALER001'; // This should come from user context
-      const response = await orderService.getOrdersByDealer(dealerId);
+      console.log('🔄 [OrderManagement] Bắt đầu load orders...');
+      console.log('🔄 [OrderManagement] Loading state:', true);
+      setLoading(true);
+      
+      // Use new API endpoint /order-restock/list/{agencyId}
+      if (!user?.agencyId) {
+        console.error('❌ [OrderManagement] Không có agencyId, không thể load orders');
+        showError('Lỗi', 'Không tìm thấy thông tin đại lý');
+        return;
+      }
+
+      const agencyId = parseInt(user.agencyId);
+      console.log('🔄 [OrderManagement] Call API với agencyId:', agencyId);
+      const response = await orderRestockService.getOrderRestockListByAgency(agencyId);
+      
+      console.log('✅ [OrderManagement] API Response:', {
+        success: response.success,
+        dataLength: response.data?.length || 0,
+        error: response.error || null,
+        sampleData: response.data?.[0] || null
+      });
+      
       if (response.success) {
-        setOrders(response.data);
+        setOrders(response.data || []);
+        console.log('✅ [OrderManagement] Đã set orders:', response.data?.length || 0, 'items');
       } else {
+        console.error('❌ [OrderManagement] API Error:', response.error);
         showError('Lỗi', response.error || 'Không thể tải danh sách đơn hàng');
       }
     } catch (error) {
-      console.error('Error loading orders:', error);
+      console.error('❌ [OrderManagement] Exception loading orders:', error);
+      console.error('❌ [OrderManagement] Error details:', error.message, error.stack);
       showError('Lỗi', 'Không thể tải danh sách đơn hàng');
+    } finally {
+      console.log('🔄 [OrderManagement] Kết thúc load, set loading = false');
+      setLoading(false);
     }
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.vehicleModel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  // Newest first by orderDate or createdAt
+  const filteredOrders = orders.filter(order => {
+    if (!searchQuery.trim()) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      order.id?.toString().toLowerCase().includes(searchLower) ||
+      order.status?.toLowerCase().includes(searchLower)
+    );
+  });
+  
+  // Newest first by orderAt or createdAt
   const sortedFilteredOrders = [...filteredOrders].sort((a, b) => {
-    const aTime = new Date(a.orderDate || a.createdAt || 0).getTime();
-    const bTime = new Date(b.orderDate || b.createdAt || 0).getTime();
+    const aTime = new Date(a.orderAt || a.createdAt || 0).getTime();
+    const bTime = new Date(b.orderAt || b.createdAt || 0).getTime();
     return bTime - aTime;
   });
 
@@ -236,8 +255,8 @@ const OrderManagementScreen = ({ navigation }) => {
       return;
     }
 
-    if (!newOrder.warehouseId || !newOrder.motorbikeId || !newOrder.pricePolicyId) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (Kho, Xe máy, Chính sách giá)');
+    if (!newOrder.warehouseId || !newOrder.motorbikeId) {
+      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (Xe máy)');
       return;
     }
 
@@ -249,7 +268,7 @@ const OrderManagementScreen = ({ navigation }) => {
     try {
       const orderRestockData = {
         quantity: parseInt(newOrder.quantity) || 0,
-        pricePolicyId: parseInt(newOrder.pricePolicyId) || 0,
+        pricePolicyId: 1, // Default price policy
         discountId: newOrder.discountId ? parseInt(newOrder.discountId) : 1,
         promotionId: newOrder.promotionId ? parseInt(newOrder.promotionId) : 1,
         warehouseId: parseInt(newOrder.warehouseId) || 0,
@@ -263,14 +282,29 @@ const OrderManagementScreen = ({ navigation }) => {
       // Call the order-restock API
       const response = await orderService.createOrderRestock(orderRestockData);
       
+      console.log('📦 [OrderManagement] Create order response:', {
+        success: response.success,
+        orderId: response.orderId,
+        orderData: response.data
+      });
+      
       if (response.success) {
+        const orderData = response.data || {};
+        const orderId = response.orderId || orderData.id;
+        
+        console.log('📦 [OrderManagement] Order created:', {
+          orderId,
+          status: orderData.status,
+          quantity: orderData.quantity,
+          subtotal: orderData.subtotal
+        });
+        
         // Reload orders after successful creation
         await loadOrders();
         setNewOrder({
           vehicleModel: '',
           quantity: '',
           color: '',
-          pricePolicyId: '',
           discountId: '',
           promotionId: '',
           warehouseId: '',
@@ -279,7 +313,12 @@ const OrderManagementScreen = ({ navigation }) => {
           agencyId: '',
         });
         setShowCreateModal(false);
-        showSuccess('Thành công', response.message || 'Đơn hàng đã được tạo thành công!');
+        
+        const successMessage = orderId 
+          ? `Đơn hàng #${orderId} đã được tạo thành công!`
+          : response.message || 'Đơn hàng đã được tạo thành công!';
+        
+        showSuccess('Thành công', successMessage);
       } else {
         showError('Lỗi', response.error || 'Không thể tạo đơn hàng');
       }
@@ -293,33 +332,55 @@ const OrderManagementScreen = ({ navigation }) => {
     showConfirm(
       'Xác nhận hủy',
       'Bạn có chắc chắn muốn hủy đơn hàng này?',
-      () => {
-        setOrders(orders.filter(order => order.id !== orderId));
-        showSuccess('Thành công', 'Đã hủy đơn hàng thành công!');
+      async () => {
+        try {
+          const response = await orderRestockService.deleteOrderRestock(orderId);
+          if (response.success) {
+            showSuccess('Thành công', 'Đã hủy đơn hàng thành công!');
+            loadOrders();
+          } else {
+            showError('Lỗi', response.error || 'Không thể hủy đơn hàng');
+          }
+        } catch (error) {
+          console.error('Error canceling order:', error);
+          showError('Lỗi', 'Không thể hủy đơn hàng');
+        }
       }
     );
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return COLORS.WARNING;
-      case 'confirmed': return COLORS.PRIMARY;
-      case 'shipped': return COLORS.SUCCESS;
-      case 'delivered': return COLORS.SUCCESS;
-      case 'cancelled': return COLORS.ERROR;
+      case 'DRAFT': return COLORS.TEXT.SECONDARY;
+      case 'PENDING': return COLORS.WARNING;
+      case 'APPROVED': return COLORS.SUCCESS;
+      case 'DELIVERED': return COLORS.PRIMARY;
+      case 'PAID': return COLORS.SUCCESS;
+      case 'CANCELED': return COLORS.ERROR;
       default: return COLORS.TEXT.SECONDARY;
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Đã xác nhận';
-      case 'shipped': return 'Đang vận chuyển';
-      case 'delivered': return 'Đã giao hàng';
-      case 'cancelled': return 'Đã hủy';
-      default: return 'Không xác định';
+      case 'DRAFT': return 'Draft';
+      case 'PENDING': return 'Chờ xác nhận';
+      case 'APPROVED': return 'Đã xác nhận';
+      case 'DELIVERED': return 'Đã giao hàng';
+      case 'PAID': return 'Đã thanh toán';
+      case 'CANCELED': return 'Đã hủy';
+      default: return status || 'Không xác định';
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
   };
 
   const getPriorityColor = (priority) => {
@@ -351,8 +412,8 @@ const OrderManagementScreen = ({ navigation }) => {
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>{order.id}</Text>
-          <Text style={styles.vehicleModel}>{order.vehicleModel}</Text>
+          <Text style={styles.orderId}>Order #{order.id || '-'}</Text>
+          <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
         </View>
         <View style={styles.orderStatus}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
@@ -364,33 +425,47 @@ const OrderManagementScreen = ({ navigation }) => {
       <View style={styles.orderDetails}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Số lượng:</Text>
-          <Text style={styles.detailValue}>{order.quantity} xe</Text>
+          <Text style={styles.detailValue}>{order.quantity || 0} xe</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Màu sắc:</Text>
-          <Text style={styles.detailValue}>{order.color}</Text>
+          <Text style={styles.detailLabel}>Giá cơ bản:</Text>
+          <Text style={styles.detailValue}>{formatPrice(order.basePrice || 0)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Ngày đặt:</Text>
-          <Text style={styles.detailValue}>{order.orderDate}</Text>
+          <Text style={styles.detailLabel}>Giá bán buôn:</Text>
+          <Text style={styles.detailValue}>{formatPrice(order.wholesalePrice || 0)}</Text>
         </View>
+        {order.discountTotal > 0 && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Giảm giá:</Text>
+            <Text style={[styles.detailValue, { color: COLORS.ERROR }]}>
+              -{formatPrice(order.discountTotal || 0)}
+            </Text>
+          </View>
+        )}
+        {order.promotionTotal > 0 && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Khuyến mãi:</Text>
+            <Text style={[styles.detailValue, { color: COLORS.SUCCESS }]}>
+              -{formatPrice(order.promotionTotal || 0)}
+            </Text>
+          </View>
+        )}
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Dự kiến giao:</Text>
-          <Text style={styles.detailValue}>{order.expectedDelivery}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Ưu tiên:</Text>
-          <Text style={[styles.detailValue, { color: getPriorityColor(order.priority) }]}>
-            {getPriorityText(order.priority)}
+          <Text style={styles.detailLabel}>Giá cuối cùng:</Text>
+          <Text style={[styles.detailValue, { fontWeight: 'bold' }]}>
+            {formatPrice(order.finalPrice || 0)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Tổng giá trị:</Text>
-          <Text style={[styles.detailValue, styles.priceValue]}>{formatPrice(order.totalValue)}</Text>
+          <Text style={styles.detailLabel}>Tổng tiền:</Text>
+          <Text style={[styles.detailValue, styles.priceValue]}>
+            {formatPrice(order.subtotal || 0)}
+          </Text>
         </View>
       </View>
 
-      {order.status === 'pending' && (
+      {order.status === 'DRAFT' && (
         <View style={styles.orderActions}>
           <TouchableOpacity
             style={styles.cancelButton}
@@ -420,7 +495,6 @@ const OrderManagementScreen = ({ navigation }) => {
                 vehicleModel: '',
                 quantity: '',
                 color: '',
-                pricePolicyId: '',
                 discountId: '',
                 promotionId: '',
                 warehouseId: '',
@@ -546,30 +620,18 @@ const OrderManagementScreen = ({ navigation }) => {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Kho *</Text>
-            <View style={styles.vehicleSelector}>
-              {warehouses.length > 0 ? (
-                warehouses.map((wh) => (
-                  <TouchableOpacity
-                    key={wh.id}
-                    style={[
-                      styles.vehicleOption,
-                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOption
-                    ]}
-                    onPress={() => setNewOrder({ ...newOrder, warehouseId: String(wh.id) })}
-                  >
-                    <Text style={[
-                      styles.vehicleOptionText,
-                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
-                    ]}>
-                      {wh.name || wh.location || `Kho ${wh.id}`}
-                    </Text>
-                    <Text style={styles.vehiclePrice}>ID: {wh.id}</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.noOptionsText}>Đang tải danh sách kho...</Text>
-              )}
-            </View>
+            {newOrder.warehouseId ? (
+              <View style={styles.selectedAgencyContainer}>
+                <Text style={styles.selectedAgencyText}>
+                  {warehouses.find(wh => wh.id === Number(newOrder.warehouseId))?.name || 
+                   warehouses.find(wh => wh.id === Number(newOrder.warehouseId))?.location || 
+                   `Kho ID: ${newOrder.warehouseId}`}
+                </Text>
+                <Text style={styles.selectedAgencyId}>ID: {newOrder.warehouseId}</Text>
+              </View>
+            ) : (
+              <Text style={styles.noAgencyText}>Đang tải thông tin kho...</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -586,34 +648,6 @@ const OrderManagementScreen = ({ navigation }) => {
             ) : (
               <Text style={styles.noAgencyText}>Không tìm thấy thông tin đại lý</Text>
             )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Chính sách giá *</Text>
-            <View style={styles.vehicleSelector}>
-              {pricePolicies.length > 0 ? (
-                pricePolicies.map((pp) => (
-                  <TouchableOpacity
-                    key={pp.id}
-                    style={[
-                      styles.vehicleOption,
-                      newOrder.pricePolicyId === String(pp.id) && styles.selectedVehicleOption
-                    ]}
-                    onPress={() => setNewOrder({ ...newOrder, pricePolicyId: String(pp.id) })}
-                  >
-                    <Text style={[
-                      styles.vehicleOptionText,
-                      newOrder.pricePolicyId === String(pp.id) && styles.selectedVehicleOptionText
-                    ]}>
-                      {pp.title || `Chính sách ${pp.id}`}
-                    </Text>
-                    <Text style={styles.vehiclePrice}>ID: {pp.id}</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.noOptionsText}>Đang tải danh sách chính sách giá...</Text>
-              )}
-            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -742,16 +776,16 @@ const OrderManagementScreen = ({ navigation }) => {
           <Text style={styles.statLabel}>Tổng đơn</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {orders.filter(o => o.status === 'pending').length}
+          <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>
+            {orders.filter(o => o.status === 'PENDING').length}
           </Text>
           <Text style={styles.statLabel}>Chờ xác nhận</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {orders.filter(o => o.status === 'shipped').length}
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>
+            {orders.filter(o => o.status === 'APPROVED').length}
           </Text>
-          <Text style={styles.statLabel}>Đang vận chuyển</Text>
+          <Text style={styles.statLabel}>Đã xác nhận</Text>
         </View>
       </View>
 
@@ -761,21 +795,38 @@ const OrderManagementScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.ordersContent}
       >
-          {sortedFilteredOrders.length > 0 ? (
-            sortedFilteredOrders.map((order, index) => (
+        {(() => {
+          console.log('🖥️ [OrderManagement] Render list:', {
+            loading,
+            ordersCount: orders.length,
+            filteredCount: sortedFilteredOrders.length
+          });
+          
+          if (loading && orders.length === 0) {
+            return (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>⏳</Text>
+                <Text style={styles.emptyTitle}>Đang tải...</Text>
+              </View>
+            );
+          } else if (sortedFilteredOrders.length > 0) {
+            return sortedFilteredOrders.map((order, index) => (
               <View key={getUniqueKey(order, index)}>
                 {renderOrderCard(order)}
               </View>
-            ))
-          ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
-            <Text style={styles.emptySubtitle}>
-              Tạo đơn đặt xe đầu tiên từ EVM
-            </Text>
-          </View>
-        )}
+            ));
+          } else {
+            return (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>📦</Text>
+                <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
+                <Text style={styles.emptySubtitle}>
+                  Tạo đơn đặt xe đầu tiên từ EVM
+                </Text>
+              </View>
+            );
+          }
+        })()}
       </ScrollView>
 
       {renderCreateModal()}
@@ -938,6 +989,12 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+    marginTop: 4,
+  },
+  orderDate: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
   },
   orderStatus: {
     marginLeft: SIZES.PADDING.SMALL,
@@ -1222,3 +1279,4 @@ const styles = StyleSheet.create({
 });
 
 export default OrderManagementScreen;
+

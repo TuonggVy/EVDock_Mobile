@@ -186,10 +186,23 @@ export const orderService = {
 
       const response = await axiosInstance.post('/order-restock', requestData);
       
+      // Response format: { data: { id, basePrice, quantity, ... } }
+      const responseData = response.data.data || response.data;
+      const orderId = responseData?.id || responseData?.orderId;
+      
+      console.log('✅ Order created successfully:', {
+        orderId,
+        status: responseData?.status,
+        quantity: responseData?.quantity,
+        subtotal: responseData?.subtotal,
+        fullData: responseData
+      });
+      
       return {
         success: true,
-        data: response.data.data || response.data,
-        message: response.data.message || 'Tạo đơn hàng thành công'
+        data: responseData,
+        orderId: orderId,
+        message: response.data.message || `Tạo đơn hàng thành công${orderId ? ` (ID: ${orderId})` : ''}`
       };
     } catch (error) {
       console.error('Error creating order restock:', error);
