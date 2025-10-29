@@ -9,9 +9,11 @@ class PromotionService {
   // Get all promotions
   async getAllPromotions(page = 1, limit = 10) {
     try {
+      console.log('🔄 [PromotionService] Fetching promotions:', { page, limit });
       const response = await axiosInstance.get(`${API_BASE_URL}/promotion/list`, {
         params: { page, limit }
       });
+      console.log('✅ [PromotionService] Promotions fetched:', response.data);
       return {
         success: true,
         data: response.data.data || [],
@@ -19,7 +21,24 @@ class PromotionService {
         message: response.data.message || 'Get promotion list successfully!'
       };
     } catch (error) {
-      console.error('Error fetching promotions:', error);
+      console.error('❌ [PromotionService] Error fetching promotions:', error);
+      console.error('❌ [PromotionService] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      // Handle 403 specifically
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'Không có quyền truy cập danh sách khuyến mãi. Vui lòng kiểm tra quyền của tài khoản.',
+          data: [],
+          message: 'Forbidden: Access denied'
+        };
+      }
+      
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to fetch promotions',
