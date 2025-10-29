@@ -1,4 +1,5 @@
 import storageService from './storage/storageService';
+import axiosInstance from './api/axiosInstance';
 
 // Local storage keys (kept internal to this module to avoid global churn)
 const STORAGE_KEY_ORDERS = '@EVDock:Orders';
@@ -164,6 +165,40 @@ export const orderService = {
     } catch (error) {
       console.error('Error updating order:', error);
       return { success: false, error: 'Không thể cập nhật đơn hàng' };
+    }
+  },
+
+  // Create order restock via API
+  createOrderRestock: async (orderData) => {
+    try {
+      const requestData = {
+        quantity: parseInt(orderData.quantity) || 0,
+        pricePolicyId: parseInt(orderData.pricePolicyId) || 1,
+        discountId: parseInt(orderData.discountId) || 1,
+        promotionId: parseInt(orderData.promotionId) || 1,
+        warehouseId: parseInt(orderData.warehouseId) || 1,
+        motorbikeId: parseInt(orderData.motorbikeId) || 1,
+        colorId: parseInt(orderData.colorId) || 1,
+        agencyId: parseInt(orderData.agencyId) || 1,
+      };
+
+      console.log('Creating order restock with data:', JSON.stringify(requestData, null, 2));
+
+      const response = await axiosInstance.post('/order-restock', requestData);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Tạo đơn hàng thành công'
+      };
+    } catch (error) {
+      console.error('Error creating order restock:', error);
+      console.error('Error details:', error.response?.data);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Không thể tạo đơn hàng',
+        message: 'Không thể tạo đơn hàng'
+      };
     }
   },
 };
