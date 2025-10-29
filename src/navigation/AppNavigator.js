@@ -54,6 +54,8 @@ import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
 import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
 import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
 import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
+import OrderRestockManagementScreen from '../screens/order/OrderRestockManagementScreen';
+import OrderRestockDetailScreen from '../screens/order/OrderRestockDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -336,6 +338,16 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="AddPromotion" 
               component={AddPromotionScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="OrderRestockManagement" 
+              component={OrderRestockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="OrderRestockDetail" 
+              component={OrderRestockDetailScreen} 
               options={{ headerShown: false }}
             />
           </>
