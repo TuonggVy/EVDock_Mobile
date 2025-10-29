@@ -30,6 +30,9 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     limit: 10,
     total: 0
   });
+  // Cache for order details (warehouse and motorbike names)
+  const [orderDetailsCache, setOrderDetailsCache] = useState({});
+  const [loadingDetails, setLoadingDetails] = useState({});
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -67,7 +70,49 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterOrders();
-  }, [searchQuery, selectedStatus, orders]);
+  }, [searchQuery, selectedStatus, orders, orderDetailsCache]);
+
+  const loadOrderDetail = async (orderId) => {
+    // Check cache first
+    if (orderDetailsCache[orderId]) {
+      return orderDetailsCache[orderId];
+    }
+
+    // Check if already loading
+    if (loadingDetails[orderId]) {
+      return null;
+    }
+
+    try {
+      setLoadingDetails(prev => ({ ...prev, [orderId]: true }));
+      const response = await orderRestockService.getOrderRestockDetail(orderId);
+      
+      if (response.success && response.data) {
+        const detail = {
+          warehouseName: response.data.warehouse?.name || null,
+          motorbikeName: response.data.electricMotorbike?.name || null,
+        };
+        
+        // Cache the detail
+        setOrderDetailsCache(prev => ({
+          ...prev,
+          [orderId]: detail
+        }));
+        
+        return detail;
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error loading order detail ${orderId}:`, error);
+      return null;
+    } finally {
+      setLoadingDetails(prev => {
+        const newState = { ...prev };
+        delete newState[orderId];
+        return newState;
+      });
+    }
+  };
 
   const loadOrders = async (page = 1) => {
     try {
@@ -84,8 +129,13 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       const response = await orderRestockService.getOrderRestockList(params);
       
       if (response.success) {
-        setOrders(response.data || []);
+        const ordersList = response.data || [];
+        setOrders(ordersList);
         setPaginationInfo(response.paginationInfo || { page: 1, limit: 10, total: 0 });
+        
+        // Load details for all orders in parallel
+        const detailPromises = ordersList.map(order => loadOrderDetail(order.id));
+        await Promise.all(detailPromises);
       } else {
         showError('Lỗi', response.error || 'Không thể tải danh sách đơn hàng');
       }
@@ -111,8 +161,36 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    // Clear cache to force reload of details
+    setOrderDetailsCache({});
     await loadAgencies();
     await loadOrders();
+  };
+
+  const getAgencyName = (agencyId) => {
+    if (!agencyId) return 'N/A';
+    const agency = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
+    return agency?.name || `Agency #${agencyId}`;
+  };
+
+  const getWarehouseName = (order) => {
+    // First check cache
+    const cachedDetail = orderDetailsCache[order.id];
+    if (cachedDetail?.warehouseName) {
+      return cachedDetail.warehouseName;
+    }
+    // Fallback to order data if available
+    return order.warehouse?.name || 'Đang tải...';
+  };
+
+  const getMotorbikeName = (order) => {
+    // First check cache
+    const cachedDetail = orderDetailsCache[order.id];
+    if (cachedDetail?.motorbikeName) {
+      return cachedDetail.motorbikeName;
+    }
+    // Fallback to order data if available
+    return order.electricMotorbike?.name || 'Đang tải...';
   };
 
   const filterOrders = () => {
@@ -121,12 +199,16 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order =>
-        order.id?.toString().toLowerCase().includes(query) ||
-        order.electricMotorbike?.name?.toLowerCase().includes(query) ||
-        order.warehouse?.name?.toLowerCase().includes(query) ||
-        getAgencyName(order.agencyId).toLowerCase().includes(query)
-      );
+      filtered = filtered.filter(order => {
+        const motorbikeName = getMotorbikeName(order).toLowerCase();
+        const warehouseName = getWarehouseName(order).toLowerCase();
+        return (
+          order.id?.toString().toLowerCase().includes(query) ||
+          motorbikeName.includes(query) ||
+          warehouseName.includes(query) ||
+          getAgencyName(order.agencyId).toLowerCase().includes(query)
+        );
+      });
     }
 
     // Filter by status
@@ -200,12 +282,6 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     });
   };
 
-  const getAgencyName = (agencyId) => {
-    if (!agencyId) return 'N/A';
-    const agency = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-    return agency?.name || `Agency #${agencyId}`;
-  };
-
   const renderOrderCard = (order) => (
     <TouchableOpacity
       key={order.id}
@@ -232,13 +308,13 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Xe:</Text>
           <Text style={styles.detailValue}>
-            {order.electricMotorbike?.name || 'N/A'}
+            {getMotorbikeName(order)}
           </Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Kho:</Text>
           <Text style={styles.detailValue}>
-            {order.warehouse?.name || 'N/A'}
+            {getWarehouseName(order)}
           </Text>
         </View>
         <View style={styles.detailRow}>
