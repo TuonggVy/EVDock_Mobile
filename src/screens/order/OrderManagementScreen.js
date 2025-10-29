@@ -31,6 +31,8 @@ const { width } = Dimensions.get('window');
 const OrderManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
+  // Map a lightweight signature of an order (from list/create response) to its real orderId
+  const [createdOrderIdMap, setCreatedOrderIdMap] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -67,6 +69,19 @@ const OrderManagementScreen = ({ navigation }) => {
   // Utility function to ensure unique keys
   const getUniqueKey = (item, index) => {
     return `${item.id || 'item'}_${index}`;
+  };
+
+  // Build a deterministic key from available list fields to help resolve id-less items
+  const buildOrderKey = (orderLike) => {
+    if (!orderLike) return 'null';
+    const qty = orderLike.quantity ?? '';
+    const basePrice = orderLike.basePrice ?? '';
+    const wholesalePrice = orderLike.wholesalePrice ?? '';
+    const subtotal = orderLike.subtotal ?? '';
+    const finalPrice = orderLike.finalPrice ?? '';
+    const status = orderLike.status ?? '';
+    const orderAt = orderLike.orderAt ? new Date(orderLike.orderAt).toISOString() : '';
+    return `q=${qty}|bp=${basePrice}|wp=${wholesalePrice}|fp=${finalPrice}|sub=${subtotal}|st=${status}|at=${orderAt}`;
   };
 
   // Load vehicle names from Catalog and aggregate per name
@@ -217,8 +232,28 @@ const OrderManagementScreen = ({ navigation }) => {
       });
       
       if (response.success) {
-        setOrders(response.data || []);
-        console.log('✅ [OrderManagement] Đã set orders:', response.data?.length || 0, 'items');
+        const ordersList = response.data || [];
+        
+        // Log detailed info about orders structure
+        if (ordersList.length > 0) {
+          const firstOrder = ordersList[0];
+          console.log('📋 [OrderManagement] Sample order from list:', {
+            hasId: 'id' in firstOrder,
+            id: firstOrder?.id,
+            idType: typeof firstOrder?.id,
+            keys: Object.keys(firstOrder || {}),
+            fullOrder: firstOrder
+          });
+          
+          // Check all orders for id
+          const ordersWithoutId = ordersList.filter(o => !o.id);
+          if (ordersWithoutId.length > 0) {
+            console.warn('⚠️ [OrderManagement] Có', ordersWithoutId.length, 'orders không có id:', ordersWithoutId);
+          }
+        }
+        
+        setOrders(ordersList);
+        console.log('✅ [OrderManagement] Đã set orders:', ordersList.length, 'items');
       } else {
         console.error('❌ [OrderManagement] API Error:', response.error);
         showError('Lỗi', response.error || 'Không thể tải danh sách đơn hàng');
@@ -290,16 +325,59 @@ const OrderManagementScreen = ({ navigation }) => {
       
       if (response.success) {
         const orderData = response.data || {};
-        const orderId = response.orderId || orderData.id;
+        // Get orderId from multiple possible sources
+        const orderId = response.orderId || orderData.id || response.data?.id;
         
         console.log('📦 [OrderManagement] Order created:', {
           orderId,
           status: orderData.status,
           quantity: orderData.quantity,
-          subtotal: orderData.subtotal
+          subtotal: orderData.subtotal,
+          orderDataKeys: Object.keys(orderData),
+          responseOrderId: response.orderId,
+          orderDataId: orderData.id,
+          responseDataId: response.data?.id
         });
+
+        // Store a mapping so id-less list items can still navigate to detail
+        if (orderId) {
+          const key = buildOrderKey(orderData);
+          setCreatedOrderIdMap(prev => ({ ...prev, [key]: orderId }));
+          console.log('🔗 [OrderManagement] Mapped key to orderId:', { key, orderId });
+        }
         
-        // Reload orders after successful creation
+        // Log ID confirmation
+        if (orderId) {
+          console.log('🆔 [OrderManagement] ✅ Order ID nhận được:', orderId, '(type:', typeof orderId, ')');
+        } else {
+          console.error('❌ [OrderManagement] KHÔNG CÓ orderId trong response!');
+          console.error('❌ [OrderManagement] Full response:', JSON.stringify(response, null, 2));
+        }
+        
+        // Navigate to detail screen with the newly created order ID
+        if (orderId) {
+          console.log('🧭 [OrderManagement] Navigating to detail với orderId từ create:', orderId);
+          setShowCreateModal(false);
+          
+          // Small delay to ensure modal is closed before navigation
+          setTimeout(() => {
+            navigation.navigate('OrderRestockDetail', {
+              orderId: orderId,
+              onStatusUpdate: () => {
+                loadOrders();
+              }
+            });
+          }, 100);
+          
+          // Reload orders in background (but navigate first)
+          loadOrders();
+          
+          const successMessage = `Đơn hàng #${orderId} đã được tạo thành công!`;
+          showSuccess('Thành công', successMessage);
+          return; // Exit early after navigation
+        }
+        
+        // If no orderId, just reload list normally (fallback case)
         await loadOrders();
         setNewOrder({
           vehicleModel: '',
@@ -314,11 +392,7 @@ const OrderManagementScreen = ({ navigation }) => {
         });
         setShowCreateModal(false);
         
-        const successMessage = orderId 
-          ? `Đơn hàng #${orderId} đã được tạo thành công!`
-          : response.message || 'Đơn hàng đã được tạo thành công!';
-        
-        showSuccess('Thành công', successMessage);
+        showSuccess('Thành công', response.message || 'Đơn hàng đã được tạo thành công!');
       } else {
         showError('Lỗi', response.error || 'Không thể tạo đơn hàng');
       }
@@ -408,11 +482,50 @@ const OrderManagementScreen = ({ navigation }) => {
     }).format(price);
   };
 
+  const handleViewOrder = (order) => {
+    console.log('👆 [OrderManagement] handleViewOrder called with:', {
+      orderId: order.id,
+      orderKeys: Object.keys(order),
+      fullOrder: order
+    });
+    
+    // Try direct id first
+    let orderId = order.id || order.orderId;
+    
+    // If missing, try resolve from our local mapping built at creation time
+    if (!orderId) {
+      const key = buildOrderKey(order);
+      const mappedId = createdOrderIdMap[key];
+      if (mappedId) {
+        console.log('🔎 [OrderManagement] Resolved orderId from local map:', { key, mappedId });
+        orderId = mappedId;
+      }
+    }
+    
+    if (!orderId) {
+      console.error('❌ [OrderManagement] Không có orderId trong order object:', order);
+      showError('Lỗi', 'Không tìm thấy ID đơn hàng. Vui lòng refresh lại danh sách.');
+      return;
+    }
+    
+    console.log('✅ [OrderManagement] Navigating to OrderRestockDetail with orderId:', orderId);
+    
+    navigation.navigate('OrderRestockDetail', {
+      orderId: orderId,
+      onStatusUpdate: () => {
+        loadOrders();
+      }
+    });
+  };
+
   const renderOrderCard = (order) => (
-    <View style={styles.orderCard}>
+    <TouchableOpacity 
+      style={styles.orderCard}
+      onPress={() => handleViewOrder(order)}
+      activeOpacity={0.7}
+    >
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>Order #{order.id || '-'}</Text>
           <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
         </View>
         <View style={styles.orderStatus}>
@@ -475,7 +588,7 @@ const OrderManagementScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderCreateModal = () => (
