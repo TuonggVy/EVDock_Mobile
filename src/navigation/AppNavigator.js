@@ -54,6 +54,9 @@ import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
 import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
 import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
 import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
+import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
+import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
+import EditPricePolicyScreen from '../screens/pricepolicy/EditPricePolicyScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -333,9 +336,24 @@ const AppNavigator = () => {
               component={PromotionManagementScreen} 
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="AddPromotion" 
-              component={AddPromotionScreen} 
+            <Stack.Screen
+              name="AddPromotion"
+              component={AddPromotionScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PricePolicyManagement"
+              component={PricePolicyManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AddPricePolicy"
+              component={AddPricePolicyScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditPricePolicy"
+              component={EditPricePolicyScreen}
               options={{ headerShown: false }}
             />
           </>
