@@ -186,10 +186,41 @@ export const orderService = {
 
       const response = await axiosInstance.post('/order-restock', requestData);
       
+      // Response format: { statusCode: 201, message: "...", data: { id: 7, ... } }
+      console.log('📦 [OrderService] Raw API Response:', {
+        statusCode: response.data?.statusCode,
+        message: response.data?.message,
+        hasData: !!response.data?.data,
+        fullResponse: response.data
+      });
+      
+      // Response format: { data: { id: 7, basePrice, quantity, ... } }
+      // Try response.data.data first (nested), then response.data (direct)
+      const responseData = response.data?.data || response.data;
+      const orderId = responseData?.id || responseData?.orderId;
+      
+      console.log('✅ [OrderService] Order created successfully:', {
+        orderId,
+        status: responseData?.status,
+        quantity: responseData?.quantity,
+        subtotal: responseData?.subtotal,
+        extractedData: responseData
+      });
+      
+      // Log the ID clearly
+      if (orderId) {
+        console.log('🆔 [OrderService] ✅ Order ID từ response:', orderId, '(type:', typeof orderId, ')');
+      } else {
+        console.error('❌ [OrderService] KHÔNG TÌM THẤY orderId trong response!');
+        console.error('❌ [OrderService] Response structure:', JSON.stringify(response.data, null, 2));
+        console.error('❌ [OrderService] responseData:', JSON.stringify(responseData, null, 2));
+      }
+      
       return {
         success: true,
-        data: response.data.data || response.data,
-        message: response.data.message || 'Tạo đơn hàng thành công'
+        data: responseData,
+        orderId: orderId,
+        message: response.data.message || `Tạo đơn hàng thành công${orderId ? ` (ID: ${orderId})` : ''}`
       };
     } catch (error) {
       console.error('Error creating order restock:', error);
@@ -294,4 +325,3 @@ export const warehouseService = {
 };
 
 export default { orderService, allocationService, warehouseService };
-
