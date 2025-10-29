@@ -145,6 +145,12 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       icon: '📊',
       onPress: () => Alert.alert('Tính năng', 'Báo cáo toàn diện - Sắp ra mắt'),
     },
+    {
+      title: 'Price Policy',
+      gradient: ['#4CAF50', '#66BB6A', '#81C784'],
+      icon: '💰',
+      onPress: () => navigation.navigate('PricePolicyManagement'),
+    },
   ];
 
 
