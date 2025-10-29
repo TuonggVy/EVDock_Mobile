@@ -18,6 +18,9 @@ import { COLORS, SIZES, IMAGES } from '../../constants';
 const EVMAdminHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
@@ -90,7 +93,7 @@ const EVMAdminHomeScreen = ({ navigation }) => {
     return 'Good evening';
   };
 
-  const categoryCards = [
+  const allCategoryCards = [
     {
       title: 'Pricing',
       gradient: COLORS.GRADIENT.BLUE,
@@ -140,6 +143,12 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('InventoryManagement'),
     },
     {
+      title: 'Order Restock',
+      gradient: ['#9B59B6', '#8E44AD', '#7D3C98'],
+      icon: '🔄',
+      onPress: () => navigation.navigate('OrderRestockManagement'),
+    },
+    {
       title: 'Reports',
       gradient: COLORS.GRADIENT.PURPLE,
       icon: '📊',
@@ -152,6 +161,13 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('PricePolicyManagement'),
     },
   ];
+
+  // Filter category cards based on search query
+  const categoryCards = allCategoryCards.filter(card => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return card.title.toLowerCase().includes(query);
+  });
 
 
   return (
@@ -191,7 +207,17 @@ const EVMAdminHomeScreen = ({ navigation }) => {
             style={styles.searchInput}
             placeholder="Search system, dealers..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+            >
+              <Text style={styles.clearButtonText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Category Cards */}
@@ -383,6 +409,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  clearButton: {
+    padding: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: 'bold',
   },
   logoutText: {
     marginLeft: SIZES.PADDING.SMALL,
