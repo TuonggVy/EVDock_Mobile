@@ -123,7 +123,14 @@ const StaffManagementScreen = ({ navigation }) => {
   };
 
   const filterStaff = () => {
-    let filtered = staffList;
+    // Hide soft-deleted by default and treat no-agency as not active
+    let filtered = staffList
+      .filter(s => !s.isDeleted)
+      .map(s => ({
+        ...s,
+        status: s.agencyId ? (s.status || 'active') : 'inactive',
+        isActive: s.agencyId ? (s.isActive !== false) : false,
+      }));
 
     // Only apply search filter locally (other filters are handled by API)
     if (searchQuery) {

@@ -142,21 +142,34 @@ const DealerStaffManagementScreen = ({ navigation }) => {
 
   const handleCreateStaff = async () => {
     try {
+      console.log('🟢 handleCreateStaff pressed', { newStaff, agencyId, dealerStaffRole });
       // Validation
       if (!newStaff.username || !newStaff.password || !newStaff.fullname || !newStaff.email || !newStaff.phone) {
+        console.log('⛔ Validation failed: missing required fields', {
+          username: !!newStaff.username,
+          password: !!newStaff.password,
+          fullname: !!newStaff.fullname,
+          email: !!newStaff.email,
+          phone: !!newStaff.phone,
+        });
         showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (username, password, fullname, email, phone)');
         return;
       }
 
       if (!agencyId) {
+        console.log('⛔ Validation failed: missing agencyId');
         showAlert('Lỗi', 'Không tìm thấy thông tin agency');
         return;
       }
 
-      if (!dealerStaffRole?.id) {
+      const resolvedRoleId = dealerStaffRole?.id ?? dealerStaffRole?.data?.id;
+      if (!resolvedRoleId) {
+        console.log('⛔ Validation failed: missing dealerStaffRole id (checked id and data.id)', { dealerStaffRole });
         showAlert('Lỗi', 'Không tìm thấy thông tin role Dealer Staff');
         return;
       }
+
+      setIsLoading(true);
 
       // Call API to create staff
       const staffData = {
@@ -166,15 +179,17 @@ const DealerStaffManagementScreen = ({ navigation }) => {
         email: newStaff.email,
         phone: newStaff.phone,
         address: newStaff.address,
-        roleId: dealerStaffRole.id,
-        agencyId: agencyId,
+        roleId: Number(resolvedRoleId),
+        agencyId: Number(agencyId),
       };
 
-      console.log('Creating dealer staff with data:', staffData);
+      console.log('🚀 Creating dealer staff with data:', staffData);
 
       const result = await staffService.createDealerStaff(staffData);
       
       if (result.success) {
+        console.log('✅ Create dealer staff result:', result);
+        showAlert('Thành công', result.message || 'Tạo tài khoản nhân viên thành công');
         setShowCreateModal(false);
         setNewStaff({
           username: '',
@@ -184,14 +199,16 @@ const DealerStaffManagementScreen = ({ navigation }) => {
           phone: '',
           address: '',
         });
-        showAlert('Thành công', result.message || 'Tạo tài khoản nhân viên thành công');
-        loadStaffList(agencyId); // Reload the staff list
+        await loadStaffList(agencyId); // Reload the staff list
       } else {
+        console.log('❌ Create dealer staff failed:', result);
         showAlert('Lỗi', result.error || 'Không thể tạo tài khoản nhân viên');
       }
     } catch (error) {
       console.error('Error creating staff:', error);
-      showAlert('Lỗi', 'Không thể tạo tài khoản nhân viên');
+      showAlert('Lỗi', error.message || 'Không thể tạo tài khoản nhân viên');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -214,14 +231,29 @@ const DealerStaffManagementScreen = ({ navigation }) => {
         return;
       }
 
-      // TODO: Add API for updating dealer staff
-      showAlert('Thành công', 'Cập nhật thông tin nhân viên thành công');
-      setShowEditModal(false);
-      setEditingStaff(null);
-      loadStaffList(agencyId);
+      setIsLoading(true);
+      
+      const result = await staffService.updateDealerStaff(editingStaff.id, {
+        username: editStaffForm.username,
+        fullname: editStaffForm.fullname,
+        email: editStaffForm.email,
+        phone: editStaffForm.phone,
+        address: editStaffForm.address || '',
+      });
+      
+      if (result.success) {
+        showAlert('Thành công', result.message || 'Cập nhật thông tin nhân viên thành công');
+        setShowEditModal(false);
+        setEditingStaff(null);
+        await loadStaffList(agencyId); // Reload staff list
+      } else {
+        showAlert('Lỗi', result.error || 'Không thể cập nhật thông tin nhân viên');
+      }
     } catch (error) {
       console.error('Error updating staff:', error);
-      showAlert('Lỗi', 'Không thể cập nhật thông tin nhân viên');
+      showAlert('Lỗi', error.message || 'Không thể cập nhật thông tin nhân viên');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -234,9 +266,23 @@ const DealerStaffManagementScreen = ({ navigation }) => {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            setStaffList(prev => prev.filter(s => s.id !== staff.id));
-            showAlert('Thành công', 'Đã xóa nhân viên');
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              const result = await staffService.deleteDealerStaff(staff.id);
+              
+              if (result.success) {
+                showAlert('Thành công', result.message || 'Đã xóa nhân viên');
+                await loadStaffList(agencyId); // Reload staff list
+              } else {
+                showAlert('Lỗi', result.error || 'Không thể xóa nhân viên');
+              }
+            } catch (error) {
+              console.error('Error deleting staff:', error);
+              showAlert('Lỗi', error.message || 'Không thể xóa nhân viên');
+            } finally {
+              setIsLoading(false);
+            }
           },
         },
       ]
@@ -359,6 +405,8 @@ const DealerStaffManagementScreen = ({ navigation }) => {
           <Button
             title="Tạo tài khoản"
             onPress={handleCreateStaff}
+            loading={isLoading}
+            disabled={isLoading}
             style={styles.createButton}
           />
         </View>
