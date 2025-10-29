@@ -120,6 +120,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       icon: '💰',
       onPress: () => navigation.navigate('PricePolicyManagement'),
     },
+    {
+      title: 'Order Restock',
+      gradient: ['#9B59B6', '#8E44AD', '#7D3C98'],
+      icon: '🔄',
+      onPress: () => navigation.navigate('OrderRestockManagement'),
+    },
   ];
 
 
