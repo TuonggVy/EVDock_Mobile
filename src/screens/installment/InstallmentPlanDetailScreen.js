@@ -29,6 +29,7 @@ const InstallmentPlanDetailScreen = () => {
   const { user } = useAuth();
   const installmentId = route.params?.installmentId;
   const { alertConfig, hideAlert, showSuccess, showDeleteConfirm } = useCustomAlert();
+  const viewOnly = !!route.params?.viewOnly;
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -179,6 +180,7 @@ const InstallmentPlanDetailScreen = () => {
               placeholder={label}
               placeholderTextColor={COLORS.TEXT.SECONDARY}
               keyboardType={(key.includes('Rate') || key.includes('Month') || key.includes('Percent') || key === 'processFee') ? 'numeric' : 'default'}
+              editable={!viewOnly}
             />
           </View>
         ))}
@@ -186,14 +188,14 @@ const InstallmentPlanDetailScreen = () => {
         {/* Type dropdown */}
         <View style={styles.field}>
           <Text style={styles.label}>Type (FLAT/DECLINING)</Text>
-          <TouchableOpacity style={styles.selector} onPress={() => setShowTypeDropdown(true)}>
+          <TouchableOpacity style={styles.selector} disabled={viewOnly} onPress={() => setShowTypeDropdown(true)}>
             <Text style={styles.selectorText}>{form.interestPaidType || 'Select type'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Start date picker */}
         <View style={styles.field}>
-          <TouchableOpacity activeOpacity={0.9} onPress={() => openNativeDatePicker('startAt')}>
+          <TouchableOpacity activeOpacity={0.9} disabled={viewOnly} onPress={() => openNativeDatePicker('startAt')}>
             <Text style={styles.label}>Start Date</Text>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -204,10 +206,10 @@ const InstallmentPlanDetailScreen = () => {
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 editable={false}
                 showSoftInputOnFocus={false}
-                onFocus={() => openNativeDatePicker('startAt')}
-                onPressIn={() => openNativeDatePicker('startAt')}
+                onFocus={() => { if (!viewOnly) openNativeDatePicker('startAt'); }}
+                onPressIn={() => { if (!viewOnly) openNativeDatePicker('startAt'); }}
               />
-              <TouchableOpacity style={styles.calendarButton} onPress={() => openNativeDatePicker('startAt')}>
+              <TouchableOpacity style={styles.calendarButton} disabled={viewOnly} onPress={() => openNativeDatePicker('startAt')}>
                 <Calendar size={18} />
               </TouchableOpacity>
             </View>
@@ -216,7 +218,7 @@ const InstallmentPlanDetailScreen = () => {
 
         {/* End date picker */}
         <View style={styles.field}>
-          <TouchableOpacity activeOpacity={0.9} onPress={() => openNativeDatePicker('endAt')}>
+          <TouchableOpacity activeOpacity={0.9} disabled={viewOnly} onPress={() => openNativeDatePicker('endAt')}>
             <Text style={styles.label}>End Date</Text>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -227,10 +229,10 @@ const InstallmentPlanDetailScreen = () => {
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 editable={false}
                 showSoftInputOnFocus={false}
-                onFocus={() => openNativeDatePicker('endAt')}
-                onPressIn={() => openNativeDatePicker('endAt')}
+                onFocus={() => { if (!viewOnly) openNativeDatePicker('endAt'); }}
+                onPressIn={() => { if (!viewOnly) openNativeDatePicker('endAt'); }}
               />
-              <TouchableOpacity style={styles.calendarButton} onPress={() => openNativeDatePicker('endAt')}>
+              <TouchableOpacity style={styles.calendarButton} disabled={viewOnly} onPress={() => openNativeDatePicker('endAt')}>
                 <Calendar size={18} />
               </TouchableOpacity>
             </View>
@@ -240,11 +242,12 @@ const InstallmentPlanDetailScreen = () => {
         {/* Status dropdown */}
         <View style={styles.field}>
           <Text style={styles.label}>Status (ACTIVE/INACTIVE)</Text>
-          <TouchableOpacity style={styles.selector} onPress={() => setShowStatusDropdown(true)}>
+          <TouchableOpacity style={styles.selector} disabled={viewOnly} onPress={() => setShowStatusDropdown(true)}>
             <Text style={styles.selectorText}>{form.status || 'Select status'}</Text>
           </TouchableOpacity>
         </View>
 
+        {!viewOnly && (
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.actionWrapper} disabled={saving} onPress={onSave}>
             <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.saveButton}>
@@ -259,6 +262,7 @@ const InstallmentPlanDetailScreen = () => {
             </TouchableOpacity>
           ) : null}
         </View>
+        )}
       </ScrollView>
 
       <CustomAlert
