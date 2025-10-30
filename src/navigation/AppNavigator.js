@@ -41,6 +41,7 @@ import InstallmentManagementScreen from '../screens/installment/InstallmentManag
 import InstallmentDetailScreen from '../screens/installment/InstallmentDetailScreen';
 import InstallmentPlanManagementScreen from '../screens/installment/InstallmentPlanManagementScreen';
 import InstallmentPlanDetailScreen from '../screens/installment/InstallmentPlanDetailScreen';
+import StaffInstallmentPlanListScreen from '../screens/installment/StaffInstallmentPlanListScreen';
 import DepositManagementScreen from '../screens/deposit/DepositManagementScreen';
 import CreateDepositAvailableScreen from '../screens/deposit/CreateDepositAvailableScreen';
 import CreatePreOrderScreen from '../screens/deposit/CreatePreOrderScreen';
@@ -309,6 +310,11 @@ const AppNavigator = () => {
             <Stack.Screen
               name="InstallmentPlanDetail"
               component={InstallmentPlanDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="StaffInstallmentPlanList"
+              component={StaffInstallmentPlanListScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen

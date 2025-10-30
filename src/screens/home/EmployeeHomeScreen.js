@@ -124,6 +124,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('InstallmentManagement'),
     },
     {
+      title: 'Installment Plan',
+      gradient: COLORS.GRADIENT.CYAN,
+      icon: '📈',
+      onPress: () => navigation.navigate('StaffInstallmentPlanList'),
+    },
+    {
       title: 'Deposits',
       gradient: COLORS.GRADIENT.ORANGE,
       icon: '💎',
