@@ -94,7 +94,8 @@ const agencyService = {
   async getAgencyById(agencyId) {
     try {
       const token = await this.getAuthTokenAsync();
-      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.BY_ID(agencyId)}`;
+      // Use detail endpoint to get full location/address fields
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.DETAIL(agencyId)}`;
       
       const headers = {
         'Content-Type': 'application/json',
@@ -111,14 +112,22 @@ const agencyService = {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Gracefully handle not-found without throwing
+        if (response.status === 404) {
+          return { success: false, error: 'Not found', data: null, status: 404 };
+        }
+        return { success: false, error: `HTTP error! status: ${response.status}`, data: null, status: response.status };
       }
 
       const data = await response.json();
-      return data;
+      // Normalize common API response shapes
+      const payload = (data && typeof data === 'object' && 'data' in data)
+        ? data.data
+        : data;
+      return { success: true, data: payload };
     } catch (error) {
-      console.error('Error fetching agency:', error);
-      throw error;
+      // Fail silently up the stack; return a structured error instead of throwing
+      return { success: false, error: error.message || 'Failed to fetch agency', data: null };
     }
   },
 
