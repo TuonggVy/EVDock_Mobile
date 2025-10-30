@@ -17,7 +17,7 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { orderService } from '../../services/orderService';
-import orderRestockService from '../../services/orderRestockService';
+import orderRestockService from '../../services/orderRestockManagerService';
 import { vehicleService } from '../../services/vehicleService';
 import warehouseService from '../../services/warehouseService';
 import agencyService from '../../services/agencyService';
@@ -361,7 +361,7 @@ const OrderManagementScreen = ({ navigation }) => {
           
           // Small delay to ensure modal is closed before navigation
           setTimeout(() => {
-            navigation.navigate('OrderRestockDetail', {
+            navigation.navigate('OrderRestockDetailManager', {
               orderId: orderId,
               onStatusUpdate: () => {
                 loadOrders();
@@ -510,7 +510,7 @@ const OrderManagementScreen = ({ navigation }) => {
     
     console.log('✅ [OrderManagement] Navigating to OrderRestockDetail with orderId:', orderId);
     
-    navigation.navigate('OrderRestockDetail', {
+    navigation.navigate('OrderRestockDetailManager', {
       orderId: orderId,
       onStatusUpdate: () => {
         loadOrders();
@@ -604,7 +604,7 @@ const OrderManagementScreen = ({ navigation }) => {
             style={styles.cancelButton}
             onPress={() => handleCancelOrder(order.id)}
           >
-            <Text style={styles.cancelButtonText}>Hủy đơn</Text>
+            <Text style={styles.cancelButtonText}>Xóa đơn</Text>
           </TouchableOpacity>
         </View>
       )}
