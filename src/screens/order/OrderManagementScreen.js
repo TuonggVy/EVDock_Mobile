@@ -526,6 +526,7 @@ const OrderManagementScreen = ({ navigation }) => {
     >
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
+          <Text style={styles.orderId}>#{order.id ?? '—'}</Text>
           <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
         </View>
         <View style={styles.orderStatus}>
@@ -536,6 +537,25 @@ const OrderManagementScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.orderDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Đại lý:</Text>
+          <Text style={styles.detailValue}>
+            {agencies.find(ag => ag.id === Number(order.agencyId ?? user?.agencyId))?.name ||
+             agencies.find(ag => ag.id === Number(order.agencyId ?? user?.agencyId))?.location ||
+             `Đại lý ID: ${order.agencyId ?? user?.agencyId}`}
+          </Text>
+        </View>
+        {(() => {
+          const agency = agencies.find(ag => ag.id === Number(order.agencyId ?? user?.agencyId));
+          const address = agency?.address || agency?.location;
+          if (!address) return null;
+          return (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Địa chỉ:</Text>
+              <Text style={styles.detailValue}>{address}</Text>
+            </View>
+          );
+        })()}
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Số lượng:</Text>
           <Text style={styles.detailValue}>{order.quantity || 0} xe</Text>
