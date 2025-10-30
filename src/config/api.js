@@ -64,6 +64,7 @@ export const API_ENDPOINTS = {
     LIST: '/agency/list',
     BASE: '/agency',
     BY_ID: (id) => `/agency/${id}`,
+    DETAIL: (id) => `/agency/detail/${id}`,
   },
 };
 
