@@ -124,6 +124,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('DepositManagement'),
     },
     {
+      title: 'Installment Plan',
+      gradient: COLORS.GRADIENT.CYAN,
+      icon: '📈',
+      onPress: () => navigation.navigate('InstallmentPlanManagement'),
+    },
+    {
       title: 'Customer Debt',
       gradient: COLORS.GRADIENT.ORANGE,
       icon: '💰',
