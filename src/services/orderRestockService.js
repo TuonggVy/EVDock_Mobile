@@ -9,7 +9,6 @@ const ORDER_RESTOCK_ENDPOINTS = {
   DETAIL: (orderId) => `/order-restock-management/detail/${orderId}`,
   UPDATE_STATUS: (orderId) => `/order-restock-management/status/${orderId}`,
   DELETE: (orderId) => `/order-restock-management/${orderId}`,
-  ACCEPT: (orderId) => `/order-restock/accept/${orderId}`,
 };
 
 /**
@@ -114,34 +113,11 @@ export const deleteOrderRestock = async (orderId) => {
   }
 };
 
-/**
- * Accept order restock (moves status from DRAFT to PENDING)
- * @param {number} orderId - Order ID
- * @returns {Promise<Object>} Updated order data
- */
-export const acceptOrderRestock = async (orderId) => {
-  try {
-    const response = await api.patch(ORDER_RESTOCK_ENDPOINTS.ACCEPT(orderId));
-    return {
-      success: true,
-      data: response.data?.data || response.data,
-      message: response.data?.message || 'Xác nhận đơn hàng thành công'
-    };
-  } catch (error) {
-    console.error('Error accepting order restock:', error);
-    return {
-      success: false,
-      error: error.response?.data?.message || 'Không thể xác nhận đơn hàng'
-    };
-  }
-};
-
 const orderRestockService = {
   getOrderRestockList,
   getOrderRestockDetail,
   updateOrderRestockStatus,
   deleteOrderRestock,
-  acceptOrderRestock,
 };
 
 export default orderRestockService;
