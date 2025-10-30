@@ -12,13 +12,14 @@ import {
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import orderRestockService from '../../services/orderRestockService';
+import orderRestockManagerService from '../../services/orderRestockManagerService';
 import agencyService from '../../services/agencyService';
 
-const OrderRestockDetailScreen = ({ navigation, route }) => {
+const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const { orderId, onStatusUpdate } = route.params || {};
   const [order, setOrder] = useState(null);
   const [agencies, setAgencies] = useState([]);
+  const [agencyDetail, setAgencyDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -55,107 +56,47 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
         setAgencies(response.data || []);
       }
     } catch (error) {
-      console.error('Error loading agencies:', error);
-      // Don't show error, just fail silently
+      // silent
     }
   };
 
   const loadOrderDetail = async () => {
     try {
       setLoading(true);
-      const response = await orderRestockService.getOrderRestockDetail(orderId);
-      
+      const response = await orderRestockManagerService.getOrderRestockDetail(orderId);
       if (response.success) {
-        setOrder(response.data);
+        const detail = response.data;
+        setOrder(detail);
+        const agencyId = detail?.agencyId;
+        if (agencyId) {
+          const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
+          const hasBill = !!detail.agencyBill;
+          if (!existsInList && !hasBill) {
+            const agencyResp = await agencyService.getAgencyById(agencyId);
+            if (agencyResp?.success) {
+              const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
+              setAgencyDetail(detailAgency);
+            } else {
+              setAgencyDetail(null);
+            }
+          } else if (existsInList) {
+            setAgencyDetail(existsInList);
+          } else if (hasBill) {
+            setAgencyDetail(detail.agencyBill);
+          }
+        } else {
+          setAgencyDetail(null);
+        }
       } else {
         showError('Lỗi', response.error || 'Không thể tải chi tiết đơn hàng');
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Error loading order detail:', error);
       showError('Lỗi', 'Không thể tải chi tiết đơn hàng');
       navigation.goBack();
     } finally {
       setLoading(false);
     }
-  };
-
-  const getAgencyInfo = () => {
-    if (!order?.agencyId) return null;
-    // First try to get from agencies list
-    const agency = agencies.find(a => 
-      a.id === order.agencyId || 
-      a.id?.toString() === order.agencyId?.toString()
-    );
-    // If found, return it
-    if (agency) return agency;
-    // Otherwise, check if agencyBill is in order response
-    if (order.agencyBill) return order.agencyBill;
-    // Return null if nothing found
-    return null;
-  };
-
-  const handleUpdateStatus = () => {
-    if (!selectedStatus) {
-      showError('Lỗi', 'Vui lòng chọn trạng thái mới');
-      return;
-    }
-
-    if (selectedStatus === order.status) {
-      showError('Lỗi', 'Trạng thái đã được chọn');
-      setShowStatusModal(false);
-      return;
-    }
-
-    showConfirm(
-      'Xác nhận cập nhật',
-      `Bạn có chắc chắn muốn đổi trạng thái từ "${getStatusLabel(order.status)}" sang "${getStatusLabel(selectedStatus)}"?`,
-      async () => {
-        try {
-          const response = await orderRestockService.updateOrderRestockStatus(orderId, selectedStatus);
-          if (response.success) {
-            setOrder(response.data);
-            setShowStatusModal(false);
-            setSelectedStatus('');
-            showSuccess('Thành công', 'Cập nhật trạng thái thành công!');
-            // Trigger refresh on parent screen immediately
-            if (onStatusUpdate) {
-              onStatusUpdate();
-            }
-          } else {
-            showError('Lỗi', response.error || 'Không thể cập nhật trạng thái');
-          }
-        } catch (error) {
-          console.error('Error updating status:', error);
-          showError('Lỗi', 'Không thể cập nhật trạng thái');
-        }
-      }
-    );
-  };
-
-  const handleDeleteOrder = () => {
-    showConfirm(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa đơn hàng #${order.id}?`,
-      async () => {
-        try {
-          const response = await orderRestockService.deleteOrderRestock(order.id);
-          if (response.success) {
-            showSuccess('Thành công', 'Xóa đơn hàng thành công!');
-            // Trigger refresh on parent screen immediately
-            if (onStatusUpdate) {
-              onStatusUpdate();
-            }
-            navigation.goBack();
-          } else {
-            showError('Lỗi', response.error || 'Không thể xóa đơn hàng');
-          }
-        } catch (error) {
-          console.error('Error deleting order:', error);
-          showError('Lỗi', 'Không thể xóa đơn hàng');
-        }
-      }
-    );
   };
 
   const getStatusColor = (status) => {
@@ -194,62 +135,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const renderStatusModal = () => (
-    <Modal
-      visible={showStatusModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowStatusModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Chọn trạng thái mới</Text>
-          
-          <ScrollView style={styles.statusList}>
-            {orderStatuses.map((status) => (
-              <TouchableOpacity
-                key={status.key}
-                style={[
-                  styles.statusOption,
-                  selectedStatus === status.key && styles.selectedStatusOption
-                ]}
-                onPress={() => setSelectedStatus(status.key)}
-              >
-                <View style={[styles.statusIndicator, { backgroundColor: status.color }]} />
-                <Text style={[
-                  styles.statusOptionText,
-                  selectedStatus === status.key && styles.selectedStatusOptionText
-                ]}>
-                  {status.label}
-                </Text>
-                {selectedStatus === status.key && (
-                  <Text style={styles.checkIcon}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => {
-                setShowStatusModal(false);
-                setSelectedStatus('');
-              }}
-            >
-              <Text style={styles.modalCancelText}>Hủy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalConfirmButton}
-              onPress={handleUpdateStatus}
-            >
-              <Text style={styles.modalConfirmText}>Cập nhật</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+  const renderStatusModal = () => null;
 
   if (loading) {
     return (
@@ -273,7 +159,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -290,7 +175,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Order Status Card */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>
             <Text style={styles.statusTitle}>Trạng thái đơn hàng</Text>
@@ -300,7 +184,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Order Basic Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
           {renderInfoRow('Mã đơn hàng', `#${order.id}`)}
@@ -308,30 +191,11 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           {renderInfoRow('Số lượng', `${order.quantity} xe`)}
         </View>
 
-        {/* Agency Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin đại lý</Text>
-          {(() => {
-            const agencyInfo = getAgencyInfo();
-            return (
-              <>
-                {renderInfoRow('Tên đại lý', agencyInfo?.name || `Agency #${order.agencyId}` || 'N/A')}
-                {renderInfoRow('Địa điểm', agencyInfo?.location || 'N/A')}
-                {renderInfoRow('Địa chỉ', agencyInfo?.address || 'N/A')}
-                {renderInfoRow('ID đại lý', order.agencyId?.toString() || 'N/A')}
-              </>
-            );
-          })()}
-        </View>
-
-        {/* Vehicle Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin xe</Text>
           {renderInfoRow('Tên xe', order.electricMotorbike?.name || 'N/A')}
-          {renderInfoRow('ID xe', order.electricMotorbikeId?.toString() || 'N/A')}
         </View>
 
-        {/* Warehouse Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin kho</Text>
           {renderInfoRow('Tên kho', order.warehouse?.name || 'N/A')}
@@ -339,7 +203,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           {renderInfoRow('Địa chỉ', order.warehouse?.address || 'N/A')}
         </View>
 
-        {/* Pricing Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin giá</Text>
           {renderInfoRow('Giá cơ bản', formatPrice(order.basePrice))}
@@ -354,31 +217,61 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           })}
         </View>
 
-        {/* Policy Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông tin chính sách</Text>
-          {renderInfoRow('ID chính sách giá', order.pricePolicyId?.toString() || 'N/A')}
-          {renderInfoRow('ID giảm giá', order.discountId?.toString() || 'N/A')}
-          {renderInfoRow('ID khuyến mãi', order.promotionId?.toString() || 'N/A')}
-          {renderInfoRow('ID màu sắc', order.colorId?.toString() || 'N/A')}
+          {renderInfoRow('Chính sách giá', order.pricePolicyId?.toString() || 'N/A')}
+          {renderInfoRow('Giảm giá', order.discountId?.toString() || 'N/A')}
+          {renderInfoRow('Khuyến mãi', order.promotionId?.toString() || 'N/A')}
+          {renderInfoRow('Màu sắc', order.colorId?.toString() || 'N/A')}
         </View>
       </ScrollView>
 
-      {/* Fixed Actions Bar */}
       <View style={styles.fixedActionsContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => {
-            setSelectedStatus(order.status);
-            setShowStatusModal(true);
-          }}
-        >
-          <Text style={styles.actionButtonText}>Đổi trạng thái</Text>
-        </TouchableOpacity>
-        
-        {order.status === 'DRAFT' && (
+        {order.status === 'DRAFT' ? (
+          <>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={async () => {
+                try {
+                  const resp = await orderRestockManagerService.acceptOrderRestock(order.id);
+                  if (resp.success) {
+                    setOrder(resp.data);
+                    showSuccess('Thành công', 'Đã xác nhận đơn hàng!');
+                    if (onStatusUpdate) onStatusUpdate();
+                  } else {
+                    showError('Lỗi', resp.error || 'Không thể xác nhận đơn hàng');
+                  }
+                } catch (e) {
+                  showError('Lỗi', 'Không thể xác nhận đơn hàng');
+                }
+              }}
+            >
+              <Text style={styles.actionButtonText}>Accept</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteActionButton]}
+              onPress={async () => {
+                try {
+                  const resp = await orderRestockManagerService.updateOrderRestockStatus(order.id, 'CANCELED');
+                  if (resp.success) {
+                    setOrder(resp.data);
+                    showSuccess('Thành công', 'Đã hủy đơn hàng!');
+                    if (onStatusUpdate) onStatusUpdate();
+                  } else {
+                    showError('Lỗi', resp.error || 'Không thể hủy đơn hàng');
+                  }
+                } catch (e) {
+                  showError('Lỗi', 'Không thể hủy đơn hàng');
+                }
+              }}
+            >
+              <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Cancel</Text>
+            </TouchableOpacity>
+
             {/* Delete button removed as per requirement (delete handled in list) */}
-        )}
+          </>
+        ) : null}
       </View>
 
       {renderStatusModal()}
@@ -444,7 +337,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100, // Space for fixed action buttons
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
@@ -541,11 +434,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  actionsContainer: {
-    marginTop: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.XXXLARGE,
-    gap: SIZES.PADDING.MEDIUM,
-  },
   actionButton: {
     backgroundColor: COLORS.PRIMARY,
     borderRadius: SIZES.RADIUS.MEDIUM,
@@ -565,91 +453,8 @@ const styles = StyleSheet.create({
   deleteActionButtonText: {
     color: COLORS.ERROR,
   },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: COLORS.SURFACE,
-    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
-    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
-    padding: SIZES.PADDING.LARGE,
-    maxHeight: '70%',
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.LARGE,
-    textAlign: 'center',
-  },
-  statusList: {
-    maxHeight: 400,
-    marginBottom: SIZES.PADDING.LARGE,
-  },
-  statusOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    marginBottom: SIZES.PADDING.SMALL,
-    backgroundColor: '#F5F5F5',
-  },
-  selectedStatusOption: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    borderWidth: 2,
-    borderColor: COLORS.PRIMARY,
-  },
-  statusIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: SIZES.PADDING.MEDIUM,
-  },
-  statusOptionText: {
-    flex: 1,
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
-  selectedStatusOptionText: {
-    color: COLORS.PRIMARY,
-  },
-  checkIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.PRIMARY,
-    fontWeight: 'bold',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.MEDIUM,
-  },
-  modalCancelButton: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
-  modalConfirmButton: {
-    flex: 1,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
 });
 
-export default OrderRestockDetailScreen;
+export default OrderRestockDetailManagerScreen;
+
+
