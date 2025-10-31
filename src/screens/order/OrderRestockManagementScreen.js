@@ -27,7 +27,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [paginationInfo, setPaginationInfo] = useState({
     page: 1,
-    limit: 10,
+    limit: 1000,
     total: 0
   });
   // Cache for order details (warehouse and motorbike names)
@@ -119,7 +119,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       setLoading(true);
       const params = {
         page,
-        limit: 10,
+        limit: 1000,
       };
       
       if (selectedStatus !== 'all') {
@@ -131,7 +131,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       if (response.success) {
         const ordersList = response.data || [];
         setOrders(ordersList);
-        setPaginationInfo(response.paginationInfo || { page: 1, limit: 10, total: 0 });
+        setPaginationInfo(response.paginationInfo || { page: 1, limit: 1000, total: ordersList.length });
         
         // Load details for all orders in parallel
         const detailPromises = ordersList.map(order => loadOrderDetail(order.id));
