@@ -22,6 +22,9 @@ import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
 import CustomerManagementScreen from '../screens/customer/CustomerManagementScreen';
+import CustomerDetailScreen from '../screens/customer/CustomerDetailScreen';
+import CreateCustomerScreen from '../screens/customer/CreateCustomerScreen';
+import EditCustomerScreen from '../screens/customer/EditCustomerScreen';
 import OrderManagementScreen from '../screens/order/OrderManagementScreen';
 import AllocationManagementScreen from '../screens/allocation/AllocationManagementScreen';
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
@@ -193,6 +196,21 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="CustomerManagement" 
           component={CustomerManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CustomerDetail" 
+          component={CustomerDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CreateCustomer" 
+          component={CreateCustomerScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditCustomer" 
+          component={EditCustomerScreen} 
           options={{ headerShown: false }}
         />
             <Stack.Screen

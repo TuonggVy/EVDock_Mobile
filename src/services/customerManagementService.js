@@ -1,52 +1,96 @@
-import { API_BASE_URL } from '../config/api';
+import api from './api/axiosInstance';
 
 /**
  * Customer Management API Service
  * Handles all API calls related to customer management
  */
+const ENDPOINTS = {
+  BASE: '/customer',
+  LIST_BY_AGENCY: (agencyId) => `/customer/list/${agencyId}`,
+  DETAIL: (customerId) => `/customer/detail/${customerId}`,
+  UPDATE: (customerId) => `/customer/${customerId}`,
+  DELETE: (customerId) => `/customer/${customerId}`,
+};
+
 class CustomerManagementService {
-  constructor() {
-    this.baseURL = `${API_BASE_URL}/customer-management`;
+  /**
+   * Get all customers for an agency
+   * @param {number} agencyId - Agency ID
+   * @param {Object} params - Query parameters (page, limit)
+   * @returns {Promise<Object>} Response with data and paginationInfo
+   */
+  async getCustomers(agencyId, params = {}) {
+    try {
+      const response = await api.get(ENDPOINTS.LIST_BY_AGENCY(agencyId), { params });
+      // Return the data array from response, sorted by id descending (newest first)
+      const customers = response.data?.data || [];
+      // Sort by id descending to show newest customers first
+      return customers.sort((a, b) => (b.id || 0) - (a.id || 0));
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      throw error;
+    }
   }
 
   /**
-   * Get all customers (purchased customers)
-   * @returns {Promise<Array>} List of customers
+   * Get customer detail by ID
+   * @param {number} customerId - Customer ID
+   * @returns {Promise<Object>} Customer detail
    */
-  async getCustomers() {
-    // For development, get customers from storage or use mock data
-    // TODO: Replace with actual API call when backend is ready
+  async getCustomerDetail(customerId) {
     try {
-      const storedCustomers = await this.getCustomersFromStorage();
-      return Array.isArray(storedCustomers) ? storedCustomers : [];
+      const response = await api.get(ENDPOINTS.DETAIL(customerId));
+      return response.data?.data || null;
     } catch (error) {
-      console.error('Error getting customers:', error);
-      return [];
+      console.error('Error fetching customer detail:', error);
+      throw error;
     }
-    
-    // Uncomment below when backend is ready:
-    /*
+  }
+
+  /**
+   * Create a new customer
+   * @param {Object} customerData - Customer information
+   * @returns {Promise<Object>} Created customer
+   */
+  async createCustomer(customerData) {
     try {
-      const response = await fetch(`${this.baseURL}/customers`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // Add authorization header when available
-          // 'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
+      const response = await api.post(ENDPOINTS.BASE, customerData);
+      return response.data?.data || null;
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      // Return mock data for development
-      return this.getMockCustomers();
+      console.error('Error creating customer:', error);
+      throw error;
     }
-    */
+  }
+
+  /**
+   * Update customer
+   * @param {number} customerId - Customer ID
+   * @param {Object} customerData - Updated customer information
+   * @returns {Promise<Object>} Updated customer
+   */
+  async updateCustomer(customerId, customerData) {
+    try {
+      const response = await api.patch(ENDPOINTS.UPDATE(customerId), customerData);
+      return response.data?.data || null;
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete customer
+   * @param {number} customerId - Customer ID
+   * @returns {Promise<Object>} Delete response
+   */
+  async deleteCustomer(customerId) {
+    try {
+      const response = await api.delete(ENDPOINTS.DELETE(customerId));
+      return response.data || {};
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      throw error;
+    }
   }
 
   /**
@@ -330,45 +374,12 @@ class CustomerManagementService {
   }
 
   /**
-   * Add new customer
+   * Add new customer (alias for createCustomer for backward compatibility)
    * @param {Object} customerData - Customer information
    * @returns {Promise<Object>} Created customer
    */
   async addCustomer(customerData) {
-    // For development, simulate successful creation
-    // TODO: Replace with actual API call when backend is ready
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: Date.now(), // Generate unique ID
-          ...customerData,
-          purchaseDate: new Date().toISOString().split('T')[0],
-          status: 'purchased',
-        });
-      }, 500);
-    });
-    
-    // Uncomment below when backend is ready:
-    /*
-    try {
-      const response = await fetch(`${this.baseURL}/customers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customerData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error adding customer:', error);
-      throw error;
-    }
-    */
+    return this.createCustomer(customerData);
   }
 
   /**
