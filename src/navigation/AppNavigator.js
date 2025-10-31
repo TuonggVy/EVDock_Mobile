@@ -69,6 +69,8 @@ import EditStockScreen from '../screens/stock/EditStockScreen';
 import StockDetailScreen from '../screens/stock/StockDetailScreen';
 import StaffStockListScreen from '../screens/stock/StaffStockListScreen';
 import StaffStockDetailScreen from '../screens/stock/StaffStockDetailScreen';
+import StockPromotionManagementScreen from '../screens/stock/StockPromotionManagementScreen';
+import StockPromotionDetailScreen from '../screens/stock/StockPromotionDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -386,6 +388,16 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="OrderRestockManagement" 
               component={OrderRestockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockPromotionManagement" 
+              component={StockPromotionManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockPromotionDetail" 
+              component={StockPromotionDetailScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 

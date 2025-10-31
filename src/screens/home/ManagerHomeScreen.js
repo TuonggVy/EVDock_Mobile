@@ -104,13 +104,13 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('Catalog'),
     },
     {
-      title: 'Promotions',
+      title: 'Stock Promotion Management',
       gradient: COLORS.GRADIENT.PINK,
       icon: '🎁',
-      onPress: () => navigation.navigate('B2CPromotionManagement'),
+      onPress: () => navigation.navigate('StockPromotionManagement'),
     },
     {
-      title: 'Orders',
+      title: 'Orders Restock',
       gradient: COLORS.GRADIENT.PURPLE,
       icon: '🚛',
       onPress: () => navigation.navigate('OrderManagement'),
