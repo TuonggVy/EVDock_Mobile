@@ -6,7 +6,7 @@ const ORDER_RESTOCK_ENDPOINTS = {
   LIST_BY_AGENCY: (agencyId) => `/order-restock/list/${agencyId}`,
   DETAIL: (orderId) => `/order-restock/detail/${orderId}`,
   UPDATE_STATUS: (orderId) => `/order-restock-management/status/${orderId}`,
-  DELETE: (orderId) => `/order-restock-management/${orderId}`,
+  DELETE: (orderId) => `/order-restock/${orderId}`,
   ACCEPT: (orderId) => `/order-restock/accept/${orderId}`,
 };
 
