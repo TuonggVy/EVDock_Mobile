@@ -9,13 +9,16 @@ import {
   Platform,
   TextInput,
   RefreshControl,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import stockPromotionService from '../../services/stockPromotionService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Search } from 'lucide-react-native';
+import { Search, Plus, Calendar } from 'lucide-react-native';
 
 const StockPromotionManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -28,6 +31,23 @@ const StockPromotionManagementScreen = ({ navigation }) => {
     page: 1,
     limit: 100,
     total: 0
+  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+
+  const [newPromotion, setNewPromotion] = useState({
+    name: '',
+    description: '',
+    valueType: 'PERCENT',
+    value: '',
+    startAt: '',
+    endAt: '',
+    status: 'ACTIVE',
+    agencyId: user?.agencyId || null,
   });
 
   const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
@@ -46,6 +66,12 @@ const StockPromotionManagementScreen = ({ navigation }) => {
   useEffect(() => {
     filterStockPromotions();
   }, [searchQuery, stockPromotions]);
+
+  useEffect(() => {
+    if (user?.agencyId) {
+      setNewPromotion(prev => ({ ...prev, agencyId: user.agencyId }));
+    }
+  }, [user]);
 
   const loadStockPromotions = async () => {
     try {
@@ -142,11 +168,323 @@ const StockPromotionManagementScreen = ({ navigation }) => {
     }
   };
 
+  // Date formatting functions
+  const formatDateForAPI = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    // Format as ISO string: YYYY-MM-DDTHH:mm:ss.sssZ
+    return d.toISOString();
+  };
+
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  };
+
+  // Date picker handlers
+  const handleStartDateChange = (event, selectedDate) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setStartDate(selectedDate);
+      const formattedDate = formatDateForAPI(selectedDate);
+      setNewPromotion(prev => ({ ...prev, startAt: formattedDate }));
+      
+      // If end date is before start date, update end date
+      if (selectedDate > endDate) {
+        setEndDate(selectedDate);
+        setNewPromotion(prev => ({ ...prev, endAt: formatDateForAPI(selectedDate) }));
+      }
+    }
+  };
+
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      // Ensure end date is not before start date
+      if (selectedDate < startDate) {
+        showError('Lỗi', 'Ngày kết thúc phải sau ngày bắt đầu');
+        return;
+      }
+      setEndDate(selectedDate);
+      const formattedDate = formatDateForAPI(selectedDate);
+      setNewPromotion(prev => ({ ...prev, endAt: formattedDate }));
+    }
+  };
+
+  const handleCreatePromotion = async () => {
+    console.log('🔄 [StockPromotionManagement] Starting create promotion...');
+    
+    // Validation
+    if (!newPromotion.name || !newPromotion.description || !newPromotion.value || !newPromotion.startAt || !newPromotion.endAt) {
+      showError('Lỗi', 'Vui lòng điền đầy đủ các trường bắt buộc');
+      return;
+    }
+
+    if (!newPromotion.agencyId) {
+      showError('Lỗi', 'Không tìm thấy thông tin đại lý');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const dataToSubmit = {
+        name: newPromotion.name,
+        description: newPromotion.description,
+        valueType: newPromotion.valueType,
+        value: parseFloat(newPromotion.value),
+        startAt: newPromotion.startAt,
+        endAt: newPromotion.endAt,
+        status: newPromotion.status,
+        agencyId: parseInt(newPromotion.agencyId),
+      };
+
+      console.log('📤 [StockPromotionManagement] Submitting data:', dataToSubmit);
+
+      const response = await stockPromotionService.createStockPromotion(dataToSubmit);
+
+      console.log('📥 [StockPromotionManagement] API Response:', response);
+
+      if (response.success) {
+        showSuccess('Thành công', 'Tạo stock promotion thành công!');
+        setShowCreateModal(false);
+        resetCreateForm();
+        await loadStockPromotions();
+      } else {
+        showError('Lỗi', response.error || 'Không thể tạo stock promotion');
+      }
+    } catch (error) {
+      console.error('❌ [StockPromotionManagement] Exception:', error);
+      showError('Lỗi', 'Không thể tạo stock promotion');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const resetCreateForm = () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    setStartDate(today);
+    setEndDate(tomorrow);
+    setNewPromotion({
+      name: '',
+      description: '',
+      valueType: 'PERCENT',
+      value: '',
+      startAt: '',
+      endAt: '',
+      status: 'ACTIVE',
+      agencyId: user?.agencyId || null,
+    });
+  };
+
   const handleViewDetail = (item) => {
     navigation.navigate('StockPromotionDetail', {
       stockPromotionId: item.id
     });
   };
+
+  const renderCreateModal = () => (
+    <Modal
+      visible={showCreateModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => {
+              setShowCreateModal(false);
+              resetCreateForm();
+            }}
+          >
+            <Text style={styles.modalCloseText}>Hủy</Text>
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Tạo Stock Promotion</Text>
+          <TouchableOpacity
+            style={styles.modalSaveButton}
+            onPress={handleCreatePromotion}
+            disabled={creating}
+          >
+            {creating ? (
+              <ActivityIndicator color={COLORS.TEXT.WHITE} />
+            ) : (
+              <Text style={styles.modalSaveText}>Tạo</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Tên promotion *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={newPromotion.name}
+              onChangeText={(text) => setNewPromotion(prev => ({ ...prev, name: text }))}
+              placeholder="Nhập tên promotion"
+              placeholderTextColor={COLORS.TEXT.SECONDARY}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Mô tả *</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={newPromotion.description}
+              onChangeText={(text) => setNewPromotion(prev => ({ ...prev, description: text }))}
+              placeholder="Nhập mô tả"
+              placeholderTextColor={COLORS.TEXT.SECONDARY}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Loại giảm giá *</Text>
+            <View style={styles.selectorRow}>
+              <TouchableOpacity
+                style={[
+                  styles.selectorOption,
+                  newPromotion.valueType === 'PERCENT' && styles.selectedOption
+                ]}
+                onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'PERCENT' }))}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  newPromotion.valueType === 'PERCENT' && styles.selectedOptionText
+                ]}>
+                  PERCENT (%)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.selectorOption,
+                  { marginLeft: SIZES.PADDING.SMALL },
+                  newPromotion.valueType === 'FIXED' && styles.selectedOption
+                ]}
+                onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'FIXED' }))}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  newPromotion.valueType === 'FIXED' && styles.selectedOptionText
+                ]}>
+                  FIXED (VND)
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Giá trị *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={newPromotion.value}
+              onChangeText={(text) => setNewPromotion(prev => ({ ...prev, value: text }))}
+              placeholder={newPromotion.valueType === 'PERCENT' ? "Nhập phần trăm (ví dụ: 10)" : "Nhập số tiền (ví dụ: 50000)"}
+              placeholderTextColor={COLORS.TEXT.SECONDARY}
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Ngày bắt đầu *</Text>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setShowStartDatePicker(true)}
+            >
+              <Text style={[
+                styles.dateInputText,
+                !newPromotion.startAt && styles.dateInputTextPlaceholder
+              ]}>
+                {newPromotion.startAt ? formatDateForDisplay(newPromotion.startAt) : 'Chọn ngày bắt đầu'}
+              </Text>
+              <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+            </TouchableOpacity>
+          </View>
+
+          {showStartDatePicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="datetime"
+              is24Hour={true}
+              display="default"
+              onChange={handleStartDateChange}
+            />
+          )}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Ngày kết thúc *</Text>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setShowEndDatePicker(true)}
+            >
+              <Text style={[
+                styles.dateInputText,
+                !newPromotion.endAt && styles.dateInputTextPlaceholder
+              ]}>
+                {newPromotion.endAt ? formatDateForDisplay(newPromotion.endAt) : 'Chọn ngày kết thúc'}
+              </Text>
+              <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+            </TouchableOpacity>
+          </View>
+
+          {showEndDatePicker && (
+            <DateTimePicker
+              value={endDate}
+              mode="datetime"
+              is24Hour={true}
+              display="default"
+              onChange={handleEndDateChange}
+              minimumDate={startDate}
+            />
+          )}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Trạng thái *</Text>
+            <View style={styles.selectorRow}>
+              <TouchableOpacity
+                style={[
+                  styles.selectorOption,
+                  newPromotion.status === 'ACTIVE' && styles.selectedOption
+                ]}
+                onPress={() => setNewPromotion(prev => ({ ...prev, status: 'ACTIVE' }))}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  newPromotion.status === 'ACTIVE' && styles.selectedOptionText
+                ]}>
+                  ACTIVE
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.selectorOption,
+                  { marginLeft: SIZES.PADDING.SMALL },
+                  newPromotion.status === 'INACTIVE' && styles.selectedOption
+                ]}
+                onPress={() => setNewPromotion(prev => ({ ...prev, status: 'INACTIVE' }))}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  newPromotion.status === 'INACTIVE' && styles.selectedOptionText
+                ]}>
+                  INACTIVE
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
 
   const renderStockPromotionCard = (item) => (
     <TouchableOpacity
@@ -205,7 +543,15 @@ const StockPromotionManagementScreen = ({ navigation }) => {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Stock Promotion Management</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => {
+            resetCreateForm();
+            setShowCreateModal(true);
+          }}
+        >
+          <Plus size={20} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -279,6 +625,8 @@ const StockPromotionManagementScreen = ({ navigation }) => {
         onCancel={alertConfig.onCancel}
         onClose={hideAlert}
       />
+
+      {renderCreateModal()}
     </SafeAreaView>
   );
 };
@@ -322,6 +670,14 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  createButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: COLORS.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -458,6 +814,116 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  modalCloseButton: {
+    padding: SIZES.PADDING.SMALL,
+  },
+  modalCloseText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalSaveButton: {
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSaveText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  modalContent: {
+    flex: 1,
+    padding: SIZES.PADDING.MEDIUM,
+  },
+  inputGroup: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  inputLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  textInput: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  dateInput: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dateInputText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    flex: 1,
+  },
+  dateInputTextPlaceholder: {
+    color: COLORS.TEXT.SECONDARY,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+  },
+  selectorOption: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  selectedOption: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  selectorOptionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+  },
+  selectedOptionText: {
+    color: COLORS.TEXT.WHITE,
   },
 });
 
