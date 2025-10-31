@@ -1,212 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
-  Modal,
   FlatList,
-  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
-import { CalendarCheck, Check, Phone, Car } from 'lucide-react-native';
 import useCustomerManagement from '../../hooks/useCustomerManagement';
-import {
-  formatPrice,
-  formatDate,
-  getRequestStatusColor,
-  getRequestStatusText,
-  getViewingStatusColor,
-  getViewingStatusText,
-} from '../../utils/customerManagementUtils';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, Calendar1, IdCard, Mail, MapPinHouse, Plus, Search } from 'lucide-react-native';
 
 const CustomerManagementScreen = ({ navigation }) => {
   // Local UI state
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showTestDriveModal, setShowTestDriveModal] = useState(false);
-  const [showViewingModal, setShowViewingModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('customers'); // 'customers', 'requests', or 'viewing'
 
   // Custom hook for data management
   const {
     customers,
-    testDriveRequests,
-    viewingRequests,
     loading,
     errors,
     addCustomer,
-    scheduleTestDrive,
-    completeTestDrive,
-    scheduleViewing,
-    completeViewing,
-    cancelViewing,
     refresh,
     getFilteredData,
   } = useCustomerManagement();
 
-
-  // Schedule form data
-  const [scheduleForm, setScheduleForm] = useState({
-    requestId: null,
-    scheduledDate: '',
-    scheduledTime: '',
-    notes: '',
-  });
-
-  // Viewing schedule form data
-  const [viewingForm, setViewingForm] = useState({
-    requestId: null,
-    scheduledDate: '',
-    scheduledTime: '',
-    location: '',
-    notes: '',
-  });
-
-
-
-  const handleScheduleTestDrive = (request) => {
-    setSelectedCustomer(request);
-    setScheduleForm({
-      ...scheduleForm,
-      requestId: request.id,
+  // Refresh when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refresh();
     });
-    setShowTestDriveModal(true);
-  };
+    return unsubscribe;
+  }, [navigation, refresh]);
 
-  const handleSubmitSchedule = async () => {
-    if (!scheduleForm.scheduledDate || !scheduleForm.scheduledTime) {
-      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     try {
-      await scheduleTestDrive({
-        requestId: scheduleForm.requestId,
-        scheduledDate: scheduleForm.scheduledDate,
-        scheduledTime: scheduleForm.scheduledTime,
-        notes: scheduleForm.notes,
+      const date = new Date(dateString);
+      return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
       });
-
-      Alert.alert(
-        'Thành công',
-        `Đã hẹn lịch lái thử cho ${selectedCustomer.customerName}\nMẫu xe: ${selectedCustomer.model}\nNgày: ${scheduleForm.scheduledDate}\nGiờ: ${scheduleForm.scheduledTime}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowTestDriveModal(false);
-              setScheduleForm({
-                requestId: null,
-                scheduledDate: '',
-                scheduledTime: '',
-                notes: '',
-              });
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể hẹn lịch lái thử. Vui lòng thử lại.');
+    } catch {
+      return dateString;
     }
   };
 
-  const handleCompleteTestDrive = async (requestId) => {
-    try {
-      await completeTestDrive(requestId);
-      Alert.alert('Thành công', 'Đã đánh dấu hoàn thành lái thử');
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể hoàn thành lái thử. Vui lòng thử lại.');
-    }
-  };
-
-  const handleScheduleViewing = (request) => {
-    setSelectedCustomer(request);
-    setViewingForm({
-      ...viewingForm,
-      requestId: request.id,
-      location: request.location || '',
-    });
-    setShowViewingModal(true);
-  };
-
-  const handleCompleteViewing = async (requestId) => {
-    try {
-      await completeViewing(requestId);
-      Alert.alert('Thành công', 'Đã đánh dấu hoàn thành xem xe');
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể hoàn thành xem xe. Vui lòng thử lại.');
-    }
-  };
-
-  const handleCancelViewing = (requestId) => {
-    Alert.alert(
-      'Xác nhận hủy',
-      'Bạn có chắc chắn muốn hủy yêu cầu xem xe này?',
-      [
-        { text: 'Không', style: 'cancel' },
-        {
-          text: 'Có',
-          onPress: async () => {
-            try {
-              await cancelViewing(requestId, 'Hủy bởi nhân viên');
-              Alert.alert('Thành công', 'Đã hủy yêu cầu xem xe');
-            } catch (error) {
-              Alert.alert('Lỗi', 'Không thể hủy yêu cầu xem xe. Vui lòng thử lại.');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleSubmitViewingSchedule = async () => {
-    if (!viewingForm.scheduledDate || !viewingForm.scheduledTime || !viewingForm.location) {
-      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-
-    try {
-      await scheduleViewing({
-        requestId: viewingForm.requestId,
-        scheduledDate: viewingForm.scheduledDate,
-        scheduledTime: viewingForm.scheduledTime,
-        location: viewingForm.location,
-        notes: viewingForm.notes,
-      });
-
-      Alert.alert(
-        'Thành công',
-        `Đã hẹn lịch xem xe cho ${selectedCustomer.customerName}\nMẫu xe: ${selectedCustomer.model}\nNgày: ${viewingForm.scheduledDate}\nGiờ: ${viewingForm.scheduledTime}\nĐịa điểm: ${viewingForm.location}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowViewingModal(false);
-              setViewingForm({
-                requestId: null,
-                scheduledDate: '',
-                scheduledTime: '',
-                location: '',
-                notes: '',
-              });
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể hẹn lịch xem xe. Vui lòng thử lại.');
-    }
+  const handleCustomerPress = (customer) => {
+    navigation.navigate('CustomerDetail', { customerId: customer.id });
   };
 
 
   const renderCustomerCard = ({ item }) => (
-    <View style={styles.customerCard}>
+    <TouchableOpacity
+      style={styles.customerCard}
+      onPress={() => handleCustomerPress(item)}
+      activeOpacity={0.7}
+    >
       {/* Header with gray background */}
       <LinearGradient
         colors={['#D9D9D9', '#D9D9D9']}
@@ -217,209 +69,57 @@ const CustomerManagementScreen = ({ navigation }) => {
         <View style={styles.customerHeaderContent}>
           <View style={styles.customerAvatar}>
             <Text style={styles.customerAvatarText}>
-              {item.name.charAt(0).toUpperCase()}
+              {item.name?.charAt(0).toUpperCase() || '?'}
             </Text>
           </View>
           <View style={styles.customerBasicInfo}>
-            <Text style={styles.customerCardName}>{item.name}</Text>
-            <Text style={styles.customerPhoneHeader}>{item.phone}</Text>
-          </View>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>Đã mua</Text>
+            <Text style={styles.customerCardName}>{item.name || 'N/A'}</Text>
+            <Text style={styles.customerPhoneHeader}>{item.phone || 'N/A'}</Text>
           </View>
         </View>
       </LinearGradient>
 
       {/* Content */}
       <View style={styles.customerCardContent}>
-        <View style={styles.vehicleInfoSection}>
-          <View style={styles.vehicleInfoItem}>
-            <Text style={styles.vehicleIcon}>🚗</Text>
-            <View style={styles.vehicleDetails}>
-              <Text style={styles.vehicleModel}>{item.vehicleModel}</Text>
-              <Text style={styles.vehicleColor}>Màu: {item.vehicleColor}</Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoLabelContainer}>
+            <Mail size={14} color={COLORS.TEXT.SECONDARY} />
+            <Text style={styles.infoLabel}> Email</Text>
             </View>
-          </View>
+          <Text style={styles.infoValue}>{item.email || 'N/A'}</Text>
         </View>
 
-        <View style={styles.purchaseInfoSection}>
-          <View style={styles.purchaseInfoItem}>
-            <Text style={styles.purchaseIcon}>📅</Text>
-            <View style={styles.purchaseDetails}>
-              <Text style={styles.purchaseLabel}>Ngày mua</Text>
-              <Text style={styles.purchaseDate}>{formatDate(item.purchaseDate)}</Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoLabelContainer}>
+            <MapPinHouse size={14} color={COLORS.TEXT.SECONDARY} />
+            <Text style={styles.infoLabel}> Address</Text>
             </View>
+          <Text style={styles.infoValue}>{item.address || 'N/A'}</Text>
           </View>
           
-          <View style={styles.priceSection}>
-            <Text style={styles.priceLabel}>Giá trị đơn</Text>
-            <Text style={styles.priceValue}>{formatPrice(item.orderValue)}</Text>
+        {item.credentialId && (
+          <View style={styles.infoRow}>
+            <View style={styles.infoLabelContainer}>
+              <IdCard size={14} color={COLORS.TEXT.SECONDARY} />
+              <Text style={styles.infoLabel}> ID Card</Text>
           </View>
+            <Text style={styles.infoValue}>{item.credentialId}</Text>
         </View>
+        )}
+
+        {item.dob && (
+          <View style={styles.infoRow}>
+            <View style={styles.infoLabelContainer}>
+              <Calendar1 size={14} color={COLORS.TEXT.SECONDARY} />
+              <Text style={styles.infoLabel}> Date of Birth</Text>
+        </View>
+            <Text style={styles.infoValue}>{formatDate(item.dob)}</Text>
+          </View>
+        )}
       </View>
-    </View>
+            </TouchableOpacity>
   );
 
-  const renderTestDriveRequestCard = ({ item }) => (
-    <View style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <View style={styles.requestInfo}>
-          <Text style={styles.customerName}>{item.customerName}</Text>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: getRequestStatusColor(item.status) }]} />
-            <Text style={[styles.statusText, { color: getRequestStatusColor(item.status) }]}>
-              {getRequestStatusText(item.status)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.requestActions}>
-          {item.status === 'pending' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.scheduleButton]}
-              onPress={() => handleScheduleTestDrive(item)}
-            >
-              <CalendarCheck size={20} color="white" />
-            </TouchableOpacity>
-          )}
-          {item.status === 'scheduled' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleCompleteTestDrive(item.id)}
-            >
-              <Check size={20} color="white" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.actionButton}>
-            <Phone size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.requestDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>🚗</Text>
-          <Text style={styles.detailText}>{item.model}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📱</Text>
-          <Text style={styles.detailText}>{item.customerPhone}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📅</Text>
-          <Text style={styles.detailText}>
-            Yêu cầu: {item.requestedDate}
-            {item.scheduledDate && ` | Hẹn: ${item.scheduledDate} ${item.scheduledTime}`}
-          </Text>
-        </View>
-        {item.notes && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>📝</Text>
-            <Text style={styles.detailText}>{item.notes}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.requestFooter}>
-        <Text style={styles.createdAt}>Tạo lúc: {item.createdAt}</Text>
-        {item.status === 'completed' && (
-          <Text style={styles.completedText}>✅ Đã hoàn thành</Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderViewingRequestCard = ({ item }) => (
-    <View style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <View style={styles.requestInfo}>
-          <Text style={styles.customerName}>{item.customerName}</Text>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: getViewingStatusColor(item.status) }]} />
-            <Text style={[styles.statusText, { color: getViewingStatusColor(item.status) }]}>
-              {getViewingStatusText(item.status)}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.requestActions}>
-          {item.status === 'pending' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.scheduleButton]}
-              onPress={() => handleScheduleViewing(item)}
-            >
-              <CalendarCheck size={20} color="white" />
-            </TouchableOpacity>
-          )}
-          {item.status === 'scheduled' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleCompleteViewing(item.id)}
-            >
-              <Check size={20} color="white" />
-            </TouchableOpacity>
-          )}
-          {item.status === 'pending' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelActionButton]}
-              onPress={() => handleCancelViewing(item.id)}
-            >
-              <Text style={styles.cancelIcon}>✕</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.actionButton}>
-            <Phone size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.requestDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>🚗</Text>
-          <Text style={styles.detailText}>{item.model}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📱</Text>
-          <Text style={styles.detailText}>{item.customerPhone}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📧</Text>
-          <Text style={styles.detailText}>{item.customerEmail}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📍</Text>
-          <Text style={styles.detailText}>{item.location}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📅</Text>
-          <Text style={styles.detailText}>
-            Yêu cầu: {item.requestedDate} ({item.preferredTime})
-            {item.scheduledDate && ` | Hẹn: ${item.scheduledDate} ${item.scheduledTime}`}
-          </Text>
-        </View>
-        {item.notes && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>📝</Text>
-            <Text style={styles.detailText}>{item.notes}</Text>
-          </View>
-        )}
-        {item.feedback && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>💬</Text>
-            <Text style={styles.detailText}>{item.feedback}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.requestFooter}>
-        <Text style={styles.createdAt}>Tạo lúc: {item.createdAt}</Text>
-        {item.status === 'completed' && (
-          <Text style={styles.completedText}>✅ Đã xem xe</Text>
-        )}
-        {item.status === 'cancelled' && (
-          <Text style={styles.cancelledText}>❌ Đã hủy</Text>
-        )}
-      </View>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -430,63 +130,31 @@ const CustomerManagementScreen = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft color="#FFFFFF" size={18} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
-            <Text style={styles.title}>Quản lý khách hàng</Text>
+            <Text style={styles.title}>Customer Management</Text>
             <Text style={styles.subtitle}>
-              {activeTab === 'customers' 
-                ? `${customers.length} khách hàng đã mua` 
-                : activeTab === 'requests' 
-                ? `${testDriveRequests.length} yêu cầu lái thử`
-                : `${viewingRequests.length} yêu cầu xem xe`
-              }
+              {customers.length} customers
             </Text>
           </View>
-          <View style={styles.headerSpacer} />
+        <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('CreateCustomer')}
+          >
+            <Plus color="#FFFFFF" size={18} />
+        </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'customers' && styles.activeTab]}
-          onPress={() => setActiveTab('customers')}
-        >
-          <Text style={[styles.tabText, activeTab === 'customers' && styles.activeTabText]}>
-            Khách hàng
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
-          onPress={() => setActiveTab('requests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
-            Lái thử
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'viewing' && styles.activeTab]}
-          onPress={() => setActiveTab('viewing')}
-        >
-          <Text style={[styles.tabText, activeTab === 'viewing' && styles.activeTabText]}>
-            Xem xe
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <View style={styles.searchIconContainer}>
+          <Search size={18} color={COLORS.TEXT.SECONDARY} />
+        </View>
         <TextInput
           style={styles.searchInput}
-          placeholder={
-            activeTab === 'customers' 
-              ? "Tìm kiếm khách hàng đã mua..." 
-              : activeTab === 'requests'
-              ? "Tìm kiếm yêu cầu lái thử..."
-              : "Tìm kiếm yêu cầu xem xe..."
-          }
+          placeholder="Search customers..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -495,203 +163,20 @@ const CustomerManagementScreen = ({ navigation }) => {
 
       {/* Content List */}
       <FlatList
-        data={
-          activeTab === 'customers' 
-            ? getFilteredData(customers, searchQuery)
-            : activeTab === 'requests'
-            ? getFilteredData(testDriveRequests, searchQuery)
-            : getFilteredData(viewingRequests, searchQuery)
-        }
-        renderItem={
-          activeTab === 'customers' 
-            ? renderCustomerCard 
-            : activeTab === 'requests'
-            ? renderTestDriveRequestCard
-            : renderViewingRequestCard
-        }
+        data={getFilteredData(customers, searchQuery)}
+        renderItem={renderCustomerCard}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        refreshing={loading.customers || loading.testDriveRequests || loading.viewingRequests}
+        refreshing={loading.customers}
         onRefresh={refresh}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No customers found</Text>
+            </View>
+        }
       />
 
-      {/* Test Drive Registration Modal */}
-      <Modal
-        visible={showTestDriveModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowTestDriveModal(false)}
-      >
-        <SafeAreaView style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Hẹn lịch lái thử</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowTestDriveModal(false)}
-              >
-                <Text style={styles.closeIcon}>×</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.customerInfo}>
-                <Text style={styles.customerName}>{selectedCustomer?.customerName}</Text>
-                <Text style={styles.customerPhone}>{selectedCustomer?.customerPhone}</Text>
-                <Text style={styles.modelInfo}>Mẫu xe: {selectedCustomer?.model}</Text>
-                <Text style={styles.requestInfo}>Yêu cầu ngày: {selectedCustomer?.requestedDate}</Text>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ngày hẹn lái thử *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="DD/MM/YYYY"
-                  value={scheduleForm.scheduledDate}
-                  onChangeText={(text) => setScheduleForm({ ...scheduleForm, scheduledDate: text })}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Giờ hẹn lái thử *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="HH:MM"
-                  value={scheduleForm.scheduledTime}
-                  onChangeText={(text) => setScheduleForm({ ...scheduleForm, scheduledTime: text })}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ghi chú thêm</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  placeholder="Ghi chú cho khách hàng..."
-                  value={scheduleForm.notes}
-                  onChangeText={(text) => setScheduleForm({ ...scheduleForm, notes: text })}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowTestDriveModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSubmitSchedule}
-              >
-                <LinearGradient
-                  colors={COLORS.GRADIENT.BLUE}
-                  style={styles.submitGradient}
-                >
-                  <Text style={styles.submitButtonText}>Hẹn lịch</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Vehicle Viewing Schedule Modal */}
-      <Modal
-        visible={showViewingModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowViewingModal(false)}
-      >
-        <SafeAreaView style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Hẹn lịch xem xe</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowViewingModal(false)}
-              >
-                <Text style={styles.closeIcon}>×</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.customerInfo}>
-                <Text style={styles.customerName}>{selectedCustomer?.customerName}</Text>
-                <Text style={styles.customerPhone}>{selectedCustomer?.customerPhone}</Text>
-                <Text style={styles.modelInfo}>Mẫu xe: {selectedCustomer?.model}</Text>
-                <Text style={styles.requestInfo}>Yêu cầu ngày: {selectedCustomer?.requestedDate}</Text>
-                <Text style={styles.requestInfo}>Thời gian ưa thích: {selectedCustomer?.preferredTime}</Text>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ngày hẹn xem xe *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="DD/MM/YYYY"
-                  value={viewingForm.scheduledDate}
-                  onChangeText={(text) => setViewingForm({ ...viewingForm, scheduledDate: text })}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Giờ hẹn xem xe *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="HH:MM"
-                  value={viewingForm.scheduledTime}
-                  onChangeText={(text) => setViewingForm({ ...viewingForm, scheduledTime: text })}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Địa điểm xem xe *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="Ví dụ: Showroom EVDock"
-                  value={viewingForm.location}
-                  onChangeText={(text) => setViewingForm({ ...viewingForm, location: text })}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ghi chú thêm</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  placeholder="Ghi chú cho khách hàng về việc xem xe..."
-                  value={viewingForm.notes}
-                  onChangeText={(text) => setViewingForm({ ...viewingForm, notes: text })}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowViewingModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSubmitViewingSchedule}
-              >
-                <LinearGradient
-                  colors={COLORS.GRADIENT.BLUE}
-                  style={styles.submitGradient}
-                >
-                  <Text style={styles.submitButtonText}>Hẹn lịch xem xe</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
     </View>
   );
 };
@@ -719,21 +204,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     flex: 1,
     alignItems: 'center',
   },
-  headerSpacer: {
+  addButton: {
     width: 40,
     height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: COLORS.PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     marginBottom: 2,
@@ -741,31 +225,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.SURFACE,
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.XSMALL,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: SIZES.PADDING.SMALL,
-    alignItems: 'center',
-    borderRadius: SIZES.RADIUS.SMALL,
-  },
-  activeTab: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  tabText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: COLORS.TEXT.WHITE,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -782,10 +241,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
+  searchIconContainer: {
     marginRight: SIZES.PADDING.SMALL,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,
@@ -855,72 +314,37 @@ const styles = StyleSheet.create({
   customerCardContent: {
     padding: SIZES.PADDING.LARGE,
   },
-  vehicleInfoSection: {
-    marginBottom: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  vehicleInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  vehicleIcon: {
-    fontSize: 20,
-    marginRight: SIZES.PADDING.MEDIUM,
-  },
-  vehicleDetails: {
-    flex: 1,
-  },
-  vehicleModel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: 2,
-  },
-  vehicleColor: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  purchaseInfoSection: {
+  infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
   },
-  purchaseInfoItem: {
+  infoLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  purchaseIcon: {
-    fontSize: 16,
-    marginRight: SIZES.PADDING.SMALL,
-  },
-  purchaseDetails: {
-    flex: 1,
-  },
-  purchaseLabel: {
-    fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: 2,
-  },
-  purchaseDate: {
-    fontSize: SIZES.FONT.SMALL,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  priceSection: {
-    alignItems: 'flex-end',
-  },
-  priceLabel: {
-    fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: 2,
-  },
-  priceValue: {
+  infoLabel: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.SUCCESS,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  infoValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+    flex: 2,
+    textAlign: 'right',
+  },
+  emptyContainer: {
+    paddingVertical: SIZES.PADDING.XXXLARGE,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
   },
   requestCard: {
     backgroundColor: COLORS.SURFACE,
