@@ -24,6 +24,7 @@ const DealerStaffHomeScreen = ({ navigation }) => {
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
   const fadeAnim = useState(new Animated.Value(1))[0];
   const slideAnim = useState(new Animated.Value(0))[0];
+  const [searchQuery, setSearchQuery] = useState('');
 
 
   // Auto-slide effect with smooth transitions
@@ -137,6 +138,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('DepositManagement'),
     },
     {
+      title: 'Booking Drive',
+      gradient: ['#FF6B9D', '#C44569', '#8B1538'],
+      icon: '🚗',
+      onPress: () => navigation.navigate('DriveTrialManagement'),
+    },
+    {
       title: 'Stock Management',
       gradient: ['#FF6B35', '#F7931E', '#FFB347'],
       icon: '📦',
@@ -144,6 +151,10 @@ const DealerStaffHomeScreen = ({ navigation }) => {
     },
   ];
 
+  // Filter category cards based on search query
+  const filteredCategoryCards = categoryCards.filter(category =>
+    category.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <View style={styles.container}>
@@ -182,13 +193,15 @@ const DealerStaffHomeScreen = ({ navigation }) => {
             style={styles.searchInput}
             placeholder="Search tasks, customers..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
 
         {/* Category Cards với nền gradient */}
         <View style={styles.categoriesContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-            {categoryCards.map((category, index) => (
+            {filteredCategoryCards.map((category, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.categoryCard}

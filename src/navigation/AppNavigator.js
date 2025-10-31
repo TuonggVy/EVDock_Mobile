@@ -74,6 +74,9 @@ import StaffStockListScreen from '../screens/stock/StaffStockListScreen';
 import StaffStockDetailScreen from '../screens/stock/StaffStockDetailScreen';
 import StockPromotionManagementScreen from '../screens/stock/StockPromotionManagementScreen';
 import StockPromotionDetailScreen from '../screens/stock/StockPromotionDetailScreen';
+import DriveTrialManagementScreen from '../screens/drivetrial/DriveTrialManagementScreen';
+import DriveTrialDetailScreen from '../screens/drivetrial/DriveTrialDetailScreen';
+import CreateDriveTrialScreen from '../screens/drivetrial/CreateDriveTrialScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -456,6 +459,21 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="StaffStockDetail" 
               component={StaffStockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialManagement" 
+              component={DriveTrialManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialDetail" 
+              component={DriveTrialDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateDriveTrial" 
+              component={CreateDriveTrialScreen} 
               options={{ headerShown: false }}
             />
           </>
