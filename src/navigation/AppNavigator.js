@@ -63,6 +63,10 @@ import OrderRestockDetailManagerScreen from '../screens/order/OrderRestockDetail
 import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
 import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
 import EditPricePolicyScreen from '../screens/pricepolicy/EditPricePolicyScreen';
+import StockManagementScreen from '../screens/stock/StockManagementScreen';
+import CreateStockScreen from '../screens/stock/CreateStockScreen';
+import EditStockScreen from '../screens/stock/EditStockScreen';
+import StockDetailScreen from '../screens/stock/StockDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -392,6 +396,26 @@ const AppNavigator = () => {
             component={OrderRestockDetailManagerScreen} 
             options={{ headerShown: false }}
           />
+            <Stack.Screen 
+              name="StockManagement" 
+              component={StockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateStock" 
+              component={CreateStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditStock" 
+              component={EditStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockDetail" 
+              component={StockDetailScreen} 
+              options={{ headerShown: false }}
+            />
           </>
         )}
       </Stack.Navigator>

@@ -16,12 +16,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { Search } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
 const DealerManagerHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -92,7 +96,7 @@ const DealerManagerHomeScreen = ({ navigation }) => {
     return 'Good evening';
   };
 
-  const categoryCards = [
+  const allCategoryCards = [
     {
       title: 'Catalogs',
       gradient: COLORS.GRADIENT.BLUE,
@@ -147,7 +151,20 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       icon: '👥',
       onPress: () => navigation.navigate('DealerStaffManagement'),
     },
+    {
+      title: 'Stock Management',
+      gradient: ['#FF6B35', '#F7931E', '#FFB347'],
+      icon: '📦',
+      onPress: () => navigation.navigate('StockManagement'),
+    },
   ];
+
+  // Filter category cards based on search query
+  const categoryCards = allCategoryCards.filter(card => {
+    if (!searchQuery.trim()) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return card.title.toLowerCase().includes(searchLower);
+  });
 
 
   return (
@@ -182,12 +199,22 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       <View style={styles.topSection}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search dealer, staff..."
+            placeholder="Search categories..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+            >
+              <Text style={styles.clearButtonText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Category Cards */}
@@ -395,6 +422,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  clearButton: {
+    padding: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: 'bold',
   },
   logoutText: {
     marginLeft: SIZES.PADDING.SMALL,
