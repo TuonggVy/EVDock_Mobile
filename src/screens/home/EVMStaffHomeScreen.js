@@ -121,6 +121,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('PricePolicyManagement'),
     },
     {
+      title: 'Promotion',
+      gradient: COLORS.GRADIENT.PINK_PURPLE,
+      icon: '🎁',
+      onPress: () => navigation.navigate('PromotionManagement'),
+    },
+    {
       title: 'Order Restock',
       gradient: ['#9B59B6', '#8E44AD', '#7D3C98'],
       icon: '🔄',
