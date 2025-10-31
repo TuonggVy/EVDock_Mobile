@@ -325,4 +325,3 @@ export const warehouseService = {
 };
 
 export default { orderService, allocationService, warehouseService };
-

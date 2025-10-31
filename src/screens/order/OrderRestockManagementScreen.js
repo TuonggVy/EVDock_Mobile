@@ -37,8 +37,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
   const orderStatuses = [
-    { key: 'all', label: 'Tất cả', color: COLORS.TEXT.SECONDARY },
-    { key: 'DRAFT', label: 'Draft', color: COLORS.TEXT.SECONDARY },
+    { key: 'all', label: 'All', color: COLORS.TEXT.SECONDARY },
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
@@ -130,18 +129,26 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       
       if (response.success) {
         const ordersList = response.data || [];
-        setOrders(ordersList);
-        setPaginationInfo(response.paginationInfo || { page: 1, limit: 1000, total: ordersList.length });
+        // Filter out DRAFT orders
+        const nonDraftOrders = ordersList.filter(order => order.status !== 'DRAFT');
+        // Sort by orderAt (most recent first)
+        const sortedOrders = nonDraftOrders.sort((a, b) => {
+          const dateA = new Date(a.orderAt || a.createdAt || 0);
+          const dateB = new Date(b.orderAt || b.createdAt || 0);
+          return dateB - dateA; // Descending order (newest first)
+        });
+        setOrders(sortedOrders);
+        setPaginationInfo(response.paginationInfo || { page: 1, limit: 1000, total: sortedOrders.length });
         
         // Load details for all orders in parallel
-        const detailPromises = ordersList.map(order => loadOrderDetail(order.id));
+        const detailPromises = sortedOrders.map(order => loadOrderDetail(order.id));
         await Promise.all(detailPromises);
       } else {
-        showError('Lỗi', response.error || 'Không thể tải danh sách đơn hàng');
+        showError('Error', response.error || 'Cannot load order list');
       }
     } catch (error) {
       console.error('Error loading orders:', error);
-      showError('Lỗi', 'Không thể tải danh sách đơn hàng');
+      showError('Error', 'Cannot load order list');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -180,7 +187,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       return cachedDetail.warehouseName;
     }
     // Fallback to order data if available
-    return order.warehouse?.name || 'Đang tải...';
+    return order.warehouse?.name || 'Loading...';
   };
 
   const getMotorbikeName = (order) => {
@@ -190,11 +197,12 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       return cachedDetail.motorbikeName;
     }
     // Fallback to order data if available
-    return order.electricMotorbike?.name || 'Đang tải...';
+    return order.electricMotorbike?.name || 'Loading...';
   };
 
   const filterOrders = () => {
-    let filtered = [...orders];
+    // First filter out DRAFT orders
+    let filtered = orders.filter(order => order.status !== 'DRAFT');
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -234,22 +242,59 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     });
   };
 
-  const handleDeleteOrder = (order) => {
+  // Get the next status based on current status
+  const getNextStatus = (order) => {
+    const statusFlow = {
+      'PENDING': 'APPROVED',
+      'APPROVED': 'DELIVERED',
+      'DELIVERED': 'PAID',
+    };
+    return statusFlow[order?.status] || null;
+  };
+
+  const handleUpdateToNextStatus = (order) => {
+    const nextStatus = getNextStatus(order);
+    if (!nextStatus) {
+      showError('Error', 'Cannot move to next status');
+      return;
+    }
+
     showConfirm(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa đơn hàng #${order.id}?`,
+      'Confirm Update',
+      `Are you sure you want to change order #${order.id} from "${getStatusLabel(order.status)}" to "${getStatusLabel(nextStatus)}"?`,
       async () => {
         try {
-          const response = await orderRestockService.deleteOrderRestock(order.id);
+          const response = await orderRestockService.updateOrderRestockStatus(order.id, nextStatus);
           if (response.success) {
-            showSuccess('Thành công', 'Xóa đơn hàng thành công!');
+            showSuccess('Success', 'Status updated successfully!');
             loadOrders();
           } else {
-            showError('Lỗi', response.error || 'Không thể xóa đơn hàng');
+            showError('Error', response.error || 'Cannot update status');
           }
         } catch (error) {
-          console.error('Error deleting order:', error);
-          showError('Lỗi', 'Không thể xóa đơn hàng');
+          console.error('Error updating status:', error);
+          showError('Error', 'Cannot update status');
+        }
+      }
+    );
+  };
+
+  const handleCancelOrder = (order) => {
+    showConfirm(
+      'Confirm Cancel Order',
+      `Are you sure you want to cancel order #${order.id}?`,
+      async () => {
+        try {
+          const response = await orderRestockService.updateOrderRestockStatus(order.id, 'CANCELED');
+          if (response.success) {
+            showSuccess('Success', 'Order canceled successfully!');
+            loadOrders();
+          } else {
+            showError('Error', response.error || 'Cannot cancel order');
+          }
+        } catch (error) {
+          console.error('Error canceling order:', error);
+          showError('Error', 'Cannot cancel order');
         }
       }
     );
@@ -300,29 +345,29 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
       <View style={styles.orderDetails}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Đại lý:</Text>
+          <Text style={styles.detailLabel}>Agency:</Text>
           <Text style={styles.detailValue}>
             {getAgencyName(order.agencyId)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Xe:</Text>
+          <Text style={styles.detailLabel}>Vehicle:</Text>
           <Text style={styles.detailValue}>
             {getMotorbikeName(order)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Kho:</Text>
+          <Text style={styles.detailLabel}>Warehouse:</Text>
           <Text style={styles.detailValue}>
             {getWarehouseName(order)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Số lượng:</Text>
-          <Text style={styles.detailValue}>{order.quantity} xe</Text>
+          <Text style={styles.detailLabel}>Quantity:</Text>
+          <Text style={styles.detailValue}>{order.quantity} units</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Tổng giá trị:</Text>
+          <Text style={styles.detailLabel}>Total:</Text>
           <Text style={[styles.detailValue, styles.priceValue]}>
             {formatPrice(order.subtotal)}
           </Text>
@@ -330,29 +375,40 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.orderActions}>
-        <TouchableOpacity
-          style={styles.viewButton}
-          onPress={() => handleViewOrder(order)}
-        >
-          <Text style={styles.viewButtonText}>Xem chi tiết</Text>
-        </TouchableOpacity>
-        {order.status === 'DRAFT' && (
+        {getNextStatus(order) && (
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteOrder(order)}
+            style={[styles.actionButton, styles.nextStatusButton]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleUpdateToNextStatus(order);
+            }}
           >
-            <Text style={styles.deleteButtonText}>Xóa</Text>
+            <Text style={styles.actionButtonText}>
+              {getStatusLabel(getNextStatus(order))}
+            </Text>
+          </TouchableOpacity>
+        )}
+        
+        {order.status !== 'CANCELED' && order.status !== 'PAID' && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleCancelOrder(order);
+            }}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Order</Text>
           </TouchableOpacity>
         )}
       </View>
     </TouchableOpacity>
   );
 
-  // Calculate statistics
-  const totalOrders = orders.length;
+  // Calculate statistics (excluding DRAFT orders)
+  const totalOrders = orders.filter(o => o.status !== 'DRAFT').length;
   const statusCounts = orderStatuses.reduce((acc, status) => {
     if (status.key !== 'all') {
-      acc[status.key] = orders.filter(o => o.status === status.key).length;
+      acc[status.key] = orders.filter(o => o.status === status.key && o.status !== 'DRAFT').length;
     }
     return acc;
   }, {});
@@ -367,7 +423,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý đơn hàng nhập kho</Text>
+        <Text style={styles.headerTitle}>Order Restock Management</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -376,7 +432,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         <Text style={styles.searchIcon}><Search /></Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm theo ID, tên xe, kho..."
+          placeholder="Search by ID, vehicle name, warehouse..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -387,7 +443,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{totalOrders}</Text>
-          <Text style={styles.statLabel}>Tổng đơn</Text>
+          <Text style={styles.statLabel}>Total Orders</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>
@@ -422,7 +478,8 @@ const OrderRestockManagementScreen = ({ navigation }) => {
               key={status.key}
               style={[
                 styles.statusChip,
-                selectedStatus === status.key && styles.selectedStatusChip
+                selectedStatus === status.key && styles.selectedStatusChip,
+                status.key === 'all' && styles.statusChipCenter
               ]}
               onPress={() => handleStatusFilter(status.key)}
             >
@@ -466,18 +523,18 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         {loading && filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>⏳</Text>
-            <Text style={styles.emptyTitle}>Đang tải...</Text>
+            <Text style={styles.emptyTitle}>Loading...</Text>
           </View>
         ) : filteredOrders.length > 0 ? (
           filteredOrders.map(renderOrderCard)
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>Không có đơn hàng</Text>
+            <Text style={styles.emptyTitle}>No Orders</Text>
             <Text style={styles.emptySubtitle}>
               {selectedStatus !== 'all'
-                ? `Không có đơn hàng với trạng thái "${getStatusLabel(selectedStatus)}"`
-                : 'Chưa có đơn hàng nào trong hệ thống'}
+                ? `No orders with status "${getStatusLabel(selectedStatus)}"`
+                : 'No orders in the system'}
             </Text>
           </View>
         )}
@@ -609,6 +666,9 @@ const styles = StyleSheet.create({
     minWidth: 80,
     maxWidth: 120,
   },
+  statusChipCenter: {
+    justifyContent: 'center',
+  },
   selectedStatusChip: {
     backgroundColor: COLORS.PRIMARY,
   },
@@ -712,26 +772,30 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: SIZES.PADDING.SMALL,
   },
-  viewButton: {
-    backgroundColor: COLORS.PRIMARY,
+  actionButton: {
     borderRadius: SIZES.RADIUS.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  viewButtonText: {
+  nextStatusButton: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  actionButtonText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
   },
-  deleteButton: {
-    backgroundColor: COLORS.ERROR,
-    borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.ERROR,
   },
-  deleteButtonText: {
+  cancelButtonText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.ERROR,
     fontWeight: '600',
   },
   emptyState: {
