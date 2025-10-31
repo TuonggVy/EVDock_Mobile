@@ -11,6 +11,7 @@ import {
   Dimensions,
   TextInput,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
@@ -39,10 +40,12 @@ const OrderManagementScreen = ({ navigation }) => {
   const [availableVehicles, setAvailableVehicles] = useState([]); // Synced names from Catalog
   const [editingOrder, setEditingOrder] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
+  const [colors, setColors] = useState([]);
   const [agencies, setAgencies] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [discounts, setDiscounts] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
+  const [creating, setCreating] = useState(false);
   const [newOrder, setNewOrder] = useState({
     vehicleModel: '',
     quantity: '',
@@ -146,10 +149,17 @@ const OrderManagementScreen = ({ navigation }) => {
           setAgencies(agenciesResponse.data || []);
         }
 
-        // Load promotions
-        const promotionsResponse = await promotionService.getAllPromotions(1, 100);
-        if (promotionsResponse.success) {
-          setPromotions(promotionsResponse.data || []);
+        // Load promotions from stock-promotion API for current agency, only ACTIVE
+        if (user?.agencyId) {
+          const promotionsResponse = await promotionService.getStockPromotionsByAgency(parseInt(user.agencyId), { page: 1, limit: 100, status: 'ACTIVE' });
+          if (promotionsResponse.success) {
+            const activePromos = (promotionsResponse.data || []).filter(p => (p.status || 'ACTIVE') === 'ACTIVE');
+            setPromotions(activePromos);
+          } else {
+            setPromotions([]);
+          }
+        } else {
+          setPromotions([]);
         }
 
         // Load discounts for current agency
@@ -175,6 +185,12 @@ const OrderManagementScreen = ({ navigation }) => {
         const motorbikesResponse = await motorbikeService.getAllMotorbikes({ limit: 100 });
         if (motorbikesResponse.success) {
           setMotorbikes(motorbikesResponse.data || []);
+        }
+
+        // Load colors for selection (GET /color)
+        const colorsResponse = await motorbikeService.getAllColors();
+        if (colorsResponse.success) {
+          setColors(colorsResponse.data || []);
         }
       } catch (error) {
         console.error('Error loading options:', error);
@@ -285,13 +301,34 @@ const OrderManagementScreen = ({ navigation }) => {
   });
 
   const handleCreateOrder = async () => {
-    if (!newOrder.vehicleModel || !newOrder.quantity || !newOrder.color) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+    console.log('👉 [OrderManagement] Bấm Tạo đơn');
+    setCreating(true);
+    showInfo('Đang xử lý', 'Đang tạo đơn, vui lòng đợi...');
+    if (!newOrder.quantity || !newOrder.colorId) {
+      console.warn('⚠️ [OrderManagement] Thiếu thông tin bắt buộc: quantity/colorId', {
+        quantity: newOrder.quantity,
+        colorId: newOrder.colorId,
+      });
+      showError('Lỗi', 'Vui lòng nhập số lượng và chọn màu sắc');
+      setCreating(false);
       return;
     }
 
     if (!newOrder.warehouseId || !newOrder.motorbikeId) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (Xe máy)');
+      console.warn('⚠️ [OrderManagement] Thiếu thông tin bắt buộc: warehouseId/motorbikeId', {
+        warehouseId: newOrder.warehouseId,
+        motorbikeId: newOrder.motorbikeId,
+      });
+      showError('Lỗi', 'Vui lòng chọn Kho và Xe máy');
+      setCreating(false);
+      return;
+    }
+
+    // Ensure agency is available either from form or user context
+    if (!newOrder.agencyId && !user?.agencyId) {
+      console.warn('⚠️ [OrderManagement] Thiếu thông tin bắt buộc: agencyId (không có từ user context)');
+      showError('Lỗi', 'Vui lòng chọn Đại lý');
+      setCreating(false);
       return;
     }
 
@@ -301,9 +338,9 @@ const OrderManagementScreen = ({ navigation }) => {
     }
 
     try {
+      console.log('🚀 [OrderManagement] Bắt đầu gọi API tạo đơn...');
       const orderRestockData = {
         quantity: parseInt(newOrder.quantity) || 0,
-        pricePolicyId: 1, // Default price policy
         discountId: newOrder.discountId ? parseInt(newOrder.discountId) : 1,
         promotionId: newOrder.promotionId ? parseInt(newOrder.promotionId) : 1,
         warehouseId: parseInt(newOrder.warehouseId) || 0,
@@ -324,6 +361,7 @@ const OrderManagementScreen = ({ navigation }) => {
       });
       
       if (response.success) {
+        console.log('✅ [OrderManagement] API trả về success');
         const orderData = response.data || {};
         // Get orderId from multiple possible sources
         const orderId = response.orderId || orderData.id || response.data?.id;
@@ -394,11 +432,20 @@ const OrderManagementScreen = ({ navigation }) => {
         
         showSuccess('Thành công', response.message || 'Đơn hàng đã được tạo thành công!');
       } else {
-        showError('Lỗi', response.error || 'Không thể tạo đơn hàng');
+        console.error('❌ [OrderManagement] API tạo đơn thất bại:', response);
+        const serverMessage = response.message || response.error || 'Không thể tạo đơn hàng';
+        showError('Lỗi', serverMessage);
       }
     } catch (error) {
       console.error('Error creating order:', error);
-      showError('Lỗi', 'Không thể tạo đơn đặt xe');
+      const serverMessage = (error?.response?.data?.message)
+        || (typeof error?.message === 'string' ? error.message : '')
+        || 'Không thể tạo đơn đặt xe';
+      console.error('Error details:', error?.response?.data || {});
+      showError('Lỗi', serverMessage);
+    } finally {
+      console.log('🔚 [OrderManagement] Kết thúc quy trình tạo đơn');
+      setCreating(false);
     }
   };
 
@@ -643,35 +690,18 @@ const OrderManagementScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.modalSaveButton}
             onPress={handleCreateOrder}
+            disabled={creating}
           >
-            <Text style={styles.modalSaveText}>Tạo đơn</Text>
+            {creating ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.modalSaveText}>Tạo đơn</Text>
+            )}
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.modalContent}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mẫu xe *</Text>
-            <View style={styles.vehicleSelector}>
-              {availableVehicles.map((vehicle) => (
-                <TouchableOpacity
-                  key={vehicle.id}
-                  style={[
-                    styles.vehicleOption,
-                    newOrder.vehicleModel === vehicle.name && styles.selectedVehicleOption
-                  ]}
-                  onPress={() => setNewOrder({ ...newOrder, vehicleModel: vehicle.name })}
-                >
-                  <Text style={[
-                    styles.vehicleOptionText,
-                    newOrder.vehicleModel === vehicle.name && styles.selectedVehicleOptionText
-                  ]}>
-                    {vehicle.name}
-                  </Text>
-                  <Text style={styles.vehiclePrice}>{formatPrice(vehicle.price)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          {/* Mẫu xe: không cần hiển thị */}
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Số lượng *</Text>
@@ -685,30 +715,7 @@ const OrderManagementScreen = ({ navigation }) => {
             />
           </View>
 
-          {newOrder.vehicleModel && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Màu sắc *</Text>
-              <View style={styles.colorSelector}>
-                {availableVehicles.find(v => v.name === newOrder.vehicleModel)?.colors.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorOption,
-                      newOrder.color === color && styles.selectedColorOption
-                    ]}
-                    onPress={() => setNewOrder({ ...newOrder, color })}
-                  >
-                    <Text style={[
-                      styles.colorOptionText,
-                      newOrder.color === color && styles.selectedColorOptionText
-                    ]}>
-                      {color}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+          {/* Selector màu theo mẫu xe: bỏ vì không dùng mẫu xe */}
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Xe máy *</Text>
@@ -729,7 +736,7 @@ const OrderManagementScreen = ({ navigation }) => {
                     ]}>
                       {mb.name || mb.model || `Xe máy ${mb.id}`}
                     </Text>
-                    <Text style={styles.vehiclePrice}>ID: {mb.id}</Text>
+                    {/* ID hidden per requirement */}
                   </TouchableOpacity>
                 ))
               ) : (
@@ -739,49 +746,60 @@ const OrderManagementScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>ID Màu (colorId) *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newOrder.colorId}
-              onChangeText={(text) => setNewOrder({ ...newOrder, colorId: text })}
-              placeholder="Nhập ID màu sắc"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="numeric"
-            />
-            <Text style={styles.inputHint}>Nhập ID màu tương ứng với màu đã chọn ở trên</Text>
+            <Text style={styles.inputLabel}>Màu sắc *</Text>
+            <View style={styles.vehicleSelector}>
+              {colors.length > 0 ? (
+                colors.map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.vehicleOption,
+                      newOrder.colorId === String(c.id) && styles.selectedVehicleOption
+                    ]}
+                    onPress={() => setNewOrder({ ...newOrder, colorId: String(c.id) })}
+                  >
+                    <Text style={[
+                      styles.vehicleOptionText,
+                      newOrder.colorId === String(c.id) && styles.selectedVehicleOptionText
+                    ]}>
+                      {c.colorType}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.noOptionsText}>Đang tải danh sách màu...</Text>
+              )}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Kho *</Text>
-            {newOrder.warehouseId ? (
-              <View style={styles.selectedAgencyContainer}>
-                <Text style={styles.selectedAgencyText}>
-                  {warehouses.find(wh => wh.id === Number(newOrder.warehouseId))?.name || 
-                   warehouses.find(wh => wh.id === Number(newOrder.warehouseId))?.location || 
-                   `Kho ID: ${newOrder.warehouseId}`}
-                </Text>
-                <Text style={styles.selectedAgencyId}>ID: {newOrder.warehouseId}</Text>
-              </View>
-            ) : (
-              <Text style={styles.noAgencyText}>Đang tải thông tin kho...</Text>
-            )}
+            <View style={styles.vehicleSelector}>
+              {warehouses.length > 0 ? (
+                warehouses.map((wh) => (
+                  <TouchableOpacity
+                    key={wh.id}
+                    style={[
+                      styles.vehicleOption,
+                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOption
+                    ]}
+                    onPress={() => setNewOrder({ ...newOrder, warehouseId: String(wh.id) })}
+                  >
+                    <Text style={[
+                      styles.vehicleOptionText,
+                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
+                    ]}>
+                      {wh.name || wh.location || `Kho`}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.noOptionsText}>Đang tải danh sách kho...</Text>
+              )}
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Đại lý *</Text>
-            {user?.agencyId ? (
-              <View style={styles.selectedAgencyContainer}>
-                <Text style={styles.selectedAgencyText}>
-                  {agencies.find(ag => ag.id === Number(user.agencyId))?.name || 
-                   agencies.find(ag => ag.id === Number(user.agencyId))?.location || 
-                   `Đại lý ID: ${user.agencyId}`}
-                </Text>
-                <Text style={styles.selectedAgencyId}>ID: {user.agencyId}</Text>
-              </View>
-            ) : (
-              <Text style={styles.noAgencyText}>Không tìm thấy thông tin đại lý</Text>
-            )}
-          </View>
+          {/* Đại lý: không cần hiển thị vì tự lấy từ user.agencyId */}
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Giảm giá (tùy chọn)</Text>
@@ -797,7 +815,7 @@ const OrderManagementScreen = ({ navigation }) => {
                   styles.vehicleOptionText,
                   !newOrder.discountId && styles.selectedVehicleOptionText
                 ]}>
-                  Không chọn
+                  Không có
                 </Text>
               </TouchableOpacity>
               {discounts.length > 0 ? (
@@ -816,11 +834,11 @@ const OrderManagementScreen = ({ navigation }) => {
                     ]}>
                       {disc.name || disc.description || `Giảm giá ${disc.id}`}
                     </Text>
-                    <Text style={styles.vehiclePrice}>ID: {disc.id}</Text>
+                    {/* ID hidden per requirement */}
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={styles.noOptionsText}>Đang tải danh sách giảm giá...</Text>
+                <Text style={styles.noOptionsText}>Không có mã giảm giá</Text>
               )}
             </View>
           </View>
@@ -858,7 +876,7 @@ const OrderManagementScreen = ({ navigation }) => {
                     ]}>
                       {promo.name || `Khuyến mãi ${promo.id}`}
                     </Text>
-                    <Text style={styles.vehiclePrice}>ID: {promo.id}</Text>
+                    {/* ID hidden per requirement */}
                   </TouchableOpacity>
                 ))
               ) : (
