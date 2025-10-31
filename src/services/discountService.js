@@ -1,54 +1,6 @@
-import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import axiosInstance from './api/axiosInstance';
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper function to get auth token
-const getAuthToken = async () => {
-  try {
-    const token = await AsyncStorage.getItem('token');
-    return token;
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    return null;
-  }
-};
-
-// Helper function to make API requests
-const apiRequest = async (endpoint, method = 'GET', body = null) => {
-  try {
-    const token = await getAuthToken();
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const config = {
-      method,
-      headers,
-    };
-
-    if (body) {
-      config.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('API Request Error:', error);
-    throw error;
-  }
-};
 
 // Discount Service
 export const discountService = {
@@ -56,18 +8,41 @@ export const discountService = {
   getDiscounts: async (page = 1, limit = 10) => {
     try {
       await delay(300);
-      const data = await apiRequest(`/discount/list?page=${page}&limit=${limit}`, 'GET');
+      console.log('🔄 [DiscountService] Fetching discounts:', { page, limit });
+      
+      const response = await axiosInstance.get('/discount/list', {
+        params: { page, limit }
+      });
+      
+      console.log('✅ [DiscountService] Discounts fetched:', response.data);
       
       return {
         success: true,
-        data: data.data || [],
-        pagination: data.paginationInfo || {}
+        data: response.data.data || [],
+        pagination: response.data.paginationInfo || {}
       };
     } catch (error) {
-      console.error('Error fetching discounts:', error);
+      console.error('❌ [DiscountService] Error fetching discounts:', error);
+      console.error('❌ [DiscountService] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      // Handle 403 specifically
+      if (error.response?.status === 403) {
+        return {
+          success: false,
+          error: 'Không có quyền truy cập danh sách giảm giá. Vui lòng kiểm tra quyền của tài khoản.',
+          data: []
+        };
+      }
+      
       return {
         success: false,
-        error: 'Không thể tải danh sách discount'
+        error: error.response?.data?.message || 'Không thể tải danh sách discount',
+        data: []
       };
     }
   },
@@ -92,21 +67,37 @@ export const discountService = {
   },
 
   // Get discounts for a specific agency
-  getAgencyDiscounts: async (agencyId, page = 1, limit = 10) => {
+  getAgencyDiscounts: async (agencyId, page = 1, limit = 10, type) => {
     try {
       await delay(300);
-      const data = await apiRequest(`/discount/agency/list/${agencyId}?page=${page}&limit=${limit}`, 'GET');
-      
+      if (!agencyId) {
+        return { success: false, error: 'Thiếu agencyId', data: [] };
+      }
+      console.log('🔄 [DiscountService] Fetching agency discounts:', { agencyId, page, limit, type });
+      const response = await axiosInstance.get(`/discount/agency/list/${agencyId}`, {
+        params: { page, limit, ...(type ? { type } : {}) }
+      });
+      console.log('✅ [DiscountService] Agency discounts fetched:', response.data);
       return {
         success: true,
-        data: data.data || [],
-        pagination: data.paginationInfo || {}
+        data: response.data.data || [],
+        pagination: response.data.paginationInfo || {}
       };
     } catch (error) {
-      console.error('Error fetching agency discounts:', error);
+      console.error('❌ [DiscountService] Error fetching agency discounts:', error);
+      console.error('❌ [DiscountService] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      if (error.response?.status === 403) {
+        return { success: false, error: 'Không có quyền truy cập discount của đại lý.', data: [] };
+      }
       return {
         success: false,
-        error: 'Không thể tải danh sách discount của đại lý'
+        error: error.response?.data?.message || 'Không thể tải danh sách discount của đại lý',
+        data: []
       };
     }
   },
