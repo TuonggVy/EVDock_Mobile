@@ -253,23 +253,21 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
               style={[styles.actionButton, styles.deleteActionButton]}
               onPress={async () => {
                 try {
-                  const resp = await orderRestockManagerService.updateOrderRestockStatus(order.id, 'CANCELED');
+                  const resp = await orderRestockManagerService.deleteOrderRestock(order.id);
                   if (resp.success) {
-                    setOrder(resp.data);
-                    showSuccess('Thành công', 'Đã hủy đơn hàng!');
+                    showSuccess('Thành công', 'Đã xóa đơn hàng!');
                     if (onStatusUpdate) onStatusUpdate();
+                    navigation.goBack();
                   } else {
-                    showError('Lỗi', resp.error || 'Không thể hủy đơn hàng');
+                    showError('Lỗi', resp.error || 'Không thể xóa đơn hàng');
                   }
                 } catch (e) {
-                  showError('Lỗi', 'Không thể hủy đơn hàng');
+                  showError('Lỗi', 'Không thể xóa đơn hàng');
                 }
               }}
             >
-              <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Cancel</Text>
+              <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
             </TouchableOpacity>
-
-            {/* Delete button removed as per requirement (delete handled in list) */}
           </>
         ) : null}
       </View>
