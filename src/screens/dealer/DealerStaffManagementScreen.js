@@ -104,7 +104,7 @@ const DealerStaffManagementScreen = ({ navigation }) => {
       setIsLoading(true);
       console.log('Loading staff list for agencyId:', currentAgencyId);
       
-      const result = await staffService.getDealerStaffList(currentAgencyId);
+      const result = await staffService.getDealerStaffList(currentAgencyId, { page: 1, limit: 1000 });
       
       if (result?.success) {
         console.log('Staff list loaded:', result.data);
