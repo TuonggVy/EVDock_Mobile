@@ -168,6 +168,31 @@ class PromotionService {
     }
   }
 
+  // Get stock promotions by agency with status filter (ACTIVE required to use)
+  async getStockPromotionsByAgency(agencyId, { page = 1, limit = 10, status = 'ACTIVE', valueType } = {}) {
+    try {
+      if (!agencyId) {
+        return { success: false, error: 'agencyId is required', data: [] };
+      }
+      const params = { page, limit, status };
+      if (valueType) params.valueType = valueType;
+      const response = await axiosInstance.get(`${API_BASE_URL}/stock-promotion/list/${agencyId}`, { params });
+      return {
+        success: true,
+        data: response.data?.data || response.data || [],
+        pagination: response.data?.paginationInfo,
+        message: response.data?.message || 'Get stock promotion list successfully!',
+      };
+    } catch (error) {
+      console.error('Error fetching stock promotions:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to fetch stock promotions',
+        data: [],
+      };
+    }
+  }
+
   // Format value display based on type
   formatValue(value, valueType) {
     if (valueType === 'PERCENT') {
