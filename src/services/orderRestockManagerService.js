@@ -11,27 +11,52 @@ const ORDER_RESTOCK_ENDPOINTS = {
 };
 
 export const getOrderRestockList = async (params = {}) => {
+  const buildUrl = (p = {}) => {
+    const qp = new URLSearchParams();
+    if (p.page) qp.append('page', p.page);
+    if (p.limit) qp.append('limit', p.limit);
+    if (p.status) qp.append('status', p.status);
+    if (p.agencyId) qp.append('agencyId', p.agencyId);
+    const qs = qp.toString();
+    return qs ? `${ORDER_RESTOCK_ENDPOINTS.LIST}?${qs}` : ORDER_RESTOCK_ENDPOINTS.LIST;
+  };
   try {
-    const queryParams = new URLSearchParams();
-    if (params.page) queryParams.append('page', params.page);
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.status) queryParams.append('status', params.status);
-    if (params.agencyId) queryParams.append('agencyId', params.agencyId);
-    const response = await api.get(`${ORDER_RESTOCK_ENDPOINTS.LIST}?${queryParams}`);
-    return { success: true, data: response.data.data || [], paginationInfo: response.data.paginationInfo || {} };
+    const url = buildUrl(params);
+    const response = await api.get(url);
+    const data = response.data?.data || response.data || [];
+    return { success: true, data, paginationInfo: response.data?.paginationInfo || {} };
   } catch (error) {
+    // If server rejects due to params, retry with safe defaults to fetch everything
+    const statusCode = error?.response?.status;
+    if (statusCode === 400 || statusCode === 422) {
+      try {
+        const fallbackParams = { page: 1, limit: 1000 };
+        const url = buildUrl(fallbackParams);
+        const response = await api.get(url);
+        const data = response.data?.data || response.data || [];
+        return { success: true, data, paginationInfo: response.data?.paginationInfo || {} };
+      } catch (_err) {
+        return { success: false, error: _err.response?.data?.message || 'Không thể tải danh sách đơn hàng', data: [], paginationInfo: {} };
+      }
+    }
     return { success: false, error: error.response?.data?.message || 'Không thể tải danh sách đơn hàng', data: [], paginationInfo: {} };
   }
 };
 
-export const getOrderRestockListByAgency = async (agencyId) => {
+export const getOrderRestockListByAgency = async (agencyId, params = {}) => {
   try {
     if (!agencyId) return { success: false, error: 'Agency ID is required', data: [] };
-    const response = await api.get(ORDER_RESTOCK_ENDPOINTS.LIST_BY_AGENCY(agencyId));
+    const qp = new URLSearchParams();
+    if (params.page) qp.append('page', params.page);
+    if (params.limit) qp.append('limit', params.limit);
+    if (params.status) qp.append('status', params.status);
+    const qs = qp.toString();
+    const url = qs ? `${ORDER_RESTOCK_ENDPOINTS.LIST_BY_AGENCY(agencyId)}?${qs}` : ORDER_RESTOCK_ENDPOINTS.LIST_BY_AGENCY(agencyId);
+    const response = await api.get(url);
     const ordersList = response.data?.data || response.data || [];
-    return { success: true, data: ordersList };
+    return { success: true, data: ordersList, paginationInfo: response.data?.paginationInfo || {} };
   } catch (error) {
-    return { success: false, error: error.response?.data?.message || 'Không thể tải danh sách đơn hàng', data: [] };
+    return { success: false, error: error.response?.data?.message || 'Không thể tải danh sách đơn hàng', data: [], paginationInfo: {} };
   }
 };
 

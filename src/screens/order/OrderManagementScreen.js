@@ -40,9 +40,11 @@ const OrderManagementScreen = ({ navigation }) => {
   const [availableVehicles, setAvailableVehicles] = useState([]); // Synced names from Catalog
   const [editingOrder, setEditingOrder] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
-  const [colors, setColors] = useState([]);
+  const [colors, setColors] = useState([]); // legacy, not used for selection
+  const [motorbikeColors, setMotorbikeColors] = useState([]);
   const [agencies, setAgencies] = useState([]);
   const [promotions, setPromotions] = useState([]);
+  const [allDiscounts, setAllDiscounts] = useState([]);
   const [discounts, setDiscounts] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
   const [creating, setCreating] = useState(false);
@@ -149,15 +151,20 @@ const OrderManagementScreen = ({ navigation }) => {
           setAgencies(agenciesResponse.data || []);
         }
 
-        // Load promotions from stock-promotion API for current agency, only ACTIVE
-        if (user?.agencyId) {
-          const promotionsResponse = await promotionService.getStockPromotionsByAgency(parseInt(user.agencyId), { page: 1, limit: 100, status: 'ACTIVE' });
-          if (promotionsResponse.success) {
-            const activePromos = (promotionsResponse.data || []).filter(p => (p.status || 'ACTIVE') === 'ACTIVE');
-            setPromotions(activePromos);
-          } else {
-            setPromotions([]);
-          }
+        // Load promotions from agency promotion API (do not use stock promotions here)
+        const promotionsResponse = await promotionService.getAgencyPromotions(1, 100);
+        if (promotionsResponse.success) {
+          const now = new Date();
+          const activePromos = (promotionsResponse.data || []).filter(p => {
+            const statusOk = (p.status || 'ACTIVE') === 'ACTIVE';
+            const startOk = !p.startAt || new Date(p.startAt) <= now;
+            // Treat endAt as inclusive end-of-day to avoid timezone truncation
+            const endAt = p.endAt ? new Date(p.endAt) : null;
+            const endInclusive = endAt ? new Date(endAt.getTime() + 24*60*60*1000 - 1) : null;
+            const endOk = !endInclusive || endInclusive >= now;
+            return statusOk && startOk && endOk;
+          });
+          setPromotions(activePromos);
         } else {
           setPromotions([]);
         }
@@ -167,10 +174,25 @@ const OrderManagementScreen = ({ navigation }) => {
           const discountsResponse = await discountService.getAgencyDiscounts(
             parseInt(user.agencyId),
             1,
-            100
+            200
           );
           if (discountsResponse.success) {
-            setDiscounts(discountsResponse.data || []);
+            const now = new Date();
+            const qty = parseInt(newOrder.quantity) || 0;
+            const selectedMotorbikeId = newOrder.motorbikeId ? Number(newOrder.motorbikeId) : null;
+            const raw = discountsResponse.data || [];
+            setAllDiscounts(raw);
+            const filtered = raw.filter(d => {
+              const statusOk = (d.status || 'ACTIVE') === 'ACTIVE';
+              const startOk = !d.startAt || new Date(d.startAt) <= now;
+              const dEnd = d.endAt ? new Date(d.endAt) : null;
+              const endInclusive = dEnd ? new Date(dEnd.getTime() + 24*60*60*1000 - 1) : null;
+              const endOk = !endInclusive || endInclusive >= now;
+              const qtyOk = !d.min_quantity || qty === 0 || qty >= Number(d.min_quantity);
+              const motorbikeOk = !d.motorbikeId || (selectedMotorbikeId && Number(d.motorbikeId) === selectedMotorbikeId);
+              return statusOk && startOk && endOk && motorbikeOk && qtyOk;
+            });
+            setDiscounts(filtered);
           } else {
             console.warn('⚠️ [OrderManagement] Cannot load discounts:', discountsResponse.error);
             // Still allow creating order without discounts
@@ -187,11 +209,7 @@ const OrderManagementScreen = ({ navigation }) => {
           setMotorbikes(motorbikesResponse.data || []);
         }
 
-        // Load colors for selection (GET /color)
-        const colorsResponse = await motorbikeService.getAllColors();
-        if (colorsResponse.success) {
-          setColors(colorsResponse.data || []);
-        }
+        // Không load màu tổng quát; màu sẽ lấy theo motorbike đã chọn
       } catch (error) {
         console.error('Error loading options:', error);
       }
@@ -209,6 +227,81 @@ const OrderManagementScreen = ({ navigation }) => {
       // Warehouse will be auto-selected in loadOptions after warehouses load
     }
   }, [showCreateModal, user]);
+
+  // Re-filter discounts when quantity or selected motorbike changes
+  useEffect(() => {
+    if (!allDiscounts) return;
+    const now = new Date();
+    const qty = parseInt(newOrder.quantity) || 0;
+    const selectedMotorbikeId = newOrder.motorbikeId ? Number(newOrder.motorbikeId) : null;
+    const filtered = (allDiscounts || []).filter(d => {
+      const statusOk = (d.status || 'ACTIVE') === 'ACTIVE';
+      const startOk = !d.startAt || new Date(d.startAt) <= now;
+      const dEnd = d.endAt ? new Date(d.endAt) : null;
+      const endInclusive = dEnd ? new Date(dEnd.getTime() + 24*60*60*1000 - 1) : null;
+      const endOk = !endInclusive || endInclusive >= now;
+      const qtyOk = !d.min_quantity || qty === 0 || qty >= Number(d.min_quantity);
+      const motorbikeOk = !d.motorbikeId || (selectedMotorbikeId && Number(d.motorbikeId) === selectedMotorbikeId);
+      return statusOk && startOk && endOk && motorbikeOk && qtyOk;
+    });
+    setDiscounts(filtered);
+    if (newOrder.discountId && !filtered.find(d => String(d.id) === String(newOrder.discountId))) {
+      setNewOrder(prev => ({ ...prev, discountId: '' }));
+    }
+  }, [newOrder.quantity, newOrder.motorbikeId, allDiscounts]);
+
+  // Fetch colors for selected motorbike
+  useEffect(() => {
+    const fetchMotorbikeColors = async () => {
+      try {
+        setMotorbikeColors([]);
+        if (!newOrder.motorbikeId) return;
+        const res = await motorbikeService.getMotorbikeById(parseInt(newOrder.motorbikeId));
+        // Support both shapes: { data: { data: {...} } } or { data: {...} }
+        const payload = res?.data?.data || res?.data;
+        const colors = Array.isArray(payload?.colors) ? payload.colors : [];
+        const mapped = colors.map(item => ({
+          id: item?.color?.id,
+          colorType: item?.color?.colorType,
+          imageUrl: item?.imageUrl,
+        })).filter(c => c.id && c.colorType);
+        setMotorbikeColors(mapped);
+        // Auto-select first available color for order creation
+        if (mapped.length > 0) {
+          setNewOrder(prev => ({ ...prev, colorId: String(mapped[0].id) }));
+        } else {
+          setNewOrder(prev => ({ ...prev, colorId: '' }));
+        }
+      } catch (e) {
+        console.error('Error loading colors for motorbike:', e);
+        setMotorbikeColors([]);
+        setNewOrder(prev => ({ ...prev, colorId: '' }));
+      }
+    };
+    fetchMotorbikeColors();
+  }, [newOrder.motorbikeId]);
+
+  // Clear promotion if it becomes incompatible (expired or wrong motorbike)
+  useEffect(() => {
+    if (!newOrder.promotionId) return;
+    const selectedPromo = promotions.find(p => String(p.id) === String(newOrder.promotionId));
+    if (!selectedPromo) return;
+    const now = new Date();
+    const withinTime = (!selectedPromo.startAt || new Date(selectedPromo.startAt) <= now)
+      && (!selectedPromo.endAt || new Date(selectedPromo.endAt) >= now);
+    const motorbikeOk = !selectedPromo.motorbikeId
+      || (newOrder.motorbikeId && Number(selectedPromo.motorbikeId) === Number(newOrder.motorbikeId));
+    if (!withinTime || !motorbikeOk) {
+      console.warn('⚠️ [OrderManagement] Clearing invalid promotion selection', {
+        promotionId: newOrder.promotionId,
+        promoMotorbikeId: selectedPromo.motorbikeId,
+        selectedMotorbikeId: newOrder.motorbikeId,
+        withinTime,
+        motorbikeOk,
+      });
+      setNewOrder(prev => ({ ...prev, promotionId: '' }));
+    }
+  }, [newOrder.motorbikeId, newOrder.promotionId, promotions]);
 
   useEffect(() => {
     console.log('📱 [OrderManagement] Component mounted, gọi loadOrders()');
@@ -238,7 +331,7 @@ const OrderManagementScreen = ({ navigation }) => {
 
       const agencyId = parseInt(user.agencyId);
       console.log('🔄 [OrderManagement] Call API với agencyId:', agencyId);
-      const response = await orderRestockService.getOrderRestockListByAgency(agencyId);
+      const response = await orderRestockService.getOrderRestockListByAgency(agencyId, { page: 1, limit: 1000 });
       
       console.log('✅ [OrderManagement] API Response:', {
         success: response.success,
@@ -341,13 +434,17 @@ const OrderManagementScreen = ({ navigation }) => {
       console.log('🚀 [OrderManagement] Bắt đầu gọi API tạo đơn...');
       const orderRestockData = {
         quantity: parseInt(newOrder.quantity) || 0,
-        discountId: newOrder.discountId ? parseInt(newOrder.discountId) : 1,
-        promotionId: newOrder.promotionId ? parseInt(newOrder.promotionId) : 1,
         warehouseId: parseInt(newOrder.warehouseId) || 0,
         motorbikeId: parseInt(newOrder.motorbikeId) || 0,
         colorId: parseInt(newOrder.colorId) || 1,
         agencyId: parseInt(newOrder.agencyId || user?.agencyId) || 0,
       };
+      if (newOrder.discountId) {
+        orderRestockData.discountId = parseInt(newOrder.discountId);
+      }
+      if (newOrder.promotionId) {
+        orderRestockData.promotionId = parseInt(newOrder.promotionId);
+      }
 
       console.log('Creating order restock with data:', orderRestockData);
 
@@ -728,7 +825,7 @@ const OrderManagementScreen = ({ navigation }) => {
                       styles.vehicleOption,
                       newOrder.motorbikeId === String(mb.id) && styles.selectedVehicleOption
                     ]}
-                    onPress={() => setNewOrder({ ...newOrder, motorbikeId: String(mb.id) })}
+                    onPress={() => setNewOrder({ ...newOrder, motorbikeId: String(mb.id), colorId: '' })}
                   >
                     <Text style={[
                       styles.vehicleOptionText,
@@ -748,8 +845,8 @@ const OrderManagementScreen = ({ navigation }) => {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Màu sắc *</Text>
             <View style={styles.vehicleSelector}>
-              {colors.length > 0 ? (
-                colors.map((c) => (
+              {motorbikeColors.length > 0 ? (
+                motorbikeColors.map((c) => (
                   <TouchableOpacity
                     key={c.id}
                     style={[
@@ -764,10 +861,11 @@ const OrderManagementScreen = ({ navigation }) => {
                     ]}>
                       {c.colorType}
                     </Text>
+                    {/* Không hiển thị ID màu */}
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={styles.noOptionsText}>Đang tải danh sách màu...</Text>
+                <Text style={styles.noOptionsText}>Chọn Xe máy trước để hiển thị màu</Text>
               )}
             </View>
           </View>
@@ -861,7 +959,9 @@ const OrderManagementScreen = ({ navigation }) => {
                 </Text>
               </TouchableOpacity>
               {promotions.length > 0 ? (
-                promotions.map((promo) => (
+                promotions
+                  .filter(p => !p.motorbikeId || String(p.motorbikeId) === String(newOrder.motorbikeId || ''))
+                  .map((promo) => (
                   <TouchableOpacity
                     key={promo.id}
                     style={[
