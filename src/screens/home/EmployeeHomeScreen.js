@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
+import { Search } from 'lucide-react-native';
 
 const DealerStaffHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -135,6 +136,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       icon: '💎',
       onPress: () => navigation.navigate('DepositManagement'),
     },
+    {
+      title: 'Stock Management',
+      gradient: ['#FF6B35', '#F7931E', '#FFB347'],
+      icon: '📦',
+      onPress: () => navigation.navigate('StaffStockList'),
+    },
   ];
 
 
@@ -170,7 +177,7 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       <View style={styles.topSection}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Search tasks, customers..."
