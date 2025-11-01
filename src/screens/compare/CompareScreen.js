@@ -15,7 +15,7 @@ import {
 import { COLORS, SIZES } from '../../constants';
 import { formatPrice, getStockStatus } from '../../services/vehicleService';
 import motorbikeService from '../../services/motorbikeService';
-import { Ruler, Settings, Battery, Shield } from 'lucide-react-native';
+import { Ruler, Settings, Battery, Shield, ArrowLeft, Plus, Search } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -150,7 +150,7 @@ const CompareScreen = ({ navigation, route }) => {
   const renderAddVehicleCard = () => (
     <TouchableOpacity style={styles.addVehicleCard} onPress={handleAddVehicle}>
       <View style={styles.addIconContainer}>
-        <Text style={styles.addIcon}>+</Text>
+        <Text style={styles.addIcon}><Plus color="#FFFFFF" size={18} /></Text>
       </View>
       <Text style={styles.addText}>Choose a vehicle</Text>
     </TouchableOpacity>
@@ -164,7 +164,7 @@ const CompareScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={handleBack}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Compare Vehicles</Text>
         {compareVehicles.length > 0 && (
@@ -185,7 +185,7 @@ const CompareScreen = ({ navigation, route }) => {
       >
         {compareVehicles.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔍</Text>
+            <Text style={styles.emptyIcon}><Search size={60} color="#FFFFFF" /></Text>
             <Text style={styles.emptyTitle}>No vehicles to compare</Text>
             <Text style={styles.emptySubtitle}>
               Add vehicles from the catalog to start comparing
