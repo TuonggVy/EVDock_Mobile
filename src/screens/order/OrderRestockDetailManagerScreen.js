@@ -10,6 +10,7 @@ import {
   Modal,
   Linking,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -271,32 +272,90 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
             <View style={styles.paymentTypeContainer}>
               <TouchableOpacity
                 style={[
-                  styles.paymentTypeOption,
-                  selectedPaymentType === 'FULL' && styles.paymentTypeOptionSelected
+                  styles.paymentTypeCard,
+                  selectedPaymentType === 'FULL' && styles.paymentTypeCardSelected
                 ]}
                 onPress={() => setSelectedPaymentType('FULL')}
+                activeOpacity={0.8}
               >
-                <Text style={[
-                  styles.paymentTypeText,
-                  selectedPaymentType === 'FULL' && styles.paymentTypeTextSelected
-                ]}>
-                  Thanh toán đầy đủ (FULL)
-                </Text>
+                <LinearGradient
+                  colors={selectedPaymentType === 'FULL' 
+                    ? ['#4A90E2', '#357ABD'] 
+                    : ['#FFFFFF', '#F8F9FA']
+                  }
+                  style={styles.paymentTypeCardGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={styles.paymentTypeHeader}>
+                    <View style={styles.paymentTypeIconContainer}>
+                      <Text style={styles.paymentTypeIcon}>💰</Text>
+                    </View>
+                    <View style={styles.paymentTypeTitleContainer}>
+                      <Text style={[
+                        styles.paymentTypeTitle,
+                        selectedPaymentType === 'FULL' && styles.paymentTypeTitleSelected
+                      ]}>
+                        Thanh toán đầy đủ
+                      </Text>
+                      <Text style={[
+                        styles.paymentTypeSubtitle,
+                        selectedPaymentType === 'FULL' && styles.paymentTypeSubtitleSelected
+                      ]}>
+                        Thanh toán một lần (FULL)
+                      </Text>
+                    </View>
+                    {selectedPaymentType === 'FULL' && (
+                      <View style={styles.selectedBadge}>
+                        <Text style={styles.selectedBadgeText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
-                  styles.paymentTypeOption,
-                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeOptionSelected
+                  styles.paymentTypeCard,
+                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeCardSelected
                 ]}
                 onPress={() => setSelectedPaymentType('DEFERRED')}
+                activeOpacity={0.8}
               >
-                <Text style={[
-                  styles.paymentTypeText,
-                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeTextSelected
-                ]}>
-                  Thanh toán trả chậm (DEFERRED)
-                </Text>
+                <LinearGradient
+                  colors={selectedPaymentType === 'DEFERRED' 
+                    ? ['#9B59B6', '#8E44AD'] 
+                    : ['#FFFFFF', '#F8F9FA']
+                  }
+                  style={styles.paymentTypeCardGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={styles.paymentTypeHeader}>
+                    <View style={styles.paymentTypeIconContainer}>
+                      <Text style={styles.paymentTypeIcon}>📅</Text>
+                    </View>
+                    <View style={styles.paymentTypeTitleContainer}>
+                      <Text style={[
+                        styles.paymentTypeTitle,
+                        selectedPaymentType === 'DEFERRED' && styles.paymentTypeTitleSelected
+                      ]}>
+                        Thanh toán trả chậm
+                      </Text>
+                      <Text style={[
+                        styles.paymentTypeSubtitle,
+                        selectedPaymentType === 'DEFERRED' && styles.paymentTypeSubtitleSelected
+                      ]}>
+                        Thanh toán sau (DEFERRED)
+                      </Text>
+                    </View>
+                    {selectedPaymentType === 'DEFERRED' && (
+                      <View style={styles.selectedBadge}>
+                        <Text style={styles.selectedBadgeText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
 
@@ -703,25 +762,72 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
     gap: SIZES.PADDING.MEDIUM,
   },
-  paymentTypeOption: {
-    padding: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
+  paymentTypeCard: {
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  paymentTypeCardSelected: {
     borderWidth: 2,
-    borderColor: COLORS.TEXT.SECONDARY,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-  },
-  paymentTypeOptionSelected: {
     borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
-  paymentTypeText: {
-    fontSize: SIZES.FONT.MEDIUM,
+  paymentTypeCardGradient: {
+    padding: SIZES.PADDING.LARGE,
+    borderRadius: SIZES.RADIUS.LARGE,
+  },
+  paymentTypeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentTypeIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZES.PADDING.MEDIUM,
+  },
+  paymentTypeIcon: {
+    fontSize: 28,
+  },
+  paymentTypeTitleContainer: {
+    flex: 1,
+  },
+  paymentTypeTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  paymentTypeTextSelected: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+  paymentTypeTitleSelected: {
+    color: COLORS.TEXT.WHITE,
+  },
+  paymentTypeSubtitle: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  paymentTypeSubtitleSelected: {
+    color: COLORS.TEXT.WHITE,
+    opacity: 0.9,
+  },
+  selectedBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.SUCCESS,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  selectedBadgeText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: 'bold',
   },
   modalActions: {
     flexDirection: 'row',
