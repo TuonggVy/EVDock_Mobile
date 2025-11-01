@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { ArrowLeft, DollarSign, Calendar, Check } from 'lucide-react-native';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import agencyService from '../../services/agencyService';
 
@@ -289,7 +290,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                 >
                   <View style={styles.paymentTypeHeader}>
                     <View style={styles.paymentTypeIconContainer}>
-                      <Text style={styles.paymentTypeIcon}>💰</Text>
+                      <DollarSign size={28} color={selectedPaymentType === 'FULL' ? COLORS.TEXT.WHITE : COLORS.PRIMARY} />
                     </View>
                     <View style={styles.paymentTypeTitleContainer}>
                       <Text style={[
@@ -307,7 +308,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                     </View>
                     {selectedPaymentType === 'FULL' && (
                       <View style={styles.selectedBadge}>
-                        <Text style={styles.selectedBadgeText}>✓</Text>
+                        <Check size={16} color={COLORS.TEXT.WHITE} />
                       </View>
                     )}
                   </View>
@@ -333,7 +334,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                 >
                   <View style={styles.paymentTypeHeader}>
                     <View style={styles.paymentTypeIconContainer}>
-                      <Text style={styles.paymentTypeIcon}>📅</Text>
+                      <Calendar size={28} color={selectedPaymentType === 'DEFERRED' ? COLORS.TEXT.WHITE : COLORS.PRIMARY} />
                     </View>
                     <View style={styles.paymentTypeTitleContainer}>
                       <Text style={[
@@ -351,7 +352,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                     </View>
                     {selectedPaymentType === 'DEFERRED' && (
                       <View style={styles.selectedBadge}>
-                        <Text style={styles.selectedBadgeText}>✓</Text>
+                        <Check size={16} color={COLORS.TEXT.WHITE} />
                       </View>
                     )}
                   </View>
@@ -406,7 +407,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
         <View style={styles.placeholder} />
@@ -589,11 +590,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -792,9 +788,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZES.PADDING.MEDIUM,
   },
-  paymentTypeIcon: {
-    fontSize: 28,
-  },
   paymentTypeTitleContainer: {
     flex: 1,
   },
@@ -823,11 +816,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: SIZES.PADDING.SMALL,
-  },
-  selectedBadgeText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   modalActions: {
     flexDirection: 'row',
