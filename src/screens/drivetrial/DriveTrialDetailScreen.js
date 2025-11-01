@@ -138,11 +138,11 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
     switch (status?.toUpperCase()) {
       case 'PENDING':
         return '#FF9800';
-      case 'CONFIRMED':
+      case 'ACCEPTED':
         return '#4CAF50';
       case 'COMPLETED':
         return '#2196F3';
-      case 'CANCELLED':
+      case 'CANCELED':
         return '#F44336';
       default:
         return COLORS.TEXT.SECONDARY;
@@ -153,12 +153,12 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
     switch (status?.toUpperCase()) {
       case 'PENDING':
         return 'Pending';
-      case 'CONFIRMED':
-        return 'Confirmed';
+      case 'ACCEPTED':
+        return 'Accepted';
       case 'COMPLETED':
         return 'Completed';
-      case 'CANCELLED':
-        return 'Cancelled';
+      case 'CANCELED':
+        return 'Canceled';
       default:
         return status || 'Unknown';
     }
@@ -166,9 +166,9 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
 
   const statusOptions = [
     { value: 'PENDING', label: 'Pending' },
-    { value: 'CONFIRMED', label: 'Confirmed' },
+    { value: 'ACCEPTED', label: 'Accepted' },
     { value: 'COMPLETED', label: 'Completed' },
-    { value: 'CANCELLED', label: 'Cancelled' },
+    { value: 'CANCELED', label: 'Canceled' },
   ];
 
   if (loading) {
