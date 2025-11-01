@@ -15,6 +15,9 @@ import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import { formatPrice, getStockStatus, vehicleService } from '../../services/vehicleService';
 import { getVehicleImageByColor } from '../../services/vehicleImageService';
 import { useAuth } from '../../contexts/AuthContext';
+import motorbikeService from '../../services/motorbikeService';
+import agencyStockService from '../../services/agencyStockService';
+import { Ruler, Settings, Battery, Shield, Sparkles } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,38 +29,138 @@ const VehicleDetailScreen = ({ route, navigation }) => {
   const [isChangingColor, setIsChangingColor] = useState(false);
   const [colorStockMap, setColorStockMap] = useState(null);
   const [loadingColorStocks, setLoadingColorStocks] = useState(false);
+  const [motorbikeDetails, setMotorbikeDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [configurations, setConfigurations] = useState({
+    appearance: null,
+    configuration: null,
+    battery: null,
+    safeFeature: null,
+  });
 
   const stockStatus = getStockStatus(vehicle);
+
+  // Load motorbike details and Colors
+  React.useEffect(() => {
+    let isMounted = true;
+    const loadMotorbikeDetails = async () => {
+      try {
+        setLoadingDetails(true);
+        
+        // Fetch motorbike details by ID
+        const response = await motorbikeService.getMotorbikeById(vehicle.id);
+        
+        if (!isMounted) return;
+        
+        if (response.success) {
+          const data = response.data?.data || response.data;
+          setMotorbikeDetails(data);
+          
+          // Extract configurations from motorbike details
+          setConfigurations({
+            appearance: data.appearance || null,
+            configuration: data.configuration || null,
+            battery: data.battery || null,
+            safeFeature: data.safeFeature || null,
+          });
+          
+          // If motorbike has colors data, update selectedColor and image
+          if (data.colors && Array.isArray(data.colors) && data.colors.length > 0) {
+            // Extract color info from colors array
+            const firstColor = data.colors[0];
+            const colorType = firstColor.color?.colorType || firstColor.colorType;
+            
+            if (colorType && colorType !== selectedColor) {
+              setSelectedColor(colorType);
+            }
+            
+            // Update image if available
+            if (firstColor.imageUrl) {
+              setCurrentVehicleImage(firstColor.imageUrl);
+            } else if (data.images && data.images.length > 0) {
+              setCurrentVehicleImage(data.images[0].imageUrl);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error loading motorbike details:', e);
+      } finally {
+        if (isMounted) setLoadingDetails(false);
+      }
+    };
+    
+    loadMotorbikeDetails();
+    return () => { isMounted = false; };
+  }, [vehicle?.id]);
+
   const isSelectedColorOut = React.useMemo(() => {
     if (!colorStockMap || !selectedColor) return false;
     const val = colorStockMap[selectedColor];
     return typeof val === 'number' && val <= 0;
   }, [colorStockMap, selectedColor]);
 
-  // Load per-color stocks
+  // Load per-color stocks based on user role
   React.useEffect(() => {
     let isMounted = true;
     const loadColorStocks = async () => {
       try {
         setLoadingColorStocks(true);
-        // If vehicle defines colors, fetch each color stock; otherwise fetch default bucket
-        if (Array.isArray(vehicle.colors) && vehicle.colors.length > 0) {
+        
+        // Check if user is Dealer Staff
+        if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+          // For Dealer Staff, load colors from motorbike details and fetch agency stocks
+          if (!motorbikeDetails?.colors || !Array.isArray(motorbikeDetails.colors)) {
+            if (isMounted) setLoadingColorStocks(false);
+            return;
+          }
+          
+          const agencyId = parseInt(user.agencyId);
           const responses = await Promise.all(
-            vehicle.colors.map((c) => vehicleService.getVehicleColorStock(vehicle.id, c))
+            motorbikeDetails.colors.map(async (colorItem) => {
+              const colorId = colorItem.color?.id || colorItem.id;
+              const stocksResponse = await agencyStockService.getAgencyStocks(agencyId, {
+                motorbikeId: vehicle.id,
+                colorId: colorId,
+                limit: 1000
+              });
+              
+              const totalQuantity = stocksResponse.success 
+                ? stocksResponse.data.reduce((sum, stock) => sum + (stock.quantity || 0), 0)
+                : 0;
+              
+              const colorName = colorItem.color?.colorType || colorItem.colorType;
+              return { colorName, quantity: totalQuantity };
+            })
           );
+          
           if (!isMounted) return;
+          
           const map = {};
-          responses.forEach((res, idx) => {
-            const colorName = vehicle.colors[idx];
-            map[colorName] = res?.success ? (res.data?.stock ?? 0) : 0;
+          responses.forEach(res => {
+            map[res.colorName] = res.quantity;
           });
           setColorStockMap(map);
         } else {
-          const res = await vehicleService.getVehicleColorStock(vehicle.id, null);
-          if (!isMounted) return;
-          setColorStockMap({ All: res?.success ? (res.data?.stock ?? 0) : 0 });
+          // For other roles, use vehicleService
+          if (Array.isArray(vehicle.colors) && vehicle.colors.length > 0) {
+            const responses = await Promise.all(
+              vehicle.colors.map((c) => vehicleService.getVehicleColorStock(vehicle.id, c))
+            );
+            if (!isMounted) return;
+            const map = {};
+            responses.forEach((res, idx) => {
+              const colorName = vehicle.colors[idx];
+              map[colorName] = res?.success ? (res.data?.stock ?? 0) : 0;
+            });
+            setColorStockMap(map);
+          } else {
+            const res = await vehicleService.getVehicleColorStock(vehicle.id, null);
+            if (!isMounted) return;
+            setColorStockMap({ All: res?.success ? (res.data?.stock ?? 0) : 0 });
+          }
         }
       } catch (e) {
+        console.error('Error loading color stocks:', e);
         if (isMounted) {
           setColorStockMap(null);
         }
@@ -65,9 +168,16 @@ const VehicleDetailScreen = ({ route, navigation }) => {
         if (isMounted) setLoadingColorStocks(false);
       }
     };
-    loadColorStocks();
+    
+    // Only load color stocks if motorbikeDetails is loaded for Dealer Staff
+    if (user?.role === USER_ROLES.DEALER_STAFF && !motorbikeDetails) {
+      setLoadingColorStocks(false);
+    } else {
+      loadColorStocks();
+    }
+    
     return () => { isMounted = false; };
-  }, [vehicle?.id]);
+  }, [vehicle?.id, user?.role, user?.agencyId, motorbikeDetails]);
 
   // Function to handle color selection and image change
   const handleColorChange = async (color) => {
@@ -77,7 +187,20 @@ const VehicleDetailScreen = ({ route, navigation }) => {
     setIsChangingColor(true);
     
     try {
-      // Use the vehicle image service to get color-specific image
+      // Try to get image from motorbike details first
+      if (motorbikeDetails?.colors) {
+        const colorItem = motorbikeDetails.colors.find(
+          c => (c.color?.colorType || c.colorType) === color
+        );
+        
+        if (colorItem?.imageUrl) {
+          setCurrentVehicleImage(colorItem.imageUrl);
+          setIsChangingColor(false);
+          return;
+        }
+      }
+      
+      // Fallback to vehicle image service
       const imageResponse = await getVehicleImageByColor(vehicle.id, color);
       
       if (imageResponse.success) {
@@ -93,16 +216,6 @@ const VehicleDetailScreen = ({ route, navigation }) => {
       setIsChangingColor(false);
     }
   };
-
-  const renderSpecItem = (icon, title, value, color = COLORS.TEXT.PRIMARY) => (
-    <View style={styles.specItem}>
-      <Text style={styles.specIcon}>{icon}</Text>
-      <View style={styles.specContent}>
-        <Text style={styles.specTitle}>{title}</Text>
-        <Text style={[styles.specValue, { color }]}>{value}</Text>
-      </View>
-    </View>
-  );
 
   const renderColorOption = (color, isSelected = false) => (
     <TouchableOpacity
@@ -165,15 +278,17 @@ const VehicleDetailScreen = ({ route, navigation }) => {
         <View style={styles.colorsContainer}>
           <Text style={styles.colorsTitle}>Available Colors</Text>
             <View style={styles.colorsGrid}>
-              {vehicle.colors?.map((color, index) => 
-                renderColorOption(color, color === selectedColor)
-              )}
+              {(motorbikeDetails?.colors || vehicle.colors || []).map((colorItem, index) => {
+                const colorName = typeof colorItem === 'string' 
+                  ? colorItem 
+                  : (colorItem.color?.colorType || colorItem.colorType);
+                return renderColorOption(colorName, colorName === selectedColor);
+              })}
             </View>
         </View>
 
         {/* Vehicle Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.vehicleTitle}>{vehicle.name}</Text>
           <View style={styles.titleRow}>
             <View style={styles.titleContent}>
               <Text style={styles.vehicleName}>{vehicle.name}</Text>
@@ -188,7 +303,7 @@ const VehicleDetailScreen = ({ route, navigation }) => {
           <Text style={styles.description}>{vehicle.description}</Text>
 
           {/* Stock by Color (detail view only) */}
-          {Array.isArray(vehicle.colors) && vehicle.colors.length > 0 && (
+          {((motorbikeDetails?.colors || vehicle.colors) && Array.isArray(motorbikeDetails?.colors || vehicle.colors) && (motorbikeDetails?.colors || vehicle.colors).length > 0) && (
             <View style={styles.colorStocksContainer}>
               <Text style={styles.sectionTitle}>Stock by Color</Text>
               {loadingColorStocks ? (
@@ -198,12 +313,17 @@ const VehicleDetailScreen = ({ route, navigation }) => {
                 </View>
               ) : (
                 <View style={styles.colorStocksGrid}>
-                  {vehicle.colors.map((c) => (
-                    <View key={`${vehicle.id}-${c}`} style={styles.colorStockChip}>
-                      <Text style={styles.colorStockChipText}>{c}</Text>
-                      <Text style={styles.colorStockChipCount}>{colorStockMap?.[c] ?? 0}</Text>
-                    </View>
-                  ))}
+                  {(motorbikeDetails?.colors || vehicle.colors).map((c) => {
+                    const colorName = typeof c === 'string' 
+                      ? c 
+                      : (c.color?.colorType || c.colorType);
+                    return (
+                      <View key={`${vehicle.id}-${colorName}`} style={styles.colorStockChip}>
+                        <Text style={styles.colorStockChipText}>{colorName}</Text>
+                        <Text style={styles.colorStockChipCount}>{colorStockMap?.[colorName] ?? 0}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -218,62 +338,114 @@ const VehicleDetailScreen = ({ route, navigation }) => {
           </View>
 
           {/* Specifications */}
-          <View style={styles.specsContainer}>
-            <Text style={styles.sectionTitle}>Specifications</Text>
-            
-            <View style={styles.specsGrid}>
-              {renderSpecItem(
-                '🔋',
-                'Battery Capacity',
-                vehicle.specifications?.battery || 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-              {renderSpecItem(
-                '⚡',
-                'Maximum Speed',
-                vehicle.specifications?.motor ? 
-                  `${vehicle.specifications.motor.split(' ')[0]} max` : 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-              {renderSpecItem(
-                '🛣️',
-                'Distance (WLTP)',
-                vehicle.features?.find(f => f.includes('km range')) || 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-              {renderSpecItem(
-                '⚖️',
-                'Weight',
-                vehicle.specifications?.weight || 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-              {renderSpecItem(
-                '👤',
-                'Max Load',
-                vehicle.specifications?.maxLoad || 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-              {renderSpecItem(
-                '⏱️',
-                'Charging Time',
-                vehicle.specifications?.chargingTime || 'N/A',
-                COLORS.TEXT.WHITE
-              )}
-            </View>
-          </View>
-
-          {/* Features */}
-          <View style={styles.featuresContainer}>
-            <Text style={styles.sectionTitle}>Key Features</Text>
-            <View style={styles.featuresList}>
-              {vehicle.features?.map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
-                  <Text style={styles.featureBullet}>•</Text>
-                  <Text style={styles.featureText}>{feature}</Text>
+          {(configurations.appearance || configurations.configuration || configurations.battery || configurations.safeFeature) && (
+            <View style={styles.specsContainer}>
+              <Text style={styles.sectionTitle}>Specifications</Text>
+              
+              {/* Appearance */}
+              {configurations.appearance && (
+                <View style={styles.specCategory}>
+                  <View style={styles.specCategoryHeader}>
+                    <Ruler size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.specCategoryTitle}>Appearance</Text>
+                  </View>
+                  <View style={styles.specsGrid}>
+                    {Object.entries(configurations.appearance).map(([key, value]) => {
+                      if (key === 'electricMotorbikeId' || key === 'id') return null;
+                      const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                      const displayValue = key.includes('Distance') || key.includes('Limit') ? `${value} mm` : 
+                                          key.includes('Weight') ? `${value} kg` : 
+                                          key.includes('Storage') ? `${value} L` : 
+                                          `${value}`;
+                      return (
+                        <View key={key} style={styles.specItem}>
+                          <View style={styles.specContent}>
+                            <Text style={styles.specTitle}>{displayLabel}</Text>
+                            <Text style={styles.specValue}>{displayValue}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
-              ))}
+              )}
+
+              {/* Configuration */}
+              {configurations.configuration && (
+                <View style={styles.specCategory}>
+                  <View style={styles.specCategoryHeader}>
+                    <Settings size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.specCategoryTitle}>Configuration</Text>
+                  </View>
+                  <View style={styles.specsGrid}>
+                    {Object.entries(configurations.configuration).map(([key, value]) => {
+                      if (key === 'electricMotorbikeId' || key === 'id') return null;
+                      const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                      const displayValue = key.includes('Speed') ? `${value}` : 
+                                          key.includes('Capacity') ? `${value} people` : 
+                                          `${value}`;
+                      return (
+                        <View key={key} style={styles.specItem}>
+                          <View style={styles.specContent}>
+                            <Text style={styles.specTitle}>{displayLabel}</Text>
+                            <Text style={styles.specValue}>{displayValue}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Battery */}
+              {configurations.battery && (
+                <View style={styles.specCategory}>
+                  <View style={styles.specCategoryHeader}>
+                    <Battery size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.specCategoryTitle}>Battery</Text>
+                  </View>
+                  <View style={styles.specsGrid}>
+                    {Object.entries(configurations.battery).map(([key, value]) => {
+                      if (key === 'electricMotorbikeId' || key === 'id') return null;
+                      const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                      return (
+                        <View key={key} style={styles.specItem}>
+                          <View style={styles.specContent}>
+                            <Text style={styles.specTitle}>{displayLabel}</Text>
+                            <Text style={styles.specValue}>{value}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Safe Feature */}
+              {configurations.safeFeature && (
+                <View style={styles.specCategory}>
+                  <View style={styles.specCategoryHeader}>
+                    <Shield size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.specCategoryTitle}>Safe Features</Text>
+                  </View>
+                  <View style={styles.specsGrid}>
+                    {Object.entries(configurations.safeFeature).map(([key, value]) => {
+                      if (key === 'electricMotorbikeId' || key === 'id') return null;
+                      const displayLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                      return (
+                        <View key={key} style={styles.specItem}>
+                          <View style={styles.specContent}>
+                            <Text style={styles.specTitle}>{displayLabel}</Text>
+                            <Text style={styles.specValue}>{String(value)}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </View>
-          </View>
+          )}
         </View>
 
         {/* Bottom Spacing */}
@@ -409,19 +581,6 @@ const styles = StyleSheet.create({
     padding: SIZES.PADDING.MEDIUM,
   },
 
-  // Vehicle Title
-  vehicleTitle: {
-    fontSize: SIZES.FONT.XXLARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-    textAlign: 'center',
-    marginBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: SIZES.PADDING.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-  },
-
   // Title Row
   titleRow: {
     flexDirection: 'row',
@@ -500,6 +659,26 @@ const styles = StyleSheet.create({
   specsContainer: {
     marginBottom: SIZES.PADDING.LARGE,
   },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.MEDIUM,
+  },
+  specCategory: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  specCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  specCategoryTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
   specsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -514,10 +693,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     marginBottom: SIZES.PADDING.SMALL,
   },
-  specIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    marginRight: SIZES.PADDING.SMALL,
-  },
   specContent: {
     flex: 1,
   },
@@ -529,6 +704,7 @@ const styles = StyleSheet.create({
   specValue: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
   },
 
   // Colors
