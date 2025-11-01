@@ -20,6 +20,72 @@ const agencyService = {
   },
 
   /**
+   * Get list of agencies for customer
+   * @param {Object} params - Query parameters (limit, page, location, address)
+   * @returns {Promise<Object>} Response with data array and paginationInfo
+   */
+  async getAgenciesForCustomer(params = {}) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}/agency/list/customer`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Build query string from params
+      const queryParams = new URLSearchParams();
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.page) queryParams.append('page', params.page);
+      if (params.location) queryParams.append('location', params.location);
+      if (params.address) queryParams.append('address', params.address);
+      
+      const queryString = queryParams.toString();
+      const fullUrl = queryString ? `${url}?${queryString}` : url;
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: [],
+          paginationInfo: null,
+        };
+      }
+
+      // Handle response structure: { statusCode, message, data: [...], paginationInfo: {...} }
+      const agenciesData = data.data || [];
+      const paginationInfo = data.paginationInfo || null;
+
+      return {
+        success: true,
+        data: agenciesData,
+        paginationInfo: paginationInfo,
+        message: data.message || 'Agencies loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching agencies for customer:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch agencies',
+        data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
    * Get list of agencies
    * @param {Object} params - Query parameters (limit, page, location, address)
    * @returns {Promise<Array>} List of agencies

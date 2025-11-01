@@ -66,6 +66,15 @@ export const API_ENDPOINTS = {
     BY_ID: (id) => `/agency/${id}`,
     DETAIL: (id) => `/agency/detail/${id}`,
   },
+
+  // Drive Trial
+  DRIVE_TRIAL: {
+    PUBLIC_BOOKING: '/drive-trial/public/booking',
+    LIST: (agencyId) => `/drive-trial/list/${agencyId}`,
+    DETAIL: (bookingId) => `/drive-trial/detail/${bookingId}`,
+    UPDATE: (bookingId) => `/drive-trial/${bookingId}`,
+    DELETE: (bookingId) => `/drive-trial/${bookingId}`,
+  },
 };
 
 // HTTP Headers

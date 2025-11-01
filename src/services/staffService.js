@@ -805,11 +805,12 @@ class StaffService {
   }
 
   // Get Dealer Staff list for specific agency
-  async getDealerStaffList(agencyId) {
+  async getDealerStaffList(agencyId, { page = 1, limit = 1000 } = {}) {
     try {
       const token = await this.getAuthTokenAsync();
 
-      const response = await fetch(`${API_BASE_URL}/manager/staff/list/${agencyId}`, {
+      const query = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+      const response = await fetch(`${API_BASE_URL}/manager/staff/list/${agencyId}?${query}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -859,8 +860,8 @@ class StaffService {
         createAt: staff.createAt || staff.createdAt,
       }));
 
-      // Exclude soft-deleted records to reflect actual visible data
-      const staffList = mapped.filter(s => !s.isDeleted);
+      // Keep full list, including soft-deleted if API returns them
+      const staffList = mapped;
 
       return {
         success: true,

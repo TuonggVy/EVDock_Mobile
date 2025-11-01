@@ -22,6 +22,9 @@ import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
 import CustomerManagementScreen from '../screens/customer/CustomerManagementScreen';
+import CustomerDetailScreen from '../screens/customer/CustomerDetailScreen';
+import CreateCustomerScreen from '../screens/customer/CreateCustomerScreen';
+import EditCustomerScreen from '../screens/customer/EditCustomerScreen';
 import OrderManagementScreen from '../screens/order/OrderManagementScreen';
 import AllocationManagementScreen from '../screens/allocation/AllocationManagementScreen';
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
@@ -63,6 +66,17 @@ import OrderRestockDetailManagerScreen from '../screens/order/OrderRestockDetail
 import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
 import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
 import EditPricePolicyScreen from '../screens/pricepolicy/EditPricePolicyScreen';
+import StockManagementScreen from '../screens/stock/StockManagementScreen';
+import CreateStockScreen from '../screens/stock/CreateStockScreen';
+import EditStockScreen from '../screens/stock/EditStockScreen';
+import StockDetailScreen from '../screens/stock/StockDetailScreen';
+import StaffStockListScreen from '../screens/stock/StaffStockListScreen';
+import StaffStockDetailScreen from '../screens/stock/StaffStockDetailScreen';
+import StockPromotionManagementScreen from '../screens/stock/StockPromotionManagementScreen';
+import StockPromotionDetailScreen from '../screens/stock/StockPromotionDetailScreen';
+import DriveTrialManagementScreen from '../screens/drivetrial/DriveTrialManagementScreen';
+import DriveTrialDetailScreen from '../screens/drivetrial/DriveTrialDetailScreen';
+import CreateDriveTrialScreen from '../screens/drivetrial/CreateDriveTrialScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -185,6 +199,21 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="CustomerManagement" 
           component={CustomerManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CustomerDetail" 
+          component={CustomerDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CreateCustomer" 
+          component={CreateCustomerScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditCustomer" 
+          component={EditCustomerScreen} 
           options={{ headerShown: false }}
         />
             <Stack.Screen
@@ -383,6 +412,16 @@ const AppNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen 
+              name="StockPromotionManagement" 
+              component={StockPromotionManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockPromotionDetail" 
+              component={StockPromotionDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
               name="OrderRestockDetail" 
               component={OrderRestockDetailScreen} 
               options={{ headerShown: false }}
@@ -392,6 +431,51 @@ const AppNavigator = () => {
             component={OrderRestockDetailManagerScreen} 
             options={{ headerShown: false }}
           />
+            <Stack.Screen 
+              name="StockManagement" 
+              component={StockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateStock" 
+              component={CreateStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditStock" 
+              component={EditStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockDetail" 
+              component={StockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StaffStockList" 
+              component={StaffStockListScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StaffStockDetail" 
+              component={StaffStockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialManagement" 
+              component={DriveTrialManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialDetail" 
+              component={DriveTrialDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateDriveTrial" 
+              component={CreateDriveTrialScreen} 
+              options={{ headerShown: false }}
+            />
           </>
         )}
       </Stack.Navigator>
