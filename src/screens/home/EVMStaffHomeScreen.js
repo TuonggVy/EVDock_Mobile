@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { Bell, ChartColumnIncreasing, UserRound } from 'lucide-react-native';
 
 const EVMStaffHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -147,17 +148,17 @@ const EVMStaffHomeScreen = ({ navigation }) => {
           </View>
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>📊</Text>
+              <Text style={styles.iconText}><ChartColumnIncreasing color="#FFFFFF" size={16}  /></Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>🔔</Text>
+              <Text style={styles.iconText}><Bell color="#FFFFFF" size={16} /></Text>
               <View style={styles.notificationDot} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.iconButton}
               onPress={() => navigation.navigate('Profile')}
             >
-              <Text style={styles.iconText}>👤</Text>
+              <Text style={styles.iconText}><UserRound color="#FFFFFF" size={16} /></Text>
             </TouchableOpacity>
           </View>
         </View>
