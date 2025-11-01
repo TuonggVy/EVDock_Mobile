@@ -17,7 +17,7 @@ import { getVehicleImageByColor } from '../../services/vehicleImageService';
 import { useAuth } from '../../contexts/AuthContext';
 import motorbikeService from '../../services/motorbikeService';
 import agencyStockService from '../../services/agencyStockService';
-import { Ruler, Settings, Battery, Shield, Sparkles } from 'lucide-react-native';
+import { Ruler, Settings, Battery, Shield, Sparkles, ArrowLeft } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -243,7 +243,7 @@ const VehicleDetailScreen = ({ route, navigation }) => {
             navigation.goBack();
           }}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Vehicle Details</Text>
         <View style={{ width: 40 }} />

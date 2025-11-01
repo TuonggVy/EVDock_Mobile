@@ -20,12 +20,29 @@ import { dealerCatalogStorageService } from '../../services/storage/dealerCatalo
 import { useAuth } from '../../contexts/AuthContext';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
+import { ArrowLeft, Search, Sparkles, Car } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
 const H_PADDING = 20;           // ← chỉ dùng chỗ này để căn 2 bên cho toàn bộ list
 const NUM_COLS = 2;
 const CARD_WIDTH = (width - H_PADDING * 2 - GAP) / NUM_COLS;
+
+// Icon mapping for version chips
+const getVersionIcon = (iconName) => {
+  let IconComponent = null;
+  if (iconName === 'car') IconComponent = Car;
+  else if (iconName === 'sparkles') IconComponent = Sparkles;
+  
+  if (IconComponent) {
+    return (
+      <View style={{ marginRight: 6 }}>
+        <IconComponent size={12} color={COLORS.TEXT.WHITE} />
+      </View>
+    );
+  }
+  return null;
+};
 
 /** ===== Helpers to avoid duplicate keys ===== */
 const safeKey = (id, fallbackIndex) => {
@@ -47,7 +64,7 @@ const normalizeVersions = (arr = []) => {
       cleaned.push({ ...v, id });
     }
   }
-  return [{ id: 'all', name: 'All Versions', icon: '🚗' }, ...cleaned];
+  return [{ id: 'all', name: 'All Versions', icon: 'car' }, ...cleaned];
 };
 /** ========================================= */
 
@@ -58,7 +75,7 @@ const CatalogScreen = ({ navigation, route }) => {
   const [selectedVersion, setSelectedVersion] = useState('all');
   const [vehicles, setVehicles] = useState([]);
   const [versions, setVersions] = useState([
-    { id: 'all', name: 'All Versions', icon: '🚗' }, // fallback ban đầu
+    { id: 'all', name: 'All Versions', icon: 'car' }, // fallback ban đầu
   ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -174,7 +191,7 @@ const CatalogScreen = ({ navigation, route }) => {
       const versionsList = Array.from(versionSet).map(ver => ({ 
         id: ver, 
         name: ver, 
-        icon: '⚡' 
+        icon: 'sparkles' 
       }));
 
       setVehicles(uniqueById(catalogVehicles));
@@ -304,7 +321,7 @@ const CatalogScreen = ({ navigation, route }) => {
         </>
       ) : (
         <>
-          <Text style={styles.emptyIcon}>🚗</Text>
+          <Car size={64} color={COLORS.TEXT.SECONDARY} />
           <Text style={styles.emptyTitle}>No vehicles found</Text>
           <Text style={styles.emptySubtitle}>
             Try adjusting your search or filter criteria
@@ -320,7 +337,7 @@ const CatalogScreen = ({ navigation, route }) => {
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
+            <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Vehicle Catalog</Text>
           <View style={{ width: 40 }} />
@@ -328,7 +345,7 @@ const CatalogScreen = ({ navigation, route }) => {
 
         {/* Search */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Search vehicles..."
@@ -356,7 +373,7 @@ const CatalogScreen = ({ navigation, route }) => {
                 selectedVersion === version.id && styles.versionChipActive,
               ]}
             >
-              {!!version.icon && <Text style={styles.versionChipIcon}>{version.icon}</Text>}
+              {!!version.icon && getVersionIcon(version.icon)}
               <Text
                 numberOfLines={1}
                 style={[
