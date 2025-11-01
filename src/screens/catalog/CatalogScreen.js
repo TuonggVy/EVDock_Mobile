@@ -14,9 +14,12 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { COLORS, SIZES } from '../../constants';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import { vehicleService, formatPrice, getStockStatus } from '../../services/vehicleService';
 import { dealerCatalogStorageService } from '../../services/storage/dealerCatalogStorageService';
+import { useAuth } from '../../contexts/AuthContext';
+import agencyStockService from '../../services/agencyStockService';
+import motorbikeService from '../../services/motorbikeService';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
@@ -50,6 +53,7 @@ const normalizeVersions = (arr = []) => {
 
 const CatalogScreen = ({ navigation, route }) => {
   const { mode, currentCompareVehicles = [] } = route.params || {};
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('all');
   const [vehicles, setVehicles] = useState([]);
@@ -61,23 +65,29 @@ const CatalogScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!loading) loadVehicles();
-  }, [searchQuery, selectedVersion]);
+  }, [searchQuery, selectedVersion, loading]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      // Prefer dealer catalog storage (new retail flow). Fallback to vehicleService.
-      const [catalog, versionsFromCatalog] = await Promise.all([
-        dealerCatalogStorageService.filterVehicles({ version: 'all', search: '' }),
-        dealerCatalogStorageService.getVersions(),
-      ]);
+      
+      // Check if user is Dealer Staff and has agencyId
+      if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+        await loadCatalogFromStockAPI();
+      } else {
+        // Fallback to dealer catalog storage for other roles
+        const [catalog, versionsFromCatalog] = await Promise.all([
+          dealerCatalogStorageService.filterVehicles({ version: 'all', search: '' }),
+          dealerCatalogStorageService.getVersions(),
+        ]);
 
-      setVehicles(uniqueById((catalog?.data) || []));
-      setVersions(normalizeVersions(versionsFromCatalog));
+        setVehicles(uniqueById((catalog?.data) || []));
+        setVersions(normalizeVersions(versionsFromCatalog));
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to load vehicle data');
@@ -86,14 +96,120 @@ const CatalogScreen = ({ navigation, route }) => {
     }
   };
 
+  const loadCatalogFromStockAPI = async () => {
+    try {
+      if (!user?.agencyId) {
+        console.log('No agencyId available');
+        return;
+      }
+
+      const agencyId = parseInt(user.agencyId);
+      
+      // Fetch stocks and motorbikes
+      const [stocksResponse, motorbikesResponse] = await Promise.all([
+        agencyStockService.getAgencyStocks(agencyId, { page: 1, limit: 1000 }),
+        motorbikeService.getAllMotorbikes({ limit: 1000 })
+      ]);
+
+      if (!stocksResponse.success || !motorbikesResponse.success) {
+        console.error('Failed to load data');
+        return;
+      }
+
+      const stocks = stocksResponse.data || [];
+      const motorbikes = motorbikesResponse.data || [];
+
+      // Group stocks by motorbike and aggregate quantities
+      const motorbikeMap = new Map();
+      
+      stocks.forEach(stock => {
+        const motorbikeId = stock.motorbikeId;
+        if (!motorbikeId) return;
+
+        const motorbike = motorbikes.find(m => m.id === motorbikeId);
+        if (!motorbike) return;
+
+        if (!motorbikeMap.has(motorbikeId)) {
+          motorbikeMap.set(motorbikeId, {
+            id: motorbike.id,
+            name: motorbike.name,
+            model: motorbike.model || motorbike.name,
+            version: motorbike.version || 'N/A',
+            price: motorbike.price || stock.price || 0,
+            currency: 'VND',
+            image: motorbike.images?.[0]?.imageUrl || null,
+            stockCount: 0,
+            quantity: 0, // total quantity across all colors
+            colorStocks: {},
+            inStock: false,
+          });
+        }
+
+        const vehicle = motorbikeMap.get(motorbikeId);
+        const quantity = stock.quantity || 0;
+        vehicle.quantity += quantity;
+        vehicle.stockCount += quantity;
+        
+        // Track color stocks if color info is available
+        if (stock.colorId) {
+          // We'll fetch color details if needed, for now just track by colorId
+          vehicle.colorStocks[stock.colorId] = (vehicle.colorStocks[stock.colorId] || 0) + quantity;
+        }
+      });
+
+      // Convert map to array and set inStock flag
+      const catalogVehicles = Array.from(motorbikeMap.values()).map(vehicle => ({
+        ...vehicle,
+        inStock: vehicle.quantity > 0,
+      }));
+
+      // Extract unique versions
+      const versionSet = new Set();
+      catalogVehicles.forEach(v => {
+        if (v.version && v.version !== 'N/A') {
+          versionSet.add(String(v.version));
+        }
+      });
+      
+      const versionsList = Array.from(versionSet).map(ver => ({ 
+        id: ver, 
+        name: ver, 
+        icon: '⚡' 
+      }));
+
+      setVehicles(uniqueById(catalogVehicles));
+      setVersions(normalizeVersions(versionsList));
+    } catch (error) {
+      console.error('Error loading catalog from stock API:', error);
+      Alert.alert('Error', 'Failed to load catalog data');
+    }
+  };
+
   const loadVehicles = async () => {
     try {
       setRefreshing(true);
-      const res = await dealerCatalogStorageService.filterVehicles({
-        version: selectedVersion,
-        search: searchQuery,
-      });
-      if (res?.success) setVehicles(uniqueById(res.data));
+      
+      // Check if user is Dealer Staff and has agencyId
+      if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+        // For Dealer Staff, we already have all vehicles loaded from stock API
+        // Just apply client-side filtering
+        const filtered = vehicles.filter(v => {
+          const q = (searchQuery || '').toLowerCase();
+          const matchesSearch = 
+            v.name?.toLowerCase().includes(q) || 
+            v.model?.toLowerCase().includes(q);
+          const matchesVersion = selectedVersion === 'all' || v.version === selectedVersion;
+          return matchesSearch && matchesVersion;
+        });
+        // Note: The filteredVehicles useMemo will handle the actual filtering
+      } else {
+        // Fallback to dealer catalog storage for other roles
+        const res = await dealerCatalogStorageService.filterVehicles({
+          version: selectedVersion,
+          search: searchQuery,
+        });
+        if (res?.success) setVehicles(uniqueById(res.data));
+      }
     } catch (e) {
       console.error(e);
     } finally {

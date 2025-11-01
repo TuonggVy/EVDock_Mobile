@@ -10,9 +10,12 @@ import {
   SafeAreaView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import { formatPrice, getStockStatus } from '../../services/vehicleService';
+import motorbikeService from '../../services/motorbikeService';
+import { Ruler, Settings, Battery, Shield } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +24,8 @@ const CompareScreen = ({ navigation, route }) => {
   const [compareVehicles, setCompareVehicles] = useState(
     selectedVehicle ? [selectedVehicle] : initialCompareVehicles
   );
+  const [vehicleDetails, setVehicleDetails] = useState({});
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Update compareVehicles when new vehicles are added from catalog
   useEffect(() => {
@@ -28,6 +33,38 @@ const CompareScreen = ({ navigation, route }) => {
       setCompareVehicles(initialCompareVehicles);
     }
   }, [initialCompareVehicles]);
+
+  // Load motorbike details for all vehicles
+  useEffect(() => {
+    const loadVehicleDetails = async () => {
+      if (compareVehicles.length === 0) return;
+      
+      setLoadingDetails(true);
+      try {
+        const detailsPromises = compareVehicles.map(async (vehicle) => {
+          const response = await motorbikeService.getMotorbikeById(vehicle.id);
+          if (response.success) {
+            const data = response.data?.data || response.data;
+            return { vehicleId: vehicle.id, details: data };
+          }
+          return { vehicleId: vehicle.id, details: null };
+        });
+        
+        const results = await Promise.all(detailsPromises);
+        const detailsMap = {};
+        results.forEach(({ vehicleId, details }) => {
+          detailsMap[vehicleId] = details;
+        });
+        setVehicleDetails(detailsMap);
+      } catch (error) {
+        console.error('Error loading vehicle details:', error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    
+    loadVehicleDetails();
+  }, [compareVehicles]);
 
   const handleBack = () => {
     // Go back to the previous screen in the navigation stack
@@ -168,73 +205,150 @@ const CompareScreen = ({ navigation, route }) => {
             {/* Comparison Table */}
             {compareVehicles.length > 1 && (
               <View style={styles.comparisonTable}>
-                <Text style={styles.tableTitle}>Detailed Comparison</Text>
-                
-                {/* Specifications Table */}
-                <View style={styles.table}>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableHeader}>Specification</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`header-${index}`} style={styles.tableHeader}>
-                        {vehicle.name}
-                      </Text>
-                    ))}
+                {loadingDetails ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+                    <Text style={styles.loadingText}>Loading specifications...</Text>
                   </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Price</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`price-${index}`} style={styles.tableValue}>
-                        {formatPrice(vehicle.price, vehicle.currency)}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Battery</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`battery-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.battery || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Motor</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`motor-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.motor || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Range</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`range-${index}`} style={styles.tableValue}>
-                        {vehicle.features?.find(f => f.includes('km range')) || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Weight</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`weight-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.weight || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Max Load</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`maxload-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.maxLoad || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
+                ) : (
+                  <>
+                    <Text style={styles.tableTitle}>Detailed Comparison</Text>
+                    
+                    {/* Specifications Table */}
+                    <View style={styles.table}>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableHeader}>Specification</Text>
+                        {compareVehicles.map((vehicle, index) => (
+                          <Text key={`header-${index}`} style={styles.tableHeader}>
+                            {vehicle.name}
+                          </Text>
+                        ))}
+                      </View>
+                      
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Price</Text>
+                        {compareVehicles.map((vehicle, index) => (
+                          <Text key={`price-${index}`} style={styles.tableValue}>
+                            {formatPrice(vehicle.price, vehicle.currency)}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Appearance Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.appearance) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Ruler size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Appearance</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['length', 'width', 'height', 'weight', 'undercarriageDistance', 'storageLimit'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.appearance?.[key];
+                                const displayValue = key.includes('Distance') || key.includes('Limit') ? `${value} mm` : 
+                                                    key === 'weight' ? `${value} kg` : 
+                                                    key === 'storageLimit' ? `${value} L` : 
+                                                    `${value}`;
+                                return (
+                                  <Text key={`appearance-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? displayValue : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Configuration Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.configuration) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Settings size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Configuration</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['motorType', 'speedLimit', 'maximumCapacity'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.configuration?.[key];
+                                const displayValue = key.includes('Capacity') ? `${value} people` : `${value}`;
+                                return (
+                                  <Text key={`config-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? displayValue : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Battery Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.battery) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Battery size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Battery</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['type', 'capacity', 'chargeTime', 'chargeType', 'energyConsumption', 'limit'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key === 'limit' ? 'Range Limit' : key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.battery?.[key];
+                                return (
+                                  <Text key={`battery-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? value : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Safe Feature Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.safeFeature) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Shield size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Safe Features</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['brake', 'lock'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.safeFeature?.[key];
+                                return (
+                                  <Text key={`safe-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? value : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -514,6 +628,30 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.PADDING.LARGE,
+  },
+  loadingText: {
+    marginTop: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  sectionContainer: {
+    marginTop: SIZES.PADDING.LARGE,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginLeft: SIZES.PADDING.SMALL,
   },
 });
 
