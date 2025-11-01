@@ -97,6 +97,52 @@ export const acceptOrderRestock = async (orderId) => {
   }
 };
 
+/**
+ * Create bill for order restock when order is delivered
+ * @param {number} orderId - Order ID
+ * @param {string} type - Payment type: 'FULL' or 'DEFERRED'
+ * @returns {Promise<Object>} Created bill data
+ */
+export const createOrderRestockBill = async (orderId, type = 'FULL') => {
+  try {
+    const response = await api.post(`/order-restock/bill/${orderId}`, { type });
+    return { 
+      success: true, 
+      data: response.data?.data || response.data, 
+      message: response.data?.message || 'Tạo hóa đơn thành công' 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.message || 'Không thể tạo hóa đơn' 
+    };
+  }
+};
+
+/**
+ * Get VNPay payment URL for agency bill
+ * @param {number} agencyBillId - Agency Bill ID
+ * @returns {Promise<Object>} Payment URL data
+ */
+export const getVNPayPaymentUrl = async (agencyBillId) => {
+  try {
+    const response = await api.post('/vnpay/agency-bill?platform=mobile', {
+      agencyBillId
+    });
+    return { 
+      success: true, 
+      data: response.data?.data || response.data, 
+      paymentUrl: response.data?.data?.paymentUrl || response.data?.paymentUrl,
+      message: response.data?.message || 'Lấy URL thanh toán thành công' 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.response?.data?.message || 'Không thể lấy URL thanh toán' 
+    };
+  }
+};
+
 const orderRestockManagerService = {
   getOrderRestockList,
   getOrderRestockListByAgency,
@@ -104,6 +150,8 @@ const orderRestockManagerService = {
   updateOrderRestockStatus,
   deleteOrderRestock,
   acceptOrderRestock,
+  createOrderRestockBill,
+  getVNPayPaymentUrl,
 };
 
 export default orderRestockManagerService;

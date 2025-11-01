@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Platform,
   Modal,
+  Linking,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -23,6 +24,8 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [selectedPaymentType, setSelectedPaymentType] = useState('FULL');
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -67,6 +70,49 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
       if (response.success) {
         const detail = response.data;
         setOrder(detail);
+        
+        // Auto-update order status to PAID if bill is completed
+        if (detail.agencyBill && detail.agencyBill.isCompleted && detail.status !== 'PAID') {
+          try {
+            const updateResponse = await orderRestockManagerService.updateOrderRestockStatus(orderId, 'PAID');
+            if (updateResponse.success) {
+              // Reload order detail to get updated status
+              const reloadResponse = await orderRestockManagerService.getOrderRestockDetail(orderId);
+              if (reloadResponse.success) {
+                const updatedDetail = reloadResponse.data;
+                setOrder(updatedDetail);
+                if (onStatusUpdate) onStatusUpdate();
+                
+                // Update agency detail after reload
+                const agencyId = updatedDetail?.agencyId;
+                if (agencyId) {
+                  const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
+                  const hasBill = !!updatedDetail.agencyBill;
+                  if (!existsInList && !hasBill) {
+                    const agencyResp = await agencyService.getAgencyById(agencyId);
+                    if (agencyResp?.success) {
+                      const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
+                      setAgencyDetail(detailAgency);
+                    } else {
+                      setAgencyDetail(null);
+                    }
+                  } else if (existsInList) {
+                    setAgencyDetail(existsInList);
+                  } else if (hasBill) {
+                    setAgencyDetail(updatedDetail.agencyBill);
+                  }
+                } else {
+                  setAgencyDetail(null);
+                }
+                return; // Exit early after successful update
+              }
+            }
+          } catch (updateError) {
+            console.error('Error auto-updating order status to PAID:', updateError);
+            // Don't show error to user, just log it and continue with normal flow
+          }
+        }
+        
         const agencyId = detail?.agencyId;
         if (agencyId) {
           const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
@@ -136,6 +182,143 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   );
 
   const renderStatusModal = () => null;
+
+  const handleCreateBill = async (paymentType) => {
+    try {
+      const response = await orderRestockManagerService.createOrderRestockBill(order.id, paymentType);
+      if (response.success) {
+        showSuccess('Thành công', response.message || 'Tạo hóa đơn thành công!');
+        setShowBillModal(false);
+        // Reload order detail to get updated bill information
+        await loadOrderDetail();
+        if (onStatusUpdate) onStatusUpdate();
+      } else {
+        showError('Lỗi', response.error || 'Không thể tạo hóa đơn');
+      }
+    } catch (error) {
+      console.error('Error creating bill:', error);
+      showError('Lỗi', 'Không thể tạo hóa đơn');
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!order.agencyBill || !order.agencyBill.id) {
+      showError('Lỗi', 'Không tìm thấy thông tin hóa đơn');
+      return;
+    }
+
+    if (order.agencyBill.isCompleted) {
+      showError('Thông báo', 'Hóa đơn đã được thanh toán');
+      return;
+    }
+
+    try {
+      showConfirm(
+        'Xác nhận thanh toán',
+        `Bạn có chắc chắn muốn thanh toán hóa đơn #${order.agencyBill.id}?\nSố tiền: ${formatPrice(order.agencyBill.amount)}`,
+        async () => {
+          try {
+            const response = await orderRestockManagerService.getVNPayPaymentUrl(order.agencyBill.id);
+            if (response.success && response.paymentUrl) {
+              // Check if URL can be opened
+              const canOpen = await Linking.canOpenURL(response.paymentUrl);
+               if (canOpen) {
+                 await Linking.openURL(response.paymentUrl);
+                 // Reload order detail after payment attempt to check if payment completed
+                 // Check multiple times as payment might take a few seconds
+                 setTimeout(() => {
+                   loadOrderDetail();
+                 }, 2000);
+                 setTimeout(() => {
+                   loadOrderDetail();
+                 }, 5000);
+                 setTimeout(() => {
+                   loadOrderDetail();
+                 }, 10000);
+               } else {
+                showError('Lỗi', 'Không thể mở URL thanh toán');
+              }
+            } else {
+              showError('Lỗi', response.error || 'Không thể lấy URL thanh toán');
+            }
+          } catch (error) {
+            console.error('Error getting payment URL:', error);
+            showError('Lỗi', 'Không thể xử lý thanh toán');
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error in payment flow:', error);
+      showError('Lỗi', 'Không thể xử lý thanh toán');
+    }
+  };
+
+  const renderBillModal = () => {
+    if (!showBillModal) return null;
+
+    return (
+      <Modal
+        visible={showBillModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowBillModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Chọn hình thức thanh toán</Text>
+            <Text style={styles.modalSubtitle}>Đơn hàng #{order.id} đã được giao</Text>
+
+            <View style={styles.paymentTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.paymentTypeOption,
+                  selectedPaymentType === 'FULL' && styles.paymentTypeOptionSelected
+                ]}
+                onPress={() => setSelectedPaymentType('FULL')}
+              >
+                <Text style={[
+                  styles.paymentTypeText,
+                  selectedPaymentType === 'FULL' && styles.paymentTypeTextSelected
+                ]}>
+                  Thanh toán đầy đủ (FULL)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.paymentTypeOption,
+                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeOptionSelected
+                ]}
+                onPress={() => setSelectedPaymentType('DEFERRED')}
+              >
+                <Text style={[
+                  styles.paymentTypeText,
+                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeTextSelected
+                ]}>
+                  Thanh toán trả chậm (DEFERRED)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowBillModal(false)}
+              >
+                <Text style={styles.modalButtonCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={() => handleCreateBill(selectedPaymentType)}
+              >
+                <Text style={styles.modalButtonConfirmText}>Xác nhận</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   if (loading) {
     return (
@@ -224,6 +407,20 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           {renderInfoRow('Khuyến mãi', order.promotionId?.toString() || 'N/A')}
           {renderInfoRow('Màu sắc', order.colorId?.toString() || 'N/A')}
         </View>
+
+        {order.agencyBill && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Thông tin hóa đơn</Text>
+            {renderInfoRow('Mã hóa đơn', `#${order.agencyBill.id || 'N/A'}`)}
+            {renderInfoRow('Số tiền', formatPrice(order.agencyBill.amount))}
+            {renderInfoRow('Loại thanh toán', order.agencyBill.type === 'FULL' ? 'Thanh toán đầy đủ' : 'Thanh toán trả chậm')}
+            {renderInfoRow('Ngày tạo', formatDate(order.agencyBill.createAt))}
+            {order.agencyBill.paidAt && renderInfoRow('Ngày thanh toán', formatDate(order.agencyBill.paidAt))}
+            {renderInfoRow('Trạng thái', order.agencyBill.isCompleted ? 'Đã hoàn thành' : 'Chưa hoàn thành', {
+              color: order.agencyBill.isCompleted ? COLORS.SUCCESS : COLORS.WARNING
+            })}
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.fixedActionsContainer}>
@@ -269,8 +466,27 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
               <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
             </TouchableOpacity>
           </>
+        ) : order.status === 'DELIVERED' && !order.agencyBill ? (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              setSelectedPaymentType('FULL');
+              setShowBillModal(true);
+            }}
+          >
+            <Text style={styles.actionButtonText}>Tạo hóa đơn</Text>
+          </TouchableOpacity>
+        ) : order.agencyBill && !order.agencyBill.isCompleted ? (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handlePayment}
+          >
+            <Text style={styles.actionButtonText}>Thanh toán</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
+
+      {renderBillModal()}
 
       {renderStatusModal()}
 
@@ -450,6 +666,90 @@ const styles = StyleSheet.create({
   },
   deleteActionButtonText: {
     color: COLORS.ERROR,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SIZES.PADDING.MEDIUM,
+  },
+  modalContent: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SIZES.PADDING.LARGE,
+    textAlign: 'center',
+  },
+  paymentTypeContainer: {
+    marginBottom: SIZES.PADDING.LARGE,
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  paymentTypeOption: {
+    padding: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    borderWidth: 2,
+    borderColor: COLORS.TEXT.SECONDARY,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  paymentTypeOptionSelected: {
+    borderColor: COLORS.PRIMARY,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  paymentTypeText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    textAlign: 'center',
+  },
+  paymentTypeTextSelected: {
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  modalButton: {
+    flex: 1,
+    padding: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.TEXT.SECONDARY,
+  },
+  modalButtonCancelText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  modalButtonConfirm: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  modalButtonConfirmText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
   },
 });
 
