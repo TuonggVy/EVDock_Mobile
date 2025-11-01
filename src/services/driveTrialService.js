@@ -239,7 +239,6 @@ const driveTrialService = {
       const url = `${API_BASE_URL}/drive-trial/${bookingId}`;
       
       const headers = {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
 
@@ -252,18 +251,30 @@ const driveTrialService = {
         headers: headers,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      // Handle empty response (204 No Content) or success
+      if (response.status === 204 || response.status === 200) {
         return {
-          success: false,
-          error: data.message || `HTTP error! status: ${response.status}`,
+          success: true,
+          message: 'Drive trial deleted successfully',
         };
       }
 
+      // Try to parse error response if available
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          errorMessage = data.message || errorMessage;
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, use default error message
+        console.error('Error parsing error response:', parseError);
+      }
+
       return {
-        success: true,
-        message: data.message || 'Drive trial deleted successfully',
+        success: false,
+        error: errorMessage,
       };
     } catch (error) {
       console.error('Error deleting drive trial:', error);
