@@ -24,7 +24,7 @@ const DriveTrialManagementScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all'); // all, PENDING, CONFIRMED, COMPLETED, CANCELLED
+  const [statusFilter, setStatusFilter] = useState('all'); // all, PENDING, ACCEPTED, COMPLETED, CANCELED
 
   useEffect(() => {
     loadBookings();
@@ -97,11 +97,11 @@ const DriveTrialManagementScreen = ({ navigation }) => {
     switch (status?.toUpperCase()) {
       case 'PENDING':
         return '#FF9800';
-      case 'CONFIRMED':
+      case 'ACCEPTED':
         return '#4CAF50';
       case 'COMPLETED':
         return '#2196F3';
-      case 'CANCELLED':
+      case 'CANCELED':
         return '#F44336';
       default:
         return COLORS.TEXT.SECONDARY;
@@ -112,12 +112,12 @@ const DriveTrialManagementScreen = ({ navigation }) => {
     switch (status?.toUpperCase()) {
       case 'PENDING':
         return 'Pending';
-      case 'CONFIRMED':
-        return 'Confirmed';
+      case 'ACCEPTED':
+        return 'Accepted';
       case 'COMPLETED':
         return 'Completed';
-      case 'CANCELLED':
-        return 'Cancelled';
+      case 'CANCELED':
+        return 'Canceled';
       default:
         return status || 'Unknown';
     }
@@ -214,9 +214,9 @@ const DriveTrialManagementScreen = ({ navigation }) => {
         data={[
           { key: 'all', label: 'All' },
           { key: 'PENDING', label: 'Pending' },
-          { key: 'CONFIRMED', label: 'Confirmed' },
+          { key: 'ACCEPTED', label: 'Accepted' },
           { key: 'COMPLETED', label: 'Completed' },
-          { key: 'CANCELLED', label: 'Cancelled' },
+          { key: 'CANCELED', label: 'Canceled' },
         ]}
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => (
