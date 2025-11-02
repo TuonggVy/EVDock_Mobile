@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { ArrowLeft, Plus, Search, Package, Clock } from 'lucide-react-native';
 import { orderService } from '../../services/orderService';
 import orderRestockService from '../../services/orderRestockManagerService';
 import { vehicleService } from '../../services/vehicleService';
@@ -289,13 +290,18 @@ const OrderManagementScreen = ({ navigation }) => {
     const now = new Date();
     const withinTime = (!selectedPromo.startAt || new Date(selectedPromo.startAt) <= now)
       && (!selectedPromo.endAt || new Date(selectedPromo.endAt) >= now);
+    
+    // Check if motorbike matches - handle empty string case
+    const hasValidMotorbikeId = newOrder.motorbikeId && String(newOrder.motorbikeId).trim() !== '';
     const motorbikeOk = !selectedPromo.motorbikeId
-      || (newOrder.motorbikeId && Number(selectedPromo.motorbikeId) === Number(newOrder.motorbikeId));
+      || (hasValidMotorbikeId && Number(selectedPromo.motorbikeId) === Number(newOrder.motorbikeId));
+    
     if (!withinTime || !motorbikeOk) {
       console.warn('⚠️ [OrderManagement] Clearing invalid promotion selection', {
         promotionId: newOrder.promotionId,
         promoMotorbikeId: selectedPromo.motorbikeId,
         selectedMotorbikeId: newOrder.motorbikeId,
+        hasValidMotorbikeId,
         withinTime,
         motorbikeOk,
       });
@@ -997,20 +1003,20 @@ const OrderManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Quản lý đơn hàng</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowCreateModal(true)}
         >
-          <Text style={styles.addIcon}>+</Text>
+          <Plus size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={20} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Tìm kiếm đơn hàng..."
@@ -1056,7 +1062,7 @@ const OrderManagementScreen = ({ navigation }) => {
           if (loading && orders.length === 0) {
             return (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>⏳</Text>
+                <Clock size={64} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.emptyTitle}>Đang tải...</Text>
               </View>
             );
@@ -1069,7 +1075,7 @@ const OrderManagementScreen = ({ navigation }) => {
           } else {
             return (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>📦</Text>
+                <Package size={64} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
                 <Text style={styles.emptySubtitle}>
                   Tạo đơn đặt xe đầu tiên từ EVM
@@ -1167,14 +1173,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
     marginRight: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    marginLeft: SIZES.PADDING.SMALL,
   },
 
   // Stats
@@ -1305,10 +1310,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
