@@ -39,6 +39,9 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   const [selectedColorId, setSelectedColorId] = useState(null);
   const [currentVehicleImage, setCurrentVehicleImage] = useState(vehicle?.image);
   const [motorbikeDetails, setMotorbikeDetails] = useState(null);
+  const [colorStockMap, setColorStockMap] = useState(new Map()); // Map colorId -> quantity
+  const [loadingColorStocks, setLoadingColorStocks] = useState(false);
+  const [colorCodeMap, setColorCodeMap] = useState(new Map()); // Map colorId -> colorCode/hex
   const [configurations, setConfigurations] = useState({
     appearance: null,
     configuration: null,
@@ -166,7 +169,113 @@ const CreateQuotationScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     loadMotorbikeColorData();
+    loadAllColors(); // Load all colors from API to get color codes
   }, [vehicle]);
+
+  // Load all colors from API to build color code map
+  const loadAllColors = async () => {
+    try {
+      const response = await motorbikeService.getAllColors();
+      if (response.success && response.data && Array.isArray(response.data)) {
+        const codeMap = new Map();
+        response.data.forEach(color => {
+          if (color.id) {
+            // Store colorCode or hex, fallback to colorType
+            // Priority: colorCode > hex > colorType
+            const code = color.colorCode || color.hex || color.colorType;
+            if (code) {
+              codeMap.set(color.id, code);
+            }
+          }
+        });
+        setColorCodeMap(codeMap);
+        console.log('Loaded color code map:', Array.from(codeMap.entries()));
+      }
+    } catch (error) {
+      console.error('Error loading all colors:', error);
+    }
+  };
+
+  // Load stock information for all colors
+  useEffect(() => {
+    if (availableColors.length > 0 && user?.agencyId && vehicle?.id) {
+      loadColorStocks();
+    }
+  }, [availableColors, user?.agencyId, vehicle?.id]);
+
+  // Load stock information for all colors
+  const loadColorStocks = async () => {
+    if (!user?.agencyId || !vehicle?.id || availableColors.length === 0) return;
+    
+    setLoadingColorStocks(true);
+    try {
+      const stockMap = new Map();
+      
+      // Load stock for each color
+      const stockPromises = availableColors.map(async (colorItem) => {
+        const colorId = colorItem.color?.id || colorItem.id;
+        if (!colorId) return;
+        
+        try {
+          const stockResponse = await agencyStockService.getAgencyStocks(
+            parseInt(user.agencyId),
+            {
+              motorbikeId: parseInt(vehicle.id),
+              colorId: parseInt(colorId),
+              limit: 1000
+            }
+          );
+          
+          if (stockResponse.success && stockResponse.data && stockResponse.data.length > 0) {
+            // Sum up total quantity for this color
+            const totalQuantity = stockResponse.data.reduce((sum, stock) => {
+              return sum + (stock.quantity || 0);
+            }, 0);
+            stockMap.set(colorId, totalQuantity);
+          } else {
+            stockMap.set(colorId, 0);
+          }
+        } catch (error) {
+          console.error(`Error loading stock for colorId ${colorId}:`, error);
+          stockMap.set(colorId, 0);
+        }
+      });
+      
+      await Promise.all(stockPromises);
+      setColorStockMap(stockMap);
+      
+      // Auto-select first in-stock color
+      // Case 1: If no color selected yet, select first in-stock color
+      // Case 2: If current selection is out of stock, switch to first in-stock color
+      if (availableColors.length > 0) {
+        const currentQuantity = selectedColorId ? (stockMap.get(selectedColorId) || 0) : 0;
+        
+        if (!selectedColorId || currentQuantity === 0) {
+          // Find first in-stock color
+          const firstInStockColor = availableColors.find(colorItem => {
+            const cId = colorItem.color?.id || colorItem.id;
+            return (stockMap.get(cId) || 0) > 0;
+          });
+          
+          if (firstInStockColor) {
+            const colorType = firstInStockColor.color?.colorType || firstInStockColor.colorType;
+            const colorId = firstInStockColor.color?.id || firstInStockColor.id;
+            setSelectedColor(colorType);
+            setSelectedColorId(colorId);
+            
+            // Update image
+            if (firstInStockColor.imageUrl) {
+              setCurrentVehicleImage({ uri: firstInStockColor.imageUrl });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading color stocks:', error);
+    } finally {
+      setLoadingColorStocks(false);
+    }
+  };
 
   // Load motorbike details including colors and configurations
   const loadMotorbikeColorData = async (colorName = null) => {
@@ -189,12 +298,15 @@ const CreateQuotationScreen = ({ navigation, route }) => {
           // Set available colors list
           setAvailableColors(data.colors);
           
-          // If no color selected yet, select first one
+          // If no color selected yet, wait for stock loading to select first in-stock color
+          // (will be handled in loadColorStocks useEffect)
           if (!selectedColor && data.colors.length > 0) {
             const firstColor = data.colors[0];
             const firstColorName = firstColor.color?.colorType || firstColor.colorType;
+            const firstColorId = firstColor.color?.id || firstColor.id;
+            // Temporarily set, will be adjusted after stock loading
             setSelectedColor(firstColorName);
-            setSelectedColorId(firstColor.color?.id || firstColor.id);
+            setSelectedColorId(firstColorId);
             
             // Update image for first color
             if (firstColor.imageUrl) {
@@ -492,17 +604,72 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   };
 
   const handleColorChange = (color) => {
+    // Check if color is in stock before allowing selection
+    const colorItem = availableColors.find(c => 
+      (c.color?.colorType || c.colorType) === color
+    );
+    if (colorItem) {
+      const colorId = colorItem.color?.id || colorItem.id;
+      const quantity = colorStockMap.get(colorId) || 0;
+      if (quantity === 0) {
+        showError('Out of Stock', 'This color is currently out of stock. Please select another color.');
+        return;
+      }
+    }
     setSelectedColor(color);
     loadMotorbikeColorData(color);
   };
 
-  const renderColorSelection = () => {
-    // Determine color display list
-    const colorsToDisplay = availableColors.length > 0 
-      ? availableColors.map(c => c.color?.colorType || c.colorType)
-      : (Array.isArray(vehicle?.colors) ? vehicle.colors : []);
+  // Helper function to get actual color code/hex from color object
+  const getColorFromObject = (colorItem) => {
+    const colorId = colorItem.color?.id || colorItem.id;
     
-    if (colorsToDisplay.length === 0) {
+    // First try to get from colorCodeMap (loaded from API)
+    if (colorId && colorCodeMap.has(colorId)) {
+      const code = colorCodeMap.get(colorId);
+      // If it's already a hex code, return it
+      if (code && typeof code === 'string' && code.startsWith('#')) {
+        return code;
+      }
+      // If it's a color name, get hex from map
+      if (code) {
+        return getColorHex(code);
+      }
+    }
+    
+    // Try different possible fields for color code from colorItem itself
+    // Check nested color object first
+    if (colorItem.color) {
+      if (colorItem.color.colorCode && typeof colorItem.color.colorCode === 'string') {
+        const code = colorItem.color.colorCode;
+        return code.startsWith('#') ? code : getColorHex(code);
+      }
+      if (colorItem.color.hex && typeof colorItem.color.hex === 'string') {
+        return colorItem.color.hex;
+      }
+    }
+    
+    // Check direct properties
+    if (colorItem.colorCode && typeof colorItem.colorCode === 'string') {
+      const code = colorItem.colorCode;
+      return code.startsWith('#') ? code : getColorHex(code);
+    }
+    if (colorItem.hex && typeof colorItem.hex === 'string') {
+      return colorItem.hex;
+    }
+    
+    // Fallback to colorType name (case-insensitive lookup)
+    const colorType = colorItem.color?.colorType || colorItem.colorType || '';
+    if (colorType) {
+      return getColorHex(colorType);
+    }
+    
+    // Ultimate fallback - gray color instead of black
+    return '#808080';
+  };
+
+  const renderColorSelection = () => {
+    if (availableColors.length === 0) {
       return null;
     }
 
@@ -510,25 +677,57 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Color</Text>
         <View style={styles.colorsContainer}>
-          {colorsToDisplay.map((color, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.colorOption,
-                { backgroundColor: getColorHex(color) },
-                selectedColor === color && styles.selectedColorOption,
-              ]}
-              onPress={() => handleColorChange(color)}
-            >
-              {selectedColor === color && (
-                <View style={styles.colorCheckmark}>
-                  <Text style={styles.checkmarkText}><Check color="#FFFFFF" size={14} /></Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
+          {availableColors.map((colorItem, index) => {
+            const colorId = colorItem.color?.id || colorItem.id;
+            const colorType = colorItem.color?.colorType || colorItem.colorType || '';
+            const colorCode = getColorFromObject(colorItem);
+            const quantity = colorStockMap.get(colorId) || 0;
+            const isOutOfStock = quantity === 0;
+            const isSelected = selectedColor === colorType;
+            
+            // Debug log (can be removed later)
+            if (index === 0) {
+              console.log('Color Item:', JSON.stringify(colorItem, null, 2));
+              console.log('Color Code Result:', colorCode);
+              console.log('Color Code Map has ID:', colorId, '?', colorCodeMap.has(colorId));
+            }
+
+            return (
+              <View key={colorId || index} style={styles.colorOptionWrapper}>
+                <TouchableOpacity
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: colorCode },
+                    isSelected && styles.selectedColorOption,
+                    isOutOfStock && styles.colorOptionDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!isOutOfStock) {
+                      handleColorChange(colorType);
+                    }
+                  }}
+                  disabled={isOutOfStock}
+                  activeOpacity={isOutOfStock ? 0.5 : 0.8}
+                >
+                  {isSelected && !isOutOfStock && (
+                    <View style={styles.colorCheckmark}>
+                      <Check color="#FFFFFF" size={14} />
+                    </View>
+                  )}
+                  {isOutOfStock && (
+                    <View style={styles.outOfStockOverlay}>
+                      <Text style={styles.outOfStockText}>✕</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                {isOutOfStock && (
+                  <Text style={styles.outOfStockLabel}>Out of Stock</Text>
+                )}
+              </View>
+            );
+          })}
         </View>
-        <Text style={styles.selectedColorText}>Đã chọn: {selectedColor}</Text>
+        <Text style={styles.selectedColorText}>Selected: {selectedColor}</Text>
       </View>
     );
   };
@@ -776,8 +975,15 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   );
 };
 
-// Helper function to get color hex
+// Helper function to get color hex (case-insensitive)
 const getColorHex = (colorName) => {
+  if (!colorName || typeof colorName !== 'string') {
+    return '#808080'; // Gray as fallback instead of black
+  }
+  
+  // Normalize color name (trim and capitalize first letter)
+  const normalizedName = colorName.trim();
+  
   const colorMap = {
     'Black': '#000000',
     'White': '#FFFFFF',
@@ -788,6 +994,7 @@ const getColorHex = (colorName) => {
     'Pink': '#FFC0CB',
     'Silver': '#C0C0C0',
     'Gray': '#808080',
+    'Grey': '#808080',
     'Orange': '#FFA500',
     'Purple': '#800080',
     'Brown': '#A52A2A',
@@ -798,7 +1005,27 @@ const getColorHex = (colorName) => {
     'Lime': '#00FF00',
     'Cyan': '#00FFFF',
   };
-  return colorMap[colorName] || '#000000';
+  
+  // Try exact match first
+  if (colorMap[normalizedName]) {
+    return colorMap[normalizedName];
+  }
+  
+  // Try case-insensitive match
+  const lowerName = normalizedName.toLowerCase();
+  for (const [key, value] of Object.entries(colorMap)) {
+    if (key.toLowerCase() === lowerName) {
+      return value;
+    }
+  }
+  
+  // If still not found, check if it's already a hex code
+  if (normalizedName.startsWith('#')) {
+    return normalizedName;
+  }
+  
+  // Ultimate fallback - gray instead of black
+  return '#808080';
 };
 
 const styles = StyleSheet.create({
@@ -926,6 +1153,34 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     fontStyle: 'italic',
+  },
+  colorOptionWrapper: {
+    alignItems: 'center',
+    marginRight: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  colorOptionDisabled: {
+    opacity: 0.4,
+  },
+  outOfStockOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outOfStockText: {
+    color: COLORS.TEXT.WHITE,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  outOfStockLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.ERROR,
+    marginTop: 2,
+    textAlign: 'center',
   },
   typeContainer: {
     flexDirection: 'row',

@@ -12,6 +12,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import usePayment from '../../hooks/usePayment';
@@ -19,7 +20,7 @@ import { formatPaymentAmount, getPaymentInstructions } from '../../utils/payment
 import installmentStorageService from '../../services/storage/installmentStorageService';
 import { quotationService } from '../../services/quotationService';
 import motorbikeService from '../../services/motorbikeService';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Pencil } from 'lucide-react-native';
 
 const QuotationDetailScreen = ({ navigation, route }) => {
   const { quotation, onQuotationUpdate } = route.params;
@@ -42,6 +43,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   const [selectedPaymentType, setSelectedPaymentType] = useState(null);
   const [installmentMonths, setInstallmentMonths] = useState(12);
   const [paymentData, setPaymentData] = useState(null);
+  const [depositInfo, setDepositInfo] = useState(null);
 
   // Payment hook
   const { 
@@ -56,6 +58,23 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     loadQuotationDetail();
   }, []);
 
+  // Reload quotation detail when screen comes into focus (e.g., after creating deposit)
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshDeposit = route.params?.refreshDeposit;
+      
+      if (refreshDeposit) {
+        // Reload quotation detail to get updated deposit info
+        loadQuotationDetail();
+        // Clear the refresh flag
+        navigation.setParams({ refreshDeposit: false, depositId: null });
+      } else {
+        // Always reload quotation detail when screen comes into focus
+        loadQuotationDetail();
+      }
+    }, [route.params?.refreshDeposit])
+  );
+
   const loadQuotationDetail = async () => {
     if (!quotation?.id) {
       setLoading(false);
@@ -68,6 +87,11 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       if (response.success) {
         const detail = response.data?.data || response.data;
         setQuotationDetail(detail);
+        
+        // Load deposit from quotation detail response
+        if (detail.deposit) {
+          setDepositInfo(detail.deposit);
+        }
         
         // Load motorbike details including configurations
         if (detail.motorbikeId) {
@@ -127,7 +151,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -343,11 +367,28 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         {validUntil && (
           <Text style={styles.createdDate}>Valid Until: {formatDate(validUntil)}</Text>
         )}
-        {deposit && (
-          <Text style={styles.createdDate}>Deposit: {formatPrice(deposit)}</Text>
-        )}
       </View>
     );
+  };
+
+  const getDepositStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return COLORS.WARNING;
+      case 'HOLDING': return COLORS.SUCCESS;
+      case 'APPLIED': return COLORS.PRIMARY;
+      case 'EXPIRED': return COLORS.ERROR;
+      default: return COLORS.TEXT.SECONDARY;
+    }
+  };
+
+  const getDepositStatusText = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'Pending';
+      case 'HOLDING': return 'Holding';
+      case 'APPLIED': return 'Applied';
+      case 'EXPIRED': return 'Expired';
+      default: return 'Unknown';
+    }
   };
 
   const getVehicleImage = (vehicleImage) => {
@@ -574,11 +615,69 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     );
   };
 
+  const renderDeposit = () => {
+    if (!depositInfo) {
+      return null;
+    }
+
+    const quote = getQuotationData();
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Deposit</Text>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              navigation.navigate('EditDeposit', {
+                deposit: depositInfo,
+                quotation: quote,
+                onDepositUpdate: () => {
+                  // Reload quotation detail to get updated deposit
+                  loadQuotationDetail();
+                },
+              });
+            }}
+          >
+            <Pencil size={18} color={COLORS.PRIMARY} />
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.pricingContainer}>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit ID:</Text>
+            <Text style={styles.pricingValue}>#{depositInfo.id}</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit Percent:</Text>
+            <Text style={styles.pricingValue}>{depositInfo.depositPercent}%</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit Amount:</Text>
+            <Text style={styles.pricingValue}>{formatPrice(depositInfo.depositAmount)}</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Hold Days:</Text>
+            <Text style={styles.pricingValue}>{formatDate(depositInfo.holdDays)}</Text>
+          </View>
+          <View style={[styles.pricingRow, styles.totalRow]}>
+            <Text style={styles.totalLabel}>Status:</Text>
+            <Text style={[styles.totalValue, { color: getDepositStatusColor(depositInfo.status) }]}>
+              {getDepositStatusText(depositInfo.status)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderActionButtons = () => {
     const quote = getQuotationData();
     const type = quote.type?.toUpperCase();
     const status = quote.status?.toUpperCase();
     const isDraft = status === 'DRAFT';
+    const depositStatus = depositInfo?.status?.toUpperCase();
+    const isDepositHolding = depositStatus === 'HOLDING';
     
     // Render buttons based on type
     const renderButtonsByType = () => {
@@ -586,16 +685,40 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         return null; // No buttons for draft status
       }
 
+      // If deposit status is HOLDING, show Create Customer Contract button
+      if (depositInfo && isDepositHolding) {
+        return (
+          <TouchableOpacity
+            style={styles.contractButton}
+            onPress={handleContractView}
+          >
+            <Text style={styles.contractButtonText}>Create Customer Contract</Text>
+          </TouchableOpacity>
+        );
+      }
+
       switch (type) {
         case 'AT_STORE':
           return (
             <>
-              <TouchableOpacity
-                style={styles.depositButton}
-                onPress={() => Alert.alert('Deposit', 'Deposit feature is under development')}
-              >
-                <Text style={styles.depositButtonText}>Deposit</Text>
-              </TouchableOpacity>
+              {!depositInfo && (
+                <TouchableOpacity
+                  style={styles.depositButton}
+                  onPress={() => {
+                    const quotationId = quote.id || quote.quotationId;
+                    if (quotationId) {
+                      navigation.navigate('CreateDeposit', { 
+                        quotationId: quotationId.toString(),
+                        quotation: quote, // Pass full quotation object for navigation back
+                      });
+                    } else {
+                      Alert.alert('Error', 'Quotation ID not found');
+                    }
+                  }}
+                >
+                  <Text style={styles.depositButtonText}>Deposit</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.fullPaymentButton}
                 onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
@@ -608,12 +731,24 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         case 'ORDER':
         case 'PRE_ORDER':
           return (
-            <TouchableOpacity
-              style={styles.depositButton}
-              onPress={() => Alert.alert('Deposit', 'Deposit feature is under development')}
-            >
-              <Text style={styles.depositButtonText}>Deposit</Text>
-            </TouchableOpacity>
+            !depositInfo && (
+              <TouchableOpacity
+                style={styles.depositButton}
+                onPress={() => {
+                  const quotationId = quote.id || quote.quotationId;
+                  if (quotationId) {
+                    navigation.navigate('CreateDeposit', { 
+                      quotationId: quotationId.toString(),
+                      quotation: quote, // Pass full quotation object for navigation back
+                    });
+                  } else {
+                    Alert.alert('Error', 'Quotation ID not found');
+                  }
+                }}
+              >
+                <Text style={styles.depositButtonText}>Deposit</Text>
+              </TouchableOpacity>
+            )
           );
         
         default:
@@ -1017,6 +1152,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         {renderVehicleInfo()}
         {renderCustomerInfo()}
         {renderPricing()}
+        {renderDeposit()}
       </ScrollView>
       {renderActionButtons()}
       
@@ -1076,6 +1212,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     marginBottom: SIZES.PADDING.SMALL,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+  },
+  editButtonText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   quotationHeader: {
     flexDirection: 'row',
