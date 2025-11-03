@@ -576,37 +576,61 @@ const QuotationDetailScreen = ({ navigation, route }) => {
 
   const renderActionButtons = () => {
     const quote = getQuotationData();
+    const type = quote.type?.toUpperCase();
     const status = quote.status?.toUpperCase();
-    const isAccepted = status === 'ACCEPTED';
     const isDraft = status === 'DRAFT';
     
-    return (
-      <View style={styles.actionButtons}>
-        {isAccepted && (
-          <>
+    // Render buttons based on type
+    const renderButtonsByType = () => {
+      if (isDraft) {
+        return null; // No buttons for draft status
+      }
+
+      switch (type) {
+        case 'AT_STORE':
+          return (
+            <>
+              <TouchableOpacity
+                style={styles.depositButton}
+                onPress={() => Alert.alert('Deposit', 'Deposit feature is under development')}
+              >
+                <Text style={styles.depositButtonText}>Deposit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fullPaymentButton}
+                onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
+              >
+                <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
+              </TouchableOpacity>
+            </>
+          );
+        
+        case 'ORDER':
+        case 'PRE_ORDER':
+          return (
             <TouchableOpacity
               style={styles.depositButton}
               onPress={() => Alert.alert('Deposit', 'Deposit feature is under development')}
             >
               <Text style={styles.depositButtonText}>Deposit</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fullPaymentButton}
-              onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
-            >
-              <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
-            </TouchableOpacity>
-          </>
-        )}
+          );
         
-        {!isAccepted && !isDraft && (
-          <TouchableOpacity
-            style={styles.printButton}
-            onPress={handlePrint}
-          >
-            <Text style={styles.printButtonText}>Print Quotation</Text>
-          </TouchableOpacity>
-        )}
+        default:
+          return (
+            <TouchableOpacity
+              style={styles.printButton}
+              onPress={handlePrint}
+            >
+              <Text style={styles.printButtonText}>Print Quotation</Text>
+            </TouchableOpacity>
+          );
+      }
+    };
+    
+    return (
+      <View style={styles.actionButtons}>
+        {renderButtonsByType()}
       </View>
     );
   };
