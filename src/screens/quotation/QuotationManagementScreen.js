@@ -19,7 +19,7 @@ import { quotationService } from '../../services/quotationService';
 import motorbikeService from '../../services/motorbikeService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { ArrowLeft, Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, NotepadText, Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
 
 const QuotationManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -27,6 +27,7 @@ const QuotationManagementScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedTabType, setSelectedTabType] = useState('AT_STORE'); // Tab selection: AT_STORE, ORDER, PRE_ORDER
   const [quotations, setQuotations] = useState([]);
   const [allQuotations, setAllQuotations] = useState([]); // Store all quotations for filter counts
   const [filteredQuotations, setFilteredQuotations] = useState([]);
@@ -58,7 +59,7 @@ const QuotationManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterQuotations();
-  }, [allQuotations, searchQuery, selectedFilter]);
+  }, [allQuotations, searchQuery, selectedFilter, selectedTabType]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -74,7 +75,7 @@ const QuotationManagementScreen = ({ navigation }) => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, selectedFilter]);
+  }, [searchQuery, selectedFilter, selectedTabType]);
 
   const loadQuotations = async () => {
     setLoading(true);
@@ -201,6 +202,13 @@ const QuotationManagementScreen = ({ navigation }) => {
     // Use allQuotations for filtering to get accurate counts
     let filtered = allQuotations;
     
+    // Apply type filter (tab selection)
+    if (selectedTabType) {
+      filtered = filtered.filter(quotation => 
+        quotation.type?.toUpperCase() === selectedTabType.toUpperCase()
+      );
+    }
+    
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -318,12 +326,21 @@ const QuotationManagementScreen = ({ navigation }) => {
     );
   };
 
+  // Get quotations filtered by selected tab type for status filter counts
+  const getQuotationsByTab = () => {
+    return allQuotations.filter(q => 
+      q.type?.toUpperCase() === selectedTabType.toUpperCase()
+    );
+  };
+
+  const quotationsByTab = getQuotationsByTab();
+
   const filterOptions = [
-    { key: 'all', label: 'All', count: allQuotations.length },
-    { key: 'DRAFT', label: 'Draft', count: allQuotations.filter(q => q.status === 'DRAFT').length },
-    { key: 'ACCEPTED', label: 'Accepted', count: allQuotations.filter(q => q.status === 'ACCEPTED').length },
-    { key: 'REJECTED', label: 'Rejected', count: allQuotations.filter(q => q.status === 'REJECTED').length },
-    { key: 'EXPIRED', label: 'Expired', count: allQuotations.filter(q => q.status === 'EXPIRED').length },
+    { key: 'all', label: 'All', count: quotationsByTab.length },
+    { key: 'DRAFT', label: 'Draft', count: quotationsByTab.filter(q => q.status === 'DRAFT').length },
+    { key: 'ACCEPTED', label: 'Accepted', count: quotationsByTab.filter(q => q.status === 'ACCEPTED').length },
+    { key: 'REJECTED', label: 'Rejected', count: quotationsByTab.filter(q => q.status === 'REJECTED').length },
+    { key: 'EXPIRED', label: 'Expired', count: quotationsByTab.filter(q => q.status === 'EXPIRED').length },
   ];
 
   const renderQuotationCard = ({ item: quotation }) => {
@@ -385,30 +402,41 @@ const QuotationManagementScreen = ({ navigation }) => {
     );
   };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>📋</Text>
-      <Text style={styles.emptyTitle}>No Quotations Yet</Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery || selectedFilter !== 'all' 
-          ? 'No matching quotations found' 
-          : 'Create the first quotation for customer'
-        }
-      </Text>
-      {!searchQuery && selectedFilter === 'all' && (
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateQuotation}>
-          <LinearGradient
-            colors={COLORS.GRADIENT.BLUE}
-            style={styles.createButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.createButtonText}>Create New Quotation</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const renderEmptyState = () => {
+    const getTabLabel = () => {
+      switch (selectedTabType) {
+        case 'AT_STORE': return 'At Store';
+        case 'ORDER': return 'Order';
+        case 'PRE_ORDER': return 'Pre-Order';
+        default: return '';
+      }
+    };
+
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}><NotepadText size={70} /></Text>
+        <Text style={styles.emptyTitle}>No Quotations Yet</Text>
+        <Text style={styles.emptySubtitle}>
+          {searchQuery || selectedFilter !== 'all' 
+            ? 'No matching quotations found' 
+            : `No ${getTabLabel()} quotations found`
+          }
+        </Text>
+        {!searchQuery && selectedFilter === 'all' && (
+          <TouchableOpacity style={styles.createButton} onPress={handleCreateQuotation}>
+            <LinearGradient
+              colors={COLORS.GRADIENT.BLUE}
+              style={styles.createButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.createButtonText}>Create New Quotation</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -445,6 +473,54 @@ const QuotationManagementScreen = ({ navigation }) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+        </View>
+
+        {/* Type Tabs */}
+        <View style={styles.tabSection}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                selectedTabType === 'AT_STORE' && styles.tabActive
+              ]}
+              onPress={() => setSelectedTabType('AT_STORE')}
+            >
+              <Text style={[
+                styles.tabText,
+                selectedTabType === 'AT_STORE' && styles.tabTextActive
+              ]}>
+                At Store ({allQuotations.filter(q => q.type?.toUpperCase() === 'AT_STORE').length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                selectedTabType === 'ORDER' && styles.tabActive
+              ]}
+              onPress={() => setSelectedTabType('ORDER')}
+            >
+              <Text style={[
+                styles.tabText,
+                selectedTabType === 'ORDER' && styles.tabTextActive
+              ]}>
+                Order ({allQuotations.filter(q => q.type?.toUpperCase() === 'ORDER').length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                selectedTabType === 'PRE_ORDER' && styles.tabActive
+              ]}
+              onPress={() => setSelectedTabType('PRE_ORDER')}
+            >
+              <Text style={[
+                styles.tabText,
+                selectedTabType === 'PRE_ORDER' && styles.tabTextActive
+              ]}>
+                Pre-Order ({allQuotations.filter(q => q.type?.toUpperCase() === 'PRE_ORDER').length})
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -567,6 +643,37 @@ const styles = StyleSheet.create({
   },
   createIcon: {
     fontSize: SIZES.FONT.LARGE,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: 'bold',
+  },
+  tabSection: {
+    marginTop: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.XSMALL,
+    gap: SIZES.PADDING.XSMALL,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  tabText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '500',
+  },
+  tabTextActive: {
     color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
   },
