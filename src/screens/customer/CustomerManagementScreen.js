@@ -10,7 +10,7 @@ import {
 import { COLORS, SIZES } from '../../constants';
 import useCustomerManagement from '../../hooks/useCustomerManagement';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Calendar1, IdCard, Mail, MapPinHouse, Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, Calendar1, Hash, IdCard, Mail, MapPinHouse, Plus, Search } from 'lucide-react-native';
 
 const CustomerManagementScreen = ({ navigation }) => {
   // Local UI state
@@ -81,6 +81,14 @@ const CustomerManagementScreen = ({ navigation }) => {
 
       {/* Content */}
       <View style={styles.customerCardContent}>
+        <View style={styles.infoRow}>
+          <View style={styles.infoLabelContainer}>
+            <Hash size={14} color={COLORS.TEXT.SECONDARY} />
+            <Text style={styles.infoLabel}> ID</Text>
+          </View>
+          <Text style={styles.infoValue}>{item.id || 'N/A'}</Text>
+        </View>
+
         <View style={styles.infoRow}>
           <View style={styles.infoLabelContainer}>
             <Mail size={14} color={COLORS.TEXT.SECONDARY} />

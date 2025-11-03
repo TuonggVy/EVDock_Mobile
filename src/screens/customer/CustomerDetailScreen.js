@@ -14,7 +14,7 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerManagementService from '../../services/customerManagementService';
 import agencyService from '../../services/agencyService';
 import LoadingScreen from '../../components/common/LoadingScreen';
-import { ArrowLeft, Building2, Calendar1, IdCard, Mail, MapPinHouse, Pencil, Trash } from 'lucide-react-native';
+import { ArrowLeft, Building2, Calendar1, Hash, IdCard, Mail, MapPinHouse, Pencil, Trash } from 'lucide-react-native';
 
 const CustomerDetailScreen = ({ navigation, route }) => {
   const { customerId } = route.params || {};
@@ -173,6 +173,14 @@ const CustomerDetailScreen = ({ navigation, route }) => {
 
           {/* Display Mode */}
           <View style={styles.infoSection}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoLabelContainer}>
+                  <Hash size={14} color={COLORS.TEXT.SECONDARY} />
+                  <Text style={styles.infoLabel}> ID</Text>
+                </View>
+                <Text style={styles.infoValue}>{customer.id || 'N/A'}</Text>
+              </View>
+
               <View style={styles.infoRow}>
                 <View style={styles.infoLabelContainer}>
                   <Mail size={14} color={COLORS.TEXT.SECONDARY} />
