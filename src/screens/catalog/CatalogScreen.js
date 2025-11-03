@@ -152,7 +152,7 @@ const CatalogScreen = ({ navigation, route }) => {
             name: motorbike.name,
             model: motorbike.model || motorbike.name,
             version: motorbike.version || 'N/A',
-            price: motorbike.price || stock.price || 0,
+            price: stock.price || motorbike.price || 0, // Prioritize stock price over motorbike price
             currency: 'VND',
             image: motorbike.images?.[0]?.imageUrl || null,
             stockCount: 0,

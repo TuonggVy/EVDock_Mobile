@@ -20,6 +20,7 @@ import CompareScreen from '../screens/compare/CompareScreen';
 import CreateQuotationScreen from '../screens/quotation/CreateQuotationScreen';
 import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
+import EditQuotationScreen from '../screens/quotation/EditQuotationScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
 import CustomerManagementScreen from '../screens/customer/CustomerManagementScreen';
 import CustomerDetailScreen from '../screens/customer/CustomerDetailScreen';
@@ -194,6 +195,11 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="QuotationManagement" 
           component={QuotationManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditQuotation" 
+          component={EditQuotationScreen} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 

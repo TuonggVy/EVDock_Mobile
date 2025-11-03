@@ -102,7 +102,7 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('Catalog'),
     },
     {
-      title: 'Sales',
+      title: 'Quotations',
       gradient: COLORS.GRADIENT.PURPLE, // ['#8B5CF6', '#7C3AED']
       icon: '📋',
       onPress: () => navigation.navigate('QuotationManagement'),
