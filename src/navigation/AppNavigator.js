@@ -47,9 +47,8 @@ import InstallmentPlanManagementScreen from '../screens/installment/InstallmentP
 import InstallmentPlanDetailScreen from '../screens/installment/InstallmentPlanDetailScreen';
 import StaffInstallmentPlanListScreen from '../screens/installment/StaffInstallmentPlanListScreen';
 import DepositManagementScreen from '../screens/deposit/DepositManagementScreen';
-import CreateDepositAvailableScreen from '../screens/deposit/CreateDepositAvailableScreen';
-import CreatePreOrderScreen from '../screens/deposit/CreatePreOrderScreen';
-import DepositDetailScreen from '../screens/deposit/DepositDetailScreen';
+import CreateDepositScreen from '../screens/deposit/CreateDepositScreen';
+import EditDepositScreen from '../screens/deposit/EditDepositScreen';
 import PreOrderTasksScreen from '../screens/evm/PreOrderTasksScreen';
 import StaffManagementScreen from '../screens/staff/StaffManagementScreen';
 import WarehouseManagementScreen from '../screens/warehouse/WarehouseManagementScreen';
@@ -358,18 +357,13 @@ const AppNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="CreateDepositAvailable"
-              component={CreateDepositAvailableScreen}
+              name="CreateDeposit"
+              component={CreateDepositScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="CreatePreOrder"
-              component={CreatePreOrderScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="DepositDetail" 
-              component={DepositDetailScreen} 
+              name="EditDeposit"
+              component={EditDepositScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen 

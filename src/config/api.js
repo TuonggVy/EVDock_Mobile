@@ -75,6 +75,14 @@ export const API_ENDPOINTS = {
     UPDATE: (bookingId) => `/drive-trial/${bookingId}`,
     DELETE: (bookingId) => `/drive-trial/${bookingId}`,
   },
+
+  // Deposits
+  DEPOSITS: {
+    CREATE: '/deposit',
+    BY_ID: (depositId) => `/deposit/${depositId}`,
+    UPDATE: (depositId) => `/deposit/${depositId}`,
+    DELETE: (depositId) => `/deposit/${depositId}`,
+  },
 };
 
 // HTTP Headers
