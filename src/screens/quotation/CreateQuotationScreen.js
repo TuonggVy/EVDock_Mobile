@@ -12,28 +12,41 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
 import { vehicleService } from '../../services/vehicleService';
-import { promotionService, formatPrice, formatDiscountValue, isPromotionValid } from '../../services/promotionService';
+import { formatPrice } from '../../utils/promotionUtils';
 import { quotationService } from '../../services/quotationService';
 import { dealerCatalogStorageService } from '../../services/storage/dealerCatalogStorageService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { useAuth } from '../../contexts/AuthContext';
+import motorbikeService from '../../services/motorbikeService';
+import customerManagementService from '../../services/customerManagementService';
+import agencyStockService from '../../services/agencyStockService';
+import { ArrowLeft, Calendar, Check, Search } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
 const CreateQuotationScreen = ({ navigation, route }) => {
   const vehicle = route?.params?.vehicle;
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [selectedColor, setSelectedColor] = useState(
-    (Array.isArray(vehicle?.colors) && vehicle.colors[0]) || 'Black'
-  );
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
+  const [availableColors, setAvailableColors] = useState([]);
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedColorId, setSelectedColorId] = useState(null);
+  const [currentVehicleImage, setCurrentVehicleImage] = useState(vehicle?.image);
+  const [motorbikeDetails, setMotorbikeDetails] = useState(null);
+  const [configurations, setConfigurations] = useState({
+    appearance: null,
+    configuration: null,
+    battery: null,
+    safeFeature: null,
   });
+  const [customerId, setCustomerId] = useState('');
+  const [loadedCustomerInfo, setLoadedCustomerInfo] = useState(null);
   const [pricing, setPricing] = useState({
     basePrice: Number(vehicle?.price) || 0,
     colorPrice: 0,
@@ -43,30 +56,174 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     finalPricePerUnit: Number(vehicle?.price) || 0,
     totalPrice: Number(vehicle?.price) || 0,
   });
-  const [promotions, setPromotions] = useState([]);
-  const [selectedPromotion, setSelectedPromotion] = useState(null);
-  const [showPromotionModal, setShowPromotionModal] = useState(false);
-  const [promotionCode, setPromotionCode] = useState('');
-  const [promotionError, setPromotionError] = useState('');
+  const [quotationType, setQuotationType] = useState('AT_STORE');
+  const [validUntil, setValidUntil] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [availablePromotions, setAvailablePromotions] = useState([]);
+  const [selectedPromotionId, setSelectedPromotionId] = useState(null);
 
   const { alertConfig, hideAlert, showSuccess, showError, showInfo } = useCustomAlert();
 
+  // Helper function to format date for API (YYYY-MM-DD)
+  const formatDate = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to format date for display (DD/MM/YYYY)
+  const formatDateForDisplay = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Handle date change from DateTimePicker
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setValidUntil(selectedDate);
+    }
+  };
+
+  // Helper function to calculate discount based on promotion valueType
+  const calculateDiscount = (promotion, orderValue) => {
+    if (!promotion || !orderValue) return 0;
+    
+    const { valueType, value } = promotion;
+    let discount = 0;
+    
+    if (valueType === 'PERCENT') {
+      discount = (orderValue * value) / 100;
+    } else if (valueType === 'FIXED') {
+      discount = value;
+    }
+    
+    return discount;
+  };
+
+  // Load promotions when color changes
+  useEffect(() => {
+    const loadPromotions = async () => {
+      if (!user?.agencyId || !vehicle?.id || !selectedColorId) {
+        setAvailablePromotions([]);
+        return;
+      }
+      
+      try {
+        const stockResponse = await agencyStockService.getAgencyStocks(parseInt(user.agencyId), {
+          motorbikeId: parseInt(vehicle.id),
+          colorId: parseInt(selectedColorId),
+          limit: 1000
+        });
+
+        if (stockResponse.success && stockResponse.data && stockResponse.data.length > 0) {
+          const availableStock = stockResponse.data.find(stock => stock.quantity > 0);
+          
+          if (availableStock && availableStock.id) {
+            const stockDetailResponse = await agencyStockService.getAgencyStockDetail(availableStock.id);
+            
+            if (stockDetailResponse.success && stockDetailResponse.data) {
+              const allPromotions = stockDetailResponse.data.agencyStockPromotion || [];
+              const now = new Date();
+              const activePromotions = allPromotions.filter(promoItem => {
+                const promo = promoItem.stockPromotion || {};
+                const validFrom = new Date(promo.startAt);
+                const validTo = new Date(promo.endAt);
+                const isActive = promo.status === 'ACTIVE';
+                const isInDateRange = now >= validFrom && now <= validTo;
+                return isActive && isInDateRange;
+              });
+              
+              setAvailablePromotions(activePromotions);
+              
+              // Auto-select first promotion if available and no promotion selected
+              if (activePromotions.length > 0 && !selectedPromotionId) {
+                setSelectedPromotionId(activePromotions[0].stockPromotionId);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading promotions:', error);
+        setAvailablePromotions([]);
+      }
+    };
+    
+    loadPromotions();
+  }, [selectedColor, selectedColorId]);
+  
+  // Calculate pricing when promotions or selected promotion changes
   useEffect(() => {
     calculatePricing();
-  }, [selectedColor, selectedPromotion]);
+  }, [selectedColor, selectedColorId, selectedPromotionId, availablePromotions.length]);
 
   useEffect(() => {
-    loadPromotions();
-  }, []);
+    loadMotorbikeColorData();
+  }, [vehicle]);
 
-  const loadPromotions = async () => {
+  // Load motorbike details including colors and configurations
+  const loadMotorbikeColorData = async (colorName = null) => {
+    if (!vehicle?.id) return;
     try {
-      const response = await promotionService.getActivePromotions();
+      const response = await motorbikeService.getMotorbikeById(parseInt(vehicle.id));
       if (response.success) {
-        setPromotions(response.data);
+        const data = response.data?.data || response.data;
+        setMotorbikeDetails(data);
+        
+        // Extract configurations from motorbike details
+        setConfigurations({
+          appearance: data.appearance || null,
+          configuration: data.configuration || null,
+          battery: data.battery || null,
+          safeFeature: data.safeFeature || null,
+        });
+        
+        if (data.colors && Array.isArray(data.colors) && data.colors.length > 0) {
+          // Set available colors list
+          setAvailableColors(data.colors);
+          
+          // If no color selected yet, select first one
+          if (!selectedColor && data.colors.length > 0) {
+            const firstColor = data.colors[0];
+            const firstColorName = firstColor.color?.colorType || firstColor.colorType;
+            setSelectedColor(firstColorName);
+            setSelectedColorId(firstColor.color?.id || firstColor.id);
+            
+            // Update image for first color
+            if (firstColor.imageUrl) {
+              setCurrentVehicleImage({ uri: firstColor.imageUrl });
+            } else if (data.images && data.images.length > 0) {
+              setCurrentVehicleImage({ uri: data.images[0].imageUrl });
+            }
+          } else {
+            // Update colorId and image for selected color
+            const colorToSearch = colorName || selectedColor;
+            const colorItem = data.colors.find(c => 
+              (c.color?.colorType || c.colorType) === colorToSearch
+            );
+            if (colorItem) {
+              setSelectedColorId(colorItem.color?.id || colorItem.id);
+              
+              // Update image for selected color
+              if (colorItem.imageUrl) {
+                setCurrentVehicleImage({ uri: colorItem.imageUrl });
+              }
+            }
+          }
+        } else if (data.images && data.images.length > 0) {
+          // Fallback to first image if no colors
+          setCurrentVehicleImage({ uri: data.images[0].imageUrl });
+        }
       }
     } catch (error) {
-      console.error('Error loading promotions:', error);
+      console.error('Error loading motorbike color data:', error);
     }
   };
 
@@ -75,34 +232,18 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     let colorPrice = 0;
     let promotionDiscount = 0;
 
-    // Color pricing (example logic)
-    const colorPricing = {
-      'Black': 0,
-      'White': 0,
-      'Red': 500000,
-      'Blue': 300000,
-      'Green': 400000,
-      'Yellow': 600000,
-      'Pink': 700000,
-      'Silver': 200000,
-      'Gold': 800000,
-    };
-    colorPrice = colorPricing[selectedColor] || 0;
+    // Color pricing - set to 0 for now since API doesn't provide color-specific pricing
+    // TODO: Implement when API provides color price information
+    colorPrice = 0;
 
     // Calculate price per unit after color
     const pricePerUnit = basePrice + colorPrice;
 
-    // Apply promotion discount to price per unit if selected
-    if (selectedPromotion) {
-      // Check if promotion is valid (simplified check for now)
-      const now = new Date();
-      const validFrom = new Date(selectedPromotion.validFrom);
-      const validTo = new Date(selectedPromotion.validTo);
-      const isActive = selectedPromotion.isActive;
-      const isInDateRange = now >= validFrom && now <= validTo;
-      
-      if (isActive && isInDateRange) {
-        promotionDiscount = promotionService.calculateDiscount(selectedPromotion, pricePerUnit);
+    // Calculate discount from selected promotion
+    if (selectedPromotionId && availablePromotions.length > 0) {
+      const selectedPromo = availablePromotions.find(p => p.stockPromotionId === selectedPromotionId);
+      if (selectedPromo && selectedPromo.stockPromotion) {
+        promotionDiscount = calculateDiscount(selectedPromo.stockPromotion, pricePerUnit);
       }
     }
 
@@ -123,94 +264,88 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     });
   };
 
-  const handleCreateQuotation = async () => {
-    if (!vehicle) {
-      showError('Thiếu dữ liệu', 'Không tìm thấy thông tin xe');
-      return;
-    }
-    // Validate required fields
-    if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
-      showError('Thông tin thiếu', 'Vui lòng điền đầy đủ thông tin khách hàng');
+  // Load customer info by ID
+  const loadCustomerInfo = async () => {
+    if (!customerId || !customerId.trim()) {
+      setLoadedCustomerInfo(null);
       return;
     }
 
+    try {
+      const response = await customerManagementService.getCustomerDetail(parseInt(customerId));
+      if (response) {
+        setLoadedCustomerInfo(response);
+      } else {
+        setLoadedCustomerInfo(null);
+        showError('Customer Not Found', 'No customer information found with this ID');
+      }
+    } catch (error) {
+      console.error('Error loading customer info:', error);
+      setLoadedCustomerInfo(null);
+      showError('Loading Error', 'Failed to load customer information. Please check the ID again.');
+    }
+  };
+
+  const handleCreateQuotation = async () => {
+    if (!vehicle) {
+      showError('Missing Data', 'Vehicle information not found');
+      return;
+    }
+
+    // Validate customerId
+    if (!customerId || !customerId.trim()) {
+      showError('Missing Information', 'Please enter customer ID');
+      return;
+    }
+
+    // Validate loaded customer info
+    if (!loadedCustomerInfo) {
+      showError('Missing Information', 'Customer information not found. Please check the ID.');
+      return;
+    }
+
+    // Validate user context
+    if (!user?.id || !user?.agencyId) {
+      showError('Authentication Error', 'User information not found. Please login again.');
+      return;
+    }
+
+    // Validate colorId
+    if (!selectedColorId) {
+      showError('Missing Information', 'Color information cannot be retrieved. Please select color again.');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      // Create quotation data
+      // Build quotation data according to API specs
+      const validUntilDate = new Date(validUntil);
+      validUntilDate.setHours(23, 59, 59, 0);
+      
       const quotationData = {
-        customerName: customerInfo.name,
-        customerEmail: customerInfo.email,
-        customerPhone: customerInfo.phone,
-        vehicleModel: vehicle.name,
-        vehicleImage: vehicle.imageName || 'banner-modely.png', // Use image name for consistency
-        totalAmount: pricing.totalPrice,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        createdBy: 'staff001', // This should come from auth context
-        dealerId: 'dealer001', // This should come from auth context
-        items: [
-          {
-            name: vehicle.name,
-            quantity: 1,
-            price: pricing.finalPricePerUnit,
-            type: 'vehicle'
-          }
-        ],
-        notes: '',
-        lastModified: new Date().toISOString(),
-        // Additional details for quotation detail screen
-        vehicle: {
-          ...(vehicle || {}),
-          selectedColor,
-        },
-        customer: customerInfo,
-        details: {
-          quantity: 1,
-        },
-        pricing,
-        promotion: selectedPromotion ? {
-          id: selectedPromotion.id,
-          code: selectedPromotion.code,
-          name: selectedPromotion.name,
-          discountAmount: pricing.promotionDiscount,
-        } : null,
+        type: quotationType, // AT_STORE, ORDER, PRE_ORDER
+        basePrice: pricing.basePrice,
+        promotionPrice: pricing.promotionDiscount,
+        finalPrice: pricing.finalPricePerUnit,
+        validUntil: validUntilDate.toISOString(), // User selected date
+        customerId: parseInt(customerId),
+        motorbikeId: parseInt(vehicle.id),
+        colorId: selectedColorId,
+        dealerStaffId: parseInt(user.id),
+        agencyId: parseInt(user.agencyId),
       };
 
-      // Save quotation using service (will save to local storage for now)
-      await quotationService.createQuotation(quotationData);
+      // Call real API to create quotation
+      const response = await quotationService.createQuotation(quotationData);
 
-      // Decrement dealer catalog stock by 1 (retail flow) and fallback to manufacturer stock
-      try {
-        const modelKey = vehicle.id || vehicle.name;
-        const res = await dealerCatalogStorageService.decrementColorStock({
-          vehicleModelOrId: modelKey,
-          color: selectedColor,
-          quantity: 1,
-        });
-        if (!res?.success) {
-          await vehicleService.decrementVehicleColorStock(vehicle.id, selectedColor, 1);
-        }
-      } catch (stockErr) {
-        // Non-blocking: log but don't break user flow
-        console.error('Error decrementing stock after quotation:', stockErr);
-      }
-
-      // Use promotion if selected
-      if (selectedPromotion) {
-        try {
-          await promotionService.usePromotion(selectedPromotion.id, quotationData.id);
-        } catch (error) {
-          console.error('Error using promotion:', error);
-          // Continue with quotation creation even if promotion usage fails
-        }
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create quotation');
       }
 
       showSuccess(
-        'Tạo báo giá thành công',
-        `Báo giá ${quotationData.id} đã được tạo thành công`,
+        'Quotation Created Successfully',
+        `The quotation has been created successfully`,
         () => {
           // Navigate to QuotationManagement screen and reset navigation stack
           navigation.reset({
@@ -224,66 +359,16 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       );
     } catch (error) {
       console.error('Error creating quotation:', error);
-      showError('Lỗi', 'Không thể tạo báo giá. Vui lòng thử lại.');
+      showError('Error', error.message || 'Failed to create quotation. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePromotionCodeSubmit = async () => {
-    if (!promotionCode.trim()) {
-      setPromotionError('Vui lòng nhập mã khuyến mãi');
-      return;
-    }
-
-    try {
-      // Use price per unit for validation instead of total order amount
-      const pricePerUnit = pricing.basePrice + pricing.colorPrice - pricing.quantityDiscount;
-      const response = await promotionService.validatePromotionCode(
-        String(promotionCode).trim(),
-        Number(pricePerUnit) || 0
-      );
-      
-      if (response && typeof response === 'object' && response.success) {
-        setSelectedPromotion(response.data || null);
-        setPromotionError('');
-        setShowPromotionModal(false);
-        setPromotionCode('');
-      } else {
-        setPromotionError((response && response.error) || 'Mã khuyến mãi không hợp lệ');
-      }
-    } catch (error) {
-      setPromotionError('Lỗi khi kiểm tra mã khuyến mãi');
-    }
-  };
-
-  const handleRemovePromotion = () => {
-    setSelectedPromotion(null);
-    setPromotionError('');
-  };
-
-  const handleSelectPromotion = (promotion) => {
-    setSelectedPromotion(promotion);
-    setShowPromotionModal(false);
-    setPromotionError('');
-  };
-
   const resetForm = () => {
-    setCustomerInfo({
-      name: '',
-      email: '',
-      phone: '',
-    });
+    setCustomerId('');
+    setLoadedCustomerInfo(null);
     setSelectedColor((Array.isArray(vehicle?.colors) && vehicle.colors[0]) || 'Black');
-    setSelectedPromotion(null);
-    setPromotionError('');
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(price);
   };
 
   const renderHeader = () => (
@@ -292,182 +377,346 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={styles.backButtonText}><ArrowLeft color="#FFFFFF" size={18} /></Text>
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Tạo Báo Giá</Text>
+      <Text style={styles.headerTitle}>Create Quotation</Text>
       <View style={styles.placeholder} />
     </View>
   );
 
-  const renderVehicleInfo = () => (
-    !vehicle ? null : (
+  const renderVehicleInfo = () => {
+    if (!vehicle) return null;
+    
+    // Use motorbikeDetails if available, otherwise fallback to vehicle
+    const displayData = motorbikeDetails || vehicle;
+    
+    // Helper function to format spec key
+    const formatSpecKey = (key) => {
+      return key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    };
+    
+    // Helper function to format spec value based on key
+    const formatSpecValue = (key, value) => {
+      if (key.toLowerCase().includes('distance') || key.toLowerCase().includes('limit')) {
+        return `${value} mm`;
+      } else if (key.toLowerCase().includes('weight')) {
+        return `${value} kg`;
+      } else if (key.toLowerCase().includes('storage')) {
+        return `${value} L`;
+      } else if (key.toLowerCase().includes('capacity') && typeof value === 'number') {
+        return `${value} people`;
+      }
+      return value;
+    };
+    
+    // Get first few specs from any available configuration
+    const getFirstSpecs = () => {
+      const allConfigs = [
+        configurations.battery,
+        configurations.configuration,
+        configurations.appearance,
+        configurations.safeFeature,
+      ].filter(Boolean);
+      
+      if (allConfigs.length === 0) return [];
+      
+      // Get first 4 key-value pairs from first available config
+      const firstConfig = allConfigs[0];
+      const entries = Object.entries(firstConfig).filter(
+        ([key]) => key !== 'electricMotorbikeId' && key !== 'id'
+      );
+      return entries.slice(0, 4);
+    };
+    
+    const specs = getFirstSpecs();
+    
+    return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Thông Tin Xe</Text>
+        <Text style={styles.sectionTitle}>Vehicle Information</Text>
         <View style={styles.vehicleCard}>
-          <Image source={vehicle.image} style={styles.vehicleImage} />
+          <Image 
+            source={
+              typeof currentVehicleImage === 'object' && currentVehicleImage !== null 
+                ? currentVehicleImage 
+                : (currentVehicleImage || vehicle.image)
+            } 
+            style={styles.vehicleImage} 
+          />
           <View style={styles.vehicleDetails}>
-            <Text style={styles.vehicleName}>{vehicle.name}</Text>
-            <Text style={styles.vehicleModel}>{vehicle.model}</Text>
+            <Text style={styles.vehicleName}>{displayData.name || vehicle.name}</Text>
+            <Text style={styles.vehicleModel}>{displayData.model || vehicle.model}</Text>
+            {specs.length > 0 ? (
+              <>
+                {specs.slice(0, 2).length > 0 && (
+                  <View style={styles.specsRow}>
+                    {specs.slice(0, 2).map(([key, value]) => (
+                      <Text key={key} style={styles.specText}>
+                        {formatSpecKey(key)}: {formatSpecValue(key, value)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+                {specs.length > 2 && specs.slice(2, 4).length > 0 && (
+                  <View style={styles.specsRow}>
+                    {specs.slice(2, 4).map(([key, value]) => (
+                      <Text key={key} style={styles.specText}>
+                        {formatSpecKey(key)}: {formatSpecValue(key, value)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {vehicle.specifications && (
+                  <>
+                    <View style={styles.specsRow}>
+                      <Text style={styles.specText}>Battery: {vehicle.specifications?.battery || '-'}</Text>
+                      <Text style={styles.specText}>Motor: {vehicle.specifications?.motor || '-'}</Text>
+                    </View>
+                    <View style={styles.specsRow}>
+                      <Text style={styles.specText}>Weight: {vehicle.specifications?.weight || '-'}</Text>
+                      <Text style={styles.specText}>Max Load: {vehicle.specifications?.maxLoad || '-'}</Text>
+                    </View>
+                  </>
+                )}
+              </>
+            )}
             <View style={styles.specsRow}>
-              <Text style={styles.specText}>Battery: {vehicle.specifications?.battery || '-'}</Text>
-              <Text style={styles.specText}>Motor: {vehicle.specifications?.motor || '-'}</Text>
-            </View>
-            <View style={styles.specsRow}>
-              <Text style={styles.specText}>Weight: {vehicle.specifications?.weight || '-'}</Text>
-              <Text style={styles.specText}>Max Load: {vehicle.specifications?.maxLoad || '-'}</Text>
-            </View>
-            <View style={styles.specsRow}>
-              <Text style={styles.specText}>Charging: {vehicle.specifications?.chargingTime || '-'}</Text>
-              <Text style={styles.specText}>Price: {formatPrice(Number(vehicle?.price) || 0)}</Text>
+              <Text style={styles.specText}>Price: {formatPrice(Number(vehicle?.price || displayData?.price) || 0)}</Text>
             </View>
           </View>
         </View>
       </View>
-    )
-  );
+    );
+  };
 
-  const renderColorSelection = () => (
+  const handleColorChange = (color) => {
+    setSelectedColor(color);
+    loadMotorbikeColorData(color);
+  };
+
+  const renderColorSelection = () => {
+    // Determine color display list
+    const colorsToDisplay = availableColors.length > 0 
+      ? availableColors.map(c => c.color?.colorType || c.colorType)
+      : (Array.isArray(vehicle?.colors) ? vehicle.colors : []);
+    
+    if (colorsToDisplay.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Color</Text>
+        <View style={styles.colorsContainer}>
+          {colorsToDisplay.map((color, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.colorOption,
+                { backgroundColor: getColorHex(color) },
+                selectedColor === color && styles.selectedColorOption,
+              ]}
+              onPress={() => handleColorChange(color)}
+            >
+              {selectedColor === color && (
+                <View style={styles.colorCheckmark}>
+                  <Text style={styles.checkmarkText}><Check color="#FFFFFF" size={14} /></Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={styles.selectedColorText}>Đã chọn: {selectedColor}</Text>
+      </View>
+    );
+  };
+
+  const renderQuotationTypeSelection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Màu Sắc</Text>
-      <View style={styles.colorsContainer}>
-        {(Array.isArray(vehicle?.colors) ? vehicle.colors : ['Black', 'White']).map((color, index) => (
+      <Text style={styles.sectionTitle}>Quotation Type</Text>
+      <View style={styles.typeContainer}>
+        {['AT_STORE', 'ORDER', 'PRE_ORDER'].map((type) => (
           <TouchableOpacity
-            key={index}
+            key={type}
             style={[
-              styles.colorOption,
-              { backgroundColor: getColorHex(color) },
-              selectedColor === color && styles.selectedColorOption,
+              styles.typeOption,
+              quotationType === type && styles.typeOptionSelected,
             ]}
-            onPress={() => setSelectedColor(color)}
+            onPress={() => setQuotationType(type)}
           >
-            {selectedColor === color && (
-              <View style={styles.colorCheckmark}>
-                <Text style={styles.checkmarkText}>✓</Text>
-              </View>
-            )}
+            <Text style={[
+              styles.typeText,
+              quotationType === type && styles.typeTextSelected,
+            ]}>
+              {type === 'AT_STORE' ? 'At Store' : type === 'ORDER' ? 'Order' : 'Pre-Order'}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.selectedColorText}>Đã chọn: {selectedColor}</Text>
+    </View>
+  );
+
+  const renderValidUntilSelection = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Valid Until</Text>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Quotation valid until *</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={styles.dateInputText}>
+            {formatDateForDisplay(validUntil) || 'Select expiry date'}
+          </Text>
+          <Text style={styles.datePickerIcon}><Calendar color="#FFFFFF" size={16} /></Text>
+        </TouchableOpacity>
+      </View>
+      
+      {showDatePicker && (
+        <DateTimePicker
+          value={validUntil}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+          locale="vi-VN"
+        />
+      )}
     </View>
   );
 
   const renderCustomerInfo = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Thông Tin Khách Hàng</Text>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Tên khách hàng *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={customerInfo.name}
-          onChangeText={(text) => setCustomerInfo({ ...customerInfo, name: text })}
-          placeholder="Nhập tên khách hàng"
-          placeholderTextColor={COLORS.TEXT.SECONDARY}
-        />
-      </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Email *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={customerInfo.email}
-          onChangeText={(text) => setCustomerInfo({ ...customerInfo, email: text })}
-          placeholder="Nhập email"
-          placeholderTextColor={COLORS.TEXT.SECONDARY}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Số điện thoại *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={customerInfo.phone}
-          onChangeText={(text) => setCustomerInfo({ ...customerInfo, phone: text })}
-          placeholder="Nhập số điện thoại"
-          placeholderTextColor={COLORS.TEXT.SECONDARY}
-          keyboardType="phone-pad"
-        />
-      </View>
-    </View>
-  );
-
-
-  const renderPromotionSection = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Mã Khuyến Mãi</Text>
-      {selectedPromotion ? (
-        <View style={styles.selectedPromotionCard}>
-          <View style={styles.promotionInfo}>
-            <Text style={styles.promotionCode}>{selectedPromotion.code}</Text>
-            <Text style={styles.promotionName}>{selectedPromotion.name}</Text>
-            <Text style={styles.promotionDescription}>{selectedPromotion.description}</Text>
-            <Text style={styles.promotionDiscount}>
-              Giảm: {formatDiscountValue(selectedPromotion)}
-            </Text>
-          </View>
+      <Text style={styles.sectionTitle}>Customer Information</Text>
+        <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Customer ID *</Text>
+        <View style={styles.searchInputContainer}>
+          <TextInput
+            style={styles.searchInput}
+            value={customerId}
+            onChangeText={(text) => setCustomerId(text)}
+            placeholder="Enter customer ID"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            keyboardType="numeric"
+          />
           <TouchableOpacity
-            style={styles.removePromotionButton}
-            onPress={handleRemovePromotion}
+            style={styles.searchButton}
+            onPress={loadCustomerInfo}
+            disabled={!customerId || !customerId.trim()}
           >
-            <Text style={styles.removePromotionText}>✕</Text>
+            <Search color={COLORS.TEXT.WHITE} size={20} />
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.promotionButtons}>
-          <TouchableOpacity
-            style={styles.promotionButton}
-            onPress={() => setShowPromotionModal(true)}
-          >
-            <Text style={styles.promotionButtonText}>Chọn mã khuyến mãi</Text>
-          </TouchableOpacity>
+      </View>
+      
+      {loadedCustomerInfo && (
+        <View style={styles.customerInfoCard}>
+          <Text style={styles.customerInfoTitle}>Customer Information</Text>
+          <View style={styles.customerInfoRow}>
+            <Text style={styles.customerInfoLabel}>Name:</Text>
+            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.name || 'N/A'}</Text>
+          </View>
+          <View style={styles.customerInfoRow}>
+            <Text style={styles.customerInfoLabel}>Email:</Text>
+            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.email || 'N/A'}</Text>
+          </View>
+          <View style={styles.customerInfoRow}>
+            <Text style={styles.customerInfoLabel}>Phone:</Text>
+            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.phone || 'N/A'}</Text>
+          </View>
         </View>
       )}
-      {promotionError ? (
-        <Text style={styles.errorText}>{promotionError}</Text>
-      ) : null}
     </View>
   );
+
+
+  // Helper to format promotion discount value
+  const formatPromotionValue = (promotion) => {
+    if (!promotion) return 'N/A';
+    const { valueType, value } = promotion;
+    if (valueType === 'PERCENT') {
+      return `${value}%`;
+    } else if (valueType === 'FIXED') {
+      return formatPrice(value);
+    }
+    return 'N/A';
+  };
+
+  const renderPromotionSelection = () => {
+    if (availablePromotions.length === 0) return null;
+    
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Select Promotion</Text>
+        <View style={styles.promotionsContainer}>
+          {availablePromotions.map((promoItem) => {
+            const promo = promoItem.stockPromotion || {};
+            const isSelected = selectedPromotionId === promoItem.stockPromotionId;
+            
+            return (
+              <TouchableOpacity
+                key={promoItem.stockPromotionId}
+                style={[
+                  styles.promotionCard,
+                  isSelected && styles.promotionCardSelected
+                ]}
+                onPress={() => setSelectedPromotionId(promoItem.stockPromotionId)}
+              >
+                <View style={styles.promotionCardHeader}>
+                  <View style={styles.promotionCardInfo}>
+                    <Text style={styles.promotionCardName}>{promo.name || 'Promotion'}</Text>
+                    <Text style={styles.promotionCardDescription} numberOfLines={2}>
+                      {promo.description || 'No description'}
+                    </Text>
+                    <Text style={styles.promotionCardValue}>
+                      Discount: {formatPromotionValue(promo)}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <View style={styles.promotionCheckmark}>
+                      <Check color="#FFFFFF" size={20} />
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   const renderPricing = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Bảng Giá</Text>
+        <Text style={styles.sectionTitle}>Pricing</Text>
         <View style={styles.pricingContainer}>
+          {/* Base Price */}
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Giá cơ bản:</Text>
+            <Text style={styles.pricingLabel}>Base Price:</Text>
             <Text style={styles.pricingValue}>{formatPrice(pricing.basePrice)}</Text>
           </View>
           
-          {/* Price per unit before promotion */}
-          <View style={[styles.pricingRow, styles.subtotalRow]}>
-            <Text style={styles.subtotalLabel}>Giá xe (trước KM):</Text>
-            <Text style={styles.subtotalValue}>{formatPrice(pricing.pricePerUnit)}</Text>
-          </View>
-          
-          {/* Promotion discount */}
+          {/* Discount Section */}
           {pricing.promotionDiscount > 0 && (
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>
-                {selectedPromotion ? `Giảm giá (${selectedPromotion.code}):` : 'Giảm giá khuyến mãi:'}
-              </Text>
-              <Text style={[styles.pricingValue, styles.discountText]}>-{formatPrice(pricing.promotionDiscount)}</Text>
-            </View>
+            <>
+              <View style={styles.discountRow}>
+                <Text style={styles.discountLabel}>
+                  Promotion Discount
+                </Text>
+                <Text style={styles.discountValue}>-{formatPrice(pricing.promotionDiscount)}</Text>
+              </View>
+            </>
           )}
           
-          {/* Final price per unit */}
-          <View style={[styles.pricingRow, styles.finalPriceRow]}>
-            <Text style={styles.finalPriceLabel}>Giá xe (sau KM):</Text>
-            <Text style={styles.finalPriceValue}>{formatPrice(pricing.finalPricePerUnit)}</Text>
-          </View>
+          {/* Divider */}
+          <View style={styles.pricingDivider} />
           
-          <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Số lượng:</Text>
-            <Text style={styles.pricingValue}>1</Text>
-          </View>
-          
-          {/* Final total */}
-          <View style={[styles.pricingRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Tổng cộng:</Text>
+          {/* Final Total */}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total:</Text>
             <Text style={styles.totalValue}>{formatPrice(pricing.totalPrice)}</Text>
           </View>
         </View>
@@ -475,93 +724,13 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     );
   };
 
-  const renderPromotionModal = () => (
-    <Modal
-      visible={showPromotionModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity
-            style={styles.modalCloseButton}
-            onPress={() => {
-              setShowPromotionModal(false);
-              setPromotionCode('');
-              setPromotionError('');
-            }}
-          >
-            <Text style={styles.modalCloseText}>Hủy</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Chọn Mã Khuyến Mãi</Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        <View style={styles.modalContent}>
-          {/* Manual Code Input */}
-          <View style={styles.codeInputSection}>
-            <Text style={styles.inputLabel}>Nhập mã khuyến mãi</Text>
-            <View style={styles.codeInputContainer}>
-              <TextInput
-                style={styles.codeInput}
-                value={promotionCode}
-                onChangeText={(text) => {
-                  setPromotionCode(text.toUpperCase());
-                  setPromotionError('');
-                }}
-                placeholder="Nhập mã khuyến mãi"
-                placeholderTextColor={COLORS.TEXT.SECONDARY}
-                autoCapitalize="characters"
-              />
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={handlePromotionCodeSubmit}
-              >
-                <Text style={styles.applyButtonText}>Áp dụng</Text>
-              </TouchableOpacity>
-            </View>
-            {promotionError ? (
-              <Text style={styles.errorText}>{promotionError}</Text>
-            ) : null}
-          </View>
-
-          {/* Available Promotions List */}
-          <View style={styles.promotionsListSection}>
-            <Text style={styles.inputLabel}>Mã khuyến mãi có sẵn</Text>
-            <FlatList
-              data={promotions}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.promotionItem}
-                  onPress={() => handleSelectPromotion(item)}
-                >
-                  <View style={styles.promotionItemInfo}>
-                    <Text style={styles.promotionItemCode}>{item.code}</Text>
-                    <Text style={styles.promotionItemName}>{item.name}</Text>
-                    <Text style={styles.promotionItemDescription}>{item.description}</Text>
-                    <Text style={styles.promotionItemDiscount}>
-                      Giảm: {formatDiscountValue(item)}
-                    </Text>
-                  </View>
-                  <Text style={styles.promotionItemArrow}>→</Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-            />
-          </View>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-
   const renderActionButtons = () => (
     <View style={styles.actionButtons}>
       <TouchableOpacity
         style={styles.resetButton}
         onPress={resetForm}
       >
-        <Text style={styles.resetButtonText}>Làm Mới</Text>
+        <Text style={styles.resetButtonText}>Reset</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.createButton, loading && styles.disabledButton]}
@@ -571,7 +740,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         {loading ? (
           <ActivityIndicator color={COLORS.TEXT.WHITE} />
         ) : (
-          <Text style={styles.createButtonText}>Tạo Báo Giá</Text>
+          <Text style={styles.createButtonText}>Create Quotation</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -583,12 +752,13 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {renderVehicleInfo()}
         {renderColorSelection()}
+        {renderQuotationTypeSelection()}
+        {renderValidUntilSelection()}
         {renderCustomerInfo()}
-        {renderPromotionSection()}
+        {renderPromotionSelection()}
         {renderPricing()}
       </ScrollView>
       {renderActionButtons()}
-      {renderPromotionModal()}
       
       <CustomAlert
         visible={alertConfig.visible}
@@ -736,14 +906,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectedColorOption: {
-    borderColor: COLORS.PRIMARY,
+    // borderColor: COLORS.PRIMARY,
     borderWidth: 3,
   },
   colorCheckmark: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: COLORS.PRIMARY,
+    // backgroundColor: COLORS.PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -756,6 +926,35 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     fontStyle: 'italic',
+  },
+  typeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SIZES.PADDING.SMALL,
+  },
+  typeOption: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeOptionSelected: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  typeText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  typeTextSelected: {
+    color: COLORS.TEXT.WHITE,
+    fontWeight: 'bold',
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.MEDIUM,
@@ -776,9 +975,86 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
   },
+  hintText: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: SIZES.PADDING.XSMALL,
+    fontStyle: 'italic',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateInputText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.WHITE,
+  },
+  datePickerIcon: {
+    fontSize: 20,
+  },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.WHITE,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    marginRight: SIZES.PADDING.SMALL,
+  },
+  searchButton: {
+    width: 48,
+    height: 48,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: COLORS.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customerInfoCard: {
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  customerInfoTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  customerInfoRow: {
+    flexDirection: 'row',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  customerInfoLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+    width: 100,
+  },
+  customerInfoValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.WHITE,
+    flex: 1,
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -811,74 +1087,68 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   pricingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.SMALL,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   pricingLabel: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.SECONDARY,
   },
   pricingValue: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
     color: COLORS.TEXT.WHITE,
   },
-  discountText: {
+  discountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SIZES.PADDING.SMALL,
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    marginVertical: SIZES.PADDING.SMALL,
+  },
+  discountLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.SUCCESS,
+    fontWeight: '600',
+  },
+  discountValue: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: 'bold',
     color: COLORS.SUCCESS,
   },
-  subtotalRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.PRIMARY,
-    marginTop: SIZES.PADDING.SMALL,
-    paddingTop: SIZES.PADDING.MEDIUM,
-    paddingBottom: SIZES.PADDING.MEDIUM,
-  },
-  subtotalLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-  },
-  subtotalValue: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-  },
-  finalPriceRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.PRIMARY,
-    marginTop: SIZES.PADDING.SMALL,
-    paddingTop: SIZES.PADDING.MEDIUM,
-    paddingBottom: SIZES.PADDING.MEDIUM,
-  },
-  finalPriceLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-  },
-  finalPriceValue: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+  pricingDivider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.PRIMARY,
+    marginVertical: SIZES.PADDING.MEDIUM,
   },
   totalRow: {
-    borderBottomWidth: 0,
-    borderTopColor: COLORS.PRIMARY,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: SIZES.RADIUS.SMALL,
+    padding: SIZES.PADDING.MEDIUM,
     marginTop: SIZES.PADDING.SMALL,
-    paddingTop: SIZES.PADDING.MEDIUM,
   },
   totalLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
   totalValue: {
-    fontSize: SIZES.FONT.MEDIUM,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.PRIMARY,
   },
@@ -1099,6 +1369,57 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.LARGE,
     color: COLORS.TEXT.SECONDARY,
     marginLeft: SIZES.PADDING.SMALL,
+  },
+
+  // Promotion Selection Styles
+  promotionsContainer: {
+    gap: SIZES.PADDING.SMALL,
+  },
+  promotionCard: {
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  promotionCardSelected: {
+    borderColor: COLORS.PRIMARY,
+    borderWidth: 2,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  promotionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  promotionCardInfo: {
+    flex: 1,
+    marginRight: SIZES.PADDING.SMALL,
+  },
+  promotionCardName: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginBottom: 4,
+  },
+  promotionCardDescription: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 4,
+  },
+  promotionCardValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.SUCCESS,
+    fontWeight: '600',
+  },
+  promotionCheckmark: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
