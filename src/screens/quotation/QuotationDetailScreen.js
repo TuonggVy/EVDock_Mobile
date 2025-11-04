@@ -678,11 +678,17 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     const isDraft = status === 'DRAFT';
     const depositStatus = depositInfo?.status?.toUpperCase();
     const isDepositHolding = depositStatus === 'HOLDING';
+    const isDepositPending = depositStatus === 'PENDING';
     
     // Render buttons based on type
     const renderButtonsByType = () => {
       if (isDraft) {
         return null; // No buttons for draft status
+      }
+
+      // If deposit status is PENDING, don't show any buttons
+      if (depositInfo && isDepositPending) {
+        return null;
       }
 
       // If deposit status is HOLDING, show Create Customer Contract button
@@ -719,12 +725,14 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                   <Text style={styles.depositButtonText}>Deposit</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                style={styles.fullPaymentButton}
-                onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
-              >
-                <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
-              </TouchableOpacity>
+              {!depositInfo && (
+                <TouchableOpacity
+                  style={styles.fullPaymentButton}
+                  onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
+                >
+                  <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
+                </TouchableOpacity>
+              )}
             </>
           );
         
@@ -763,9 +771,16 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       }
     };
     
+    const buttons = renderButtonsByType();
+    
+    // If no buttons to show, don't render the action buttons container
+    if (!buttons) {
+      return null;
+    }
+    
     return (
       <View style={styles.actionButtons}>
-        {renderButtonsByType()}
+        {buttons}
       </View>
     );
   };
