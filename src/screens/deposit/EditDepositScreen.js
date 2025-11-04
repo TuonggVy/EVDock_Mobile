@@ -8,7 +8,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   Modal,
 } from 'react-native';
@@ -26,7 +25,7 @@ import { ArrowLeft, Calendar, ChevronDown } from 'lucide-react-native';
 const EditDepositScreen = ({ navigation, route }) => {
   const { deposit: initialDeposit, onDepositUpdate } = route.params;
   const { user } = useAuth();
-  const { alertConfig, hideAlert, showSuccess, showError, showInfo } = useCustomAlert();
+  const { alertConfig, hideAlert, showSuccess, showError, showInfo, showConfirm } = useCustomAlert();
   
   const [formData, setFormData] = useState({
     quotationId: '',
@@ -232,53 +231,48 @@ const EditDepositScreen = ({ navigation, route }) => {
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       'Confirm Update Deposit',
       `Are you sure you want to update the deposit?\n\nQuotation: #${quotationData?.quoteCode || formData.quotationId}\nPercentage: ${formData.depositPercent}%\nAmount: ${formatCurrency(parseFloat(formData.depositAmount))}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: async () => {
-            try {
-              setLoading(true);
+      async () => {
+        try {
+          setLoading(true);
 
-              const depositId = initialDeposit?.apiDepositId || initialDeposit?.id;
-              if (!depositId) {
-                showError('Error', 'Deposit ID not found');
-                return;
-              }
-
-              const updateData = {
-                depositPercent: parseFloat(formData.depositPercent),
-                depositAmount: parseFloat(formData.depositAmount),
-                holdDays: formData.holdDay.toISOString(),
-                status: formData.status,
-              };
-
-              const result = await depositService.updateDepositStatus(depositId, updateData);
-
-              if (result.success) {
-                showSuccess('Success', 'Deposit updated successfully!');
-                // Call update callback if provided
-                if (onDepositUpdate) {
-                  onDepositUpdate();
-                }
-                setTimeout(() => {
-                  navigation.goBack();
-                }, 1500);
-              } else {
-                showError('Error', result.error || 'Cannot update deposit');
-              }
-            } catch (error) {
-              console.error('Error updating deposit:', error);
-              showError('Error', 'Cannot update deposit. Please try again.');
-            } finally {
-              setLoading(false);
-            }
+          const depositId = initialDeposit?.apiDepositId || initialDeposit?.id;
+          if (!depositId) {
+            showError('Error', 'Deposit ID not found');
+            return;
           }
+
+          const updateData = {
+            depositPercent: parseFloat(formData.depositPercent),
+            depositAmount: parseFloat(formData.depositAmount),
+            holdDays: formData.holdDay.toISOString(),
+            status: formData.status,
+          };
+
+          const result = await depositService.updateDepositStatus(depositId, updateData);
+
+          if (result.success) {
+            showSuccess('Success', 'Deposit updated successfully!');
+            // Call update callback if provided
+            if (onDepositUpdate) {
+              onDepositUpdate();
+            }
+            setTimeout(() => {
+              navigation.goBack();
+            }, 1500);
+          } else {
+            showError('Error', result.error || 'Cannot update deposit');
+          }
+        } catch (error) {
+          console.error('Error updating deposit:', error);
+          showError('Error', 'Cannot update deposit. Please try again.');
+        } finally {
+          setLoading(false);
         }
-      ]
+      },
+      null // onCancel - just close the alert
     );
   };
 
