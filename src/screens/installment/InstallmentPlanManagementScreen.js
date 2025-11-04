@@ -86,7 +86,7 @@ const InstallmentPlanManagementScreen = ({ navigation }) => {
             <Text style={styles.headerTitleText}>Installment Plans</Text>
             <Text style={styles.headerSubtitle}>{plans.length} plans</Text>
           </View>
-          <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('InstallmentPlanDetail')}> 
+          <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('CreateInstallmentPlan')}> 
             <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.createGradient}>
               <Text style={styles.createText}><Plus color="#FFFFFF" size={16} /></Text>
             </LinearGradient>
