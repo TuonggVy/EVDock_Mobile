@@ -149,6 +149,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       icon: '📦',
       onPress: () => navigation.navigate('StaffStockList'),
     },
+    {
+      title: 'Customer Contract',
+      gradient: COLORS.GRADIENT.TEAL,
+      icon: '📝',
+      onPress: () => navigation.navigate('CustomerContractManagement'),
+    },
   ];
 
   // Filter category cards based on search query

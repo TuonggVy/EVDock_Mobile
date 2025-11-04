@@ -214,7 +214,12 @@ const QuotationDetailScreen = ({ navigation, route }) => {
 
   const handleContractView = () => {
     const quote = getQuotationData();
-    navigation.navigate('Contract', { quotation: quote });
+    const quotationId = quote.id || quote.quotationId;
+    if (quotationId) {
+      navigation.navigate('CreateCustomerContract', { quotationId: quotationId.toString() });
+    } else {
+      Alert.alert('Error', 'Quotation ID not found');
+    }
   };
 
   const processPayment = async () => {

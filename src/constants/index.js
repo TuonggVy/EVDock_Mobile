@@ -74,6 +74,7 @@ export const COLORS = {
     ERROR: ['#F44336', '#EF5350', '#E57373'],
     WARNING: ['#FF9800', '#FFB74D', '#FFCC02'],
     INFO: ['#2196F3', '#42A5F5', '#64B5F6'],
+    TEAL: ['#14B8A6', '#0D9488', '#0F766E'],
   },
 };
 

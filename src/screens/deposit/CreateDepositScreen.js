@@ -8,7 +8,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +23,7 @@ import { ArrowLeft, Calendar } from 'lucide-react-native';
 
 const CreateDepositScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { alertConfig, hideAlert, showSuccess, showError, showInfo } = useCustomAlert();
+  const { alertConfig, hideAlert, showSuccess, showError, showInfo, showConfirm } = useCustomAlert();
   
   // Get quotationId from route params if available
   const initialQuotationId = route?.params?.quotationId || '';
@@ -194,52 +193,46 @@ const CreateDepositScreen = ({ navigation, route }) => {
       return;
     }
 
-    Alert.alert(
+    showConfirm(
       'Confirm Create Deposit',
       `Are you sure you want to create a deposit?\n\nQuotation: #${quotationData?.quoteCode || formData.quotationId}\nPercentage: ${formData.depositPercent}%\nAmount: ${formatCurrency(parseFloat(formData.depositAmount))}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create Deposit',
-          onPress: async () => {
-            try {
-              setLoading(true);
+      async () => {
+        try {
+          setLoading(true);
 
-              const depositData = {
-                quotationId: parseInt(formData.quotationId),
-                depositPercent: parseFloat(formData.depositPercent),
-                depositAmount: parseFloat(formData.depositAmount),
-                holdDays: formData.holdDay.toISOString(),
-              };
+          const depositData = {
+            quotationId: parseInt(formData.quotationId),
+            depositPercent: parseFloat(formData.depositPercent),
+            depositAmount: parseFloat(formData.depositAmount),
+            holdDays: formData.holdDay.toISOString(),
+          };
 
-              const result = await depositService.createDeposit(depositData);
+          const result = await depositService.createDeposit(depositData);
 
-              if (result.success) {
-                showSuccess('Success', 'Deposit created successfully!');
-                // Pass deposit data back to previous screen
-                const depositId = result.data?.id;
-                setTimeout(() => {
-                  // Navigate back to QuotationDetail and pass deposit info
-                  const quotation = route.params?.quotation || { id: parseInt(formData.quotationId) };
-                  navigation.navigate('QuotationDetail', {
-                    quotation: quotation,
-                    onQuotationUpdate: route.params?.onQuotationUpdate,
-                    refreshDeposit: true,
-                    depositId: depositId,
-                  });
-                }, 1500);
-              } else {
-                showError('Error', result.error || 'Cannot create deposit');
-              }
-            } catch (error) {
-              console.error('Error creating deposit:', error);
-              showError('Error', 'Cannot create deposit. Please try again.');
-            } finally {
-              setLoading(false);
-            }
+          if (result.success) {
+            showSuccess('Success', 'Deposit created successfully!');
+            // Pass deposit data back to previous screen
+            const depositId = result.data?.id;
+            setTimeout(() => {
+              // Navigate back to QuotationDetail and pass deposit info
+              const quotation = route.params?.quotation || { id: parseInt(formData.quotationId) };
+              navigation.navigate('QuotationDetail', {
+                quotation: quotation,
+                onQuotationUpdate: route.params?.onQuotationUpdate,
+                refreshDeposit: true,
+                depositId: depositId,
+              });
+            }, 1500);
+          } else {
+            showError('Error', result.error || 'Cannot create deposit');
           }
+        } catch (error) {
+          console.error('Error creating deposit:', error);
+          showError('Error', 'Cannot create deposit. Please try again.');
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
@@ -362,10 +355,10 @@ const CreateDepositScreen = ({ navigation, route }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Hold Date *</Text>
             <TouchableOpacity
-              style={[styles.input, errors.holdDay && styles.inputError]}
+              style={[styles.dateInput, errors.holdDay && styles.inputError]}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.inputText}>{formatDate(formData.holdDay)}</Text>
+              <Text style={styles.dateInputText}>{formatDate(formData.holdDay)}</Text>
               <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
             </TouchableOpacity>
             {errors.holdDay && typeof errors.holdDay === 'string' && (
@@ -488,6 +481,20 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+  },
+  dateInputText: {
+    flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },

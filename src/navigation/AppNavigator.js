@@ -77,6 +77,10 @@ import StockPromotionDetailScreen from '../screens/stock/StockPromotionDetailScr
 import DriveTrialManagementScreen from '../screens/drivetrial/DriveTrialManagementScreen';
 import DriveTrialDetailScreen from '../screens/drivetrial/DriveTrialDetailScreen';
 import CreateDriveTrialScreen from '../screens/drivetrial/CreateDriveTrialScreen';
+import CustomerContractManagementScreen from '../screens/contract/CustomerContractManagementScreen';
+import CreateCustomerContractScreen from '../screens/contract/CreateCustomerContractScreen';
+import EditCustomerContractScreen from '../screens/contract/EditCustomerContractScreen';
+import CustomerContractDetailScreen from '../screens/contract/CustomerContractDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -474,6 +478,26 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="CreateDriveTrial" 
               component={CreateDriveTrialScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CustomerContractManagement" 
+              component={CustomerContractManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateCustomerContract" 
+              component={CreateCustomerContractScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CustomerContractDetail" 
+              component={CustomerContractDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditCustomerContract" 
+              component={EditCustomerContractScreen} 
               options={{ headerShown: false }}
             />
           </>
