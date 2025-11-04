@@ -1,0 +1,478 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SIZES } from '../../constants';
+import CustomAlert from '../../components/common/CustomAlert';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import customerContractService from '../../services/customerContractService';
+import { ArrowLeft, Pencil, Trash2, NotepadText } from 'lucide-react-native';
+import { formatPrice } from '../../utils/promotionUtils';
+import LoadingScreen from '../../components/common/LoadingScreen';
+
+const CustomerContractDetailScreen = ({ navigation, route }) => {
+  const { contractId } = route.params || {};
+  const { alertConfig, hideAlert, showSuccess, showError, showDeleteConfirm } = useCustomAlert();
+  const [loading, setLoading] = useState(true);
+  const [contract, setContract] = useState(null);
+
+  useEffect(() => {
+    loadContractDetail();
+  }, [contractId]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (contractId) {
+        loadContractDetail();
+      }
+    }, [contractId])
+  );
+
+  const loadContractDetail = async () => {
+    try {
+      setLoading(true);
+      const response = await customerContractService.getCustomerContractDetail(contractId);
+      if (response.success && response.data) {
+        setContract(response.data);
+      } else {
+        showError('Error', response.error || 'Failed to load contract details');
+        setTimeout(() => navigation.goBack(), 2000);
+      }
+    } catch (error) {
+      console.error('Error loading contract:', error);
+      showError('Error', 'Failed to load contract details');
+      setTimeout(() => navigation.goBack(), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDateForDisplay = (date) => {
+    if (!date) return 'N/A';
+    try {
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return COLORS.WARNING;
+      case 'CONFIRMED': return '#3B82F6'; // Blue
+      case 'PROCESSING': return '#A855F7'; // Purple
+      case 'DELIVERED': return COLORS.SUCCESS;
+      case 'COMPLETED': return COLORS.SUCCESS;
+      default: return COLORS.TEXT.SECONDARY;
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'Pending';
+      case 'CONFIRMED': return 'Confirmed';
+      case 'PROCESSING': return 'Processing';
+      case 'DELIVERED': return 'Delivered';
+      case 'COMPLETED': return 'Completed';
+      default: return status || 'Unknown';
+    }
+  };
+
+  const getContractTypeLabel = (type) => {
+    switch (type?.toUpperCase()) {
+      case 'FULL': return 'Full Payment';
+      case 'DEBT': return 'Debt';
+      default: return type || 'Unknown';
+    }
+  };
+
+  const handleEdit = () => {
+    navigation.navigate('EditCustomerContract', { contractId });
+  };
+
+  const handleDelete = () => {
+    showDeleteConfirm(
+      'Delete Contract',
+      'Are you sure you want to delete this contract?',
+      async () => {
+        try {
+          const response = await customerContractService.deleteCustomerContract(contractId);
+          if (response.success) {
+            showSuccess('Success', 'Contract deleted successfully');
+            setTimeout(() => navigation.goBack(), 1500);
+          } else {
+            showError('Error', response.error || 'Failed to delete contract');
+          }
+        } catch (error) {
+          console.error('Error deleting contract:', error);
+          showError('Error', 'Failed to delete contract');
+        }
+      }
+    );
+  };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!contract) {
+    return null;
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
+          </TouchableOpacity>
+          <View style={styles.headerTitle}>
+            <Text style={styles.title}>Contract Details</Text>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.contentSection}>
+          <View style={styles.titleRow}>
+            <NotepadText color={COLORS.PRIMARY} size={24} />
+            <Text style={styles.contractTitle}>{contract.title || 'Untitled Contract'}</Text>
+          </View>
+
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(contract.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(contract.status)}</Text>
+          </View>
+
+          {/* Contract Information */}
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Contract Information</Text>
+
+            {contract.contractCode && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Contract Code:</Text>
+                <Text style={styles.infoValue}>{contract.contractCode}</Text>
+              </View>
+            )}
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Type:</Text>
+              <Text style={styles.infoValue}>{getContractTypeLabel(contract.contractPaidType)}</Text>
+            </View>
+
+            {contract.finalPrice !== undefined && contract.finalPrice !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Final Price:</Text>
+                <Text style={[styles.infoValue, styles.priceText]}>
+                  {formatPrice(contract.finalPrice || 0)}
+                </Text>
+              </View>
+            )}
+
+            {contract.signDate && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Sign Date:</Text>
+                <Text style={styles.infoValue}>{formatDateForDisplay(contract.signDate)}</Text>
+              </View>
+            )}
+
+            {contract.deliveryDate && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Delivery Date:</Text>
+                <Text style={styles.infoValue}>{formatDateForDisplay(contract.deliveryDate)}</Text>
+              </View>
+            )}
+
+            {contract.content && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Content:</Text>
+                <Text style={styles.infoValue}>{contract.content}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Customer Information */}
+          {contract.customer && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Customer Information</Text>
+              {contract.customer.name && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Name:</Text>
+                  <Text style={styles.infoValue}>{contract.customer.name}</Text>
+                </View>
+              )}
+              {contract.customer.phone && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Phone:</Text>
+                  <Text style={styles.infoValue}>{contract.customer.phone}</Text>
+                </View>
+              )}
+              {contract.customer.email && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Email:</Text>
+                  <Text style={styles.infoValue}>{contract.customer.email}</Text>
+                </View>
+              )}
+              {contract.customer.address && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Address:</Text>
+                  <Text style={styles.infoValue}>{contract.customer.address}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Motorbike Information */}
+          {contract.electricMotorbike && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Motorbike Information</Text>
+              {contract.electricMotorbike.name && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Name:</Text>
+                  <Text style={styles.infoValue}>{contract.electricMotorbike.name}</Text>
+                </View>
+              )}
+              {contract.electricMotorbike.model && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Model:</Text>
+                  <Text style={styles.infoValue}>{contract.electricMotorbike.model}</Text>
+                </View>
+              )}
+              {contract.electricMotorbike.version && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Version:</Text>
+                  <Text style={styles.infoValue}>{contract.electricMotorbike.version}</Text>
+                </View>
+              )}
+              {contract.electricMotorbike.makeFrom && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Made From:</Text>
+                  <Text style={styles.infoValue}>{contract.electricMotorbike.makeFrom}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Color Information */}
+          {contract.color && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Color</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Color Type:</Text>
+                <Text style={styles.infoValue}>{contract.color.colorType || 'N/A'}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Staff Information */}
+          {contract.staff && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Created by Staff</Text>
+              {contract.staff.username && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Username:</Text>
+                  <Text style={styles.infoValue}>{contract.staff.username}</Text>
+                </View>
+              )}
+              {contract.staff.email && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Email:</Text>
+                  <Text style={styles.infoValue}>{contract.staff.email}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Quotation Information */}
+          {contract.quotationId && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Quotation</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Quotation ID:</Text>
+                <Text style={styles.infoValue}>#{contract.quotationId}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Contract Documents */}
+          {contract.contractDocuments && contract.contractDocuments.length > 0 && (
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionTitle}>Contract Documents</Text>
+              {contract.contractDocuments.map((doc, index) => (
+                <View key={doc.id || index} style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>{doc.documentType || `Document ${index + 1}`}:</Text>
+                  <Text style={styles.infoValue} numberOfLines={1}>{doc.imageUrl || 'N/A'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+          <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Pencil color={COLORS.TEXT.WHITE} size={20} />
+            <Text style={styles.buttonText}>Edit Contract</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+          <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Trash2 color={COLORS.TEXT.WHITE} size={20} />
+            <Text style={styles.buttonText}>Delete Contract</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  header: {
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.LARGE,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: SIZES.FONT.HEADER,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  contentSection: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  contractTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginLeft: SIZES.PADDING.SMALL,
+    flex: 1,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  statusText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  infoCard: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SIZES.PADDING.SMALL,
+    paddingBottom: SIZES.PADDING.SMALL,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BACKGROUND.SECONDARY,
+  },
+  infoLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '500',
+    flex: 1,
+  },
+  infoValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+    flex: 2,
+    textAlign: 'right',
+  },
+  priceText: {
+    color: COLORS.PRIMARY,
+    fontSize: SIZES.FONT.LARGE,
+  },
+  footer: {
+    flexDirection: 'row',
+    padding: SIZES.PADDING.LARGE,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BACKGROUND.SECONDARY,
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  editButton: {
+    flex: 1,
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  deleteButton: {
+    flex: 1,
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+  },
+  buttonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+});
+
+export default CustomerContractDetailScreen;
