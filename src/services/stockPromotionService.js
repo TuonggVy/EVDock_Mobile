@@ -33,9 +33,15 @@ class StockPromotionService {
       
       console.log('✅ [StockPromotionService] Stock promotions fetched:', response.data);
       
+      // Normalize response data: convert snake_case to camelCase
+      const normalizedData = (response.data?.data || response.data || []).map(item => ({
+        ...item,
+        valueType: item.value_type || item.valueType,
+      }));
+
       return {
         success: true,
-        data: response.data?.data || response.data || [],
+        data: normalizedData,
         pagination: response.data?.paginationInfo || {},
         message: response.data?.message || 'Get stock promotion list successfully!',
       };
@@ -76,9 +82,16 @@ class StockPromotionService {
       
       console.log('✅ [StockPromotionService] Stock promotion detail fetched:', response.data);
       
+      // Normalize response data: convert snake_case to camelCase
+      const rawData = response.data?.data || response.data || null;
+      const normalizedData = rawData ? {
+        ...rawData,
+        valueType: rawData.value_type || rawData.valueType,
+      } : null;
+
       return {
         success: true,
-        data: response.data?.data || response.data || null,
+        data: normalizedData,
         message: response.data?.message || 'Get stock promotion detail successfully!',
       };
     } catch (error) {
@@ -121,9 +134,16 @@ class StockPromotionService {
       
       console.log('✅ [StockPromotionService] Stock promotion created:', response.data);
       
+      // Normalize response data: convert snake_case to camelCase
+      const rawData = response.data?.data || response.data || null;
+      const normalizedData = rawData ? {
+        ...rawData,
+        valueType: rawData.value_type || rawData.valueType,
+      } : null;
+
       return {
         success: true,
-        data: response.data?.data || response.data || null,
+        data: normalizedData,
         message: response.data?.message || 'Create stock promotion successfully!',
       };
     } catch (error) {
@@ -170,9 +190,16 @@ class StockPromotionService {
       
       console.log('✅ [StockPromotionService] Stock promotion updated:', response.data);
       
+      // Normalize response data: convert snake_case to camelCase
+      const rawData = response.data?.data || response.data || null;
+      const normalizedData = rawData ? {
+        ...rawData,
+        valueType: rawData.value_type || rawData.valueType,
+      } : null;
+
       return {
         success: true,
-        data: response.data?.data || response.data || null,
+        data: normalizedData,
         message: response.data?.message || 'Update stock promotion successfully!',
       };
     } catch (error) {
