@@ -157,6 +157,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       icon: '📦',
       onPress: () => navigation.navigate('StockManagement'),
     },
+    {
+      title: 'Ap Batches Management',
+      gradient: COLORS.GRADIENT.PURPLE,
+      icon: '📋',
+      onPress: () => navigation.navigate('AgencyBatchManagement'),
+    },
   ];
 
   // Filter category cards based on search query

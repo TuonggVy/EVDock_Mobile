@@ -99,6 +99,7 @@ import EVMStaffCreditLineManagementScreen from '../screens/creditline/EVMStaffCr
 import EVMStaffCreditLineDetailScreen from '../screens/creditline/EVMStaffCreditLineDetailScreen';
 import EVMStaffCreditLineEditScreen from '../screens/creditline/EVMStaffCreditLineEditScreen';
 import BatchManagementScreen from '../screens/batches/BatchManagementScreen';
+import AgencyBatchManagementScreen from '../screens/batches/AgencyBatchManagementScreen';
 import CreateBatchScreen from '../screens/batches/CreateBatchScreen';
 import EditBatchScreen from '../screens/batches/EditBatchScreen';
 import BatchDetailScreen from '../screens/batches/BatchDetailScreen';
@@ -609,6 +610,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="BatchManagement" 
               component={BatchManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AgencyBatchManagement" 
+              component={AgencyBatchManagementScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 
