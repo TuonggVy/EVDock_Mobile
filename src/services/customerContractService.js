@@ -95,10 +95,39 @@ class CustomerContractService {
   async deleteCustomerContract(customerContractId) {
     try {
       const response = await api.delete(ENDPOINTS.DELETE(customerContractId));
-      return { success: true, data: response.data?.data || {} };
+      // Response structure: { statusCode: 200, message: "Delete customer contract success", data: {} }
+      // Axios wraps the response, so the actual data is in response.data
+      const responseData = response.data;
+      
+      // If we got here without an exception, the HTTP request was successful
+      // Check if the API response indicates success (statusCode 200 or message exists)
+      if (responseData && (responseData.statusCode === 200 || responseData.message)) {
+        return {
+          success: true,
+          data: responseData.data || {},
+          message: responseData.message || 'Contract deleted successfully'
+        };
+      }
+      
+      // If response exists but no statusCode/message, still consider success (HTTP was successful)
+      return {
+        success: true,
+        data: responseData?.data || responseData || {},
+        message: responseData?.message || 'Contract deleted successfully'
+      };
     } catch (error) {
       console.error('Error deleting customer contract:', error);
-      return { success: false, error: error.response?.data?.message || 'Failed to delete customer contract' };
+      // Extract error message from various possible locations
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.message || 
+                          errorData?.error || 
+                          error.message || 
+                          'Failed to delete customer contract';
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
     }
   }
 }

@@ -155,6 +155,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       icon: '📝',
       onPress: () => navigation.navigate('CustomerContractManagement'),
     },
+    {
+      title: 'Installment Contract',
+      gradient: COLORS.GRADIENT.INFO,
+      icon: '📄',
+      onPress: () => navigation.navigate('InstallmentContractManagement'),
+    },
   ];
 
   // Filter category cards based on search query

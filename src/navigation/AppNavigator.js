@@ -47,6 +47,14 @@ import InstallmentPlanManagementScreen from '../screens/installment/InstallmentP
 import InstallmentPlanDetailScreen from '../screens/installment/InstallmentPlanDetailScreen';
 import CreateInstallmentPlanScreen from '../screens/installment/CreateInstallmentPlanScreen';
 import StaffInstallmentPlanListScreen from '../screens/installment/StaffInstallmentPlanListScreen';
+import ChooseInstallmentPlanScreen from '../screens/installment/ChooseInstallmentPlanScreen';
+import CreateInstallmentContractScreen from '../screens/installment/CreateInstallmentContractScreen';
+import InstallmentContractManagementScreen from '../screens/installment/InstallmentContractManagementScreen';
+import InstallmentContractDetailScreen from '../screens/installment/InstallmentContractDetailScreen';
+import EditInstallmentContractScreen from '../screens/installment/EditInstallmentContractScreen';
+import InstallmentPaymentScreen from '../screens/installment/InstallmentPaymentScreen';
+import InstallmentPaymentDetailScreen from '../screens/installment/InstallmentPaymentDetailScreen';
+import EditInstallmentPaymentScreen from '../screens/installment/EditInstallmentPaymentScreen';
 import DepositManagementScreen from '../screens/deposit/DepositManagementScreen';
 import CreateDepositScreen from '../screens/deposit/CreateDepositScreen';
 import EditDepositScreen from '../screens/deposit/EditDepositScreen';
@@ -359,6 +367,46 @@ const AppNavigator = () => {
             <Stack.Screen
               name="StaffInstallmentPlanList"
               component={StaffInstallmentPlanListScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ChooseInstallmentPlan"
+              component={ChooseInstallmentPlanScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CreateInstallmentContract"
+              component={CreateInstallmentContractScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentContractManagement"
+              component={InstallmentContractManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentContractDetail"
+              component={InstallmentContractDetailScreen}
+              options={{ headerShown: false }}
+                        />
+            <Stack.Screen
+              name="EditInstallmentContract"
+              component={EditInstallmentContractScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentPayment"
+              component={InstallmentPaymentScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentPaymentDetail"
+              component={InstallmentPaymentDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditInstallmentPayment"
+              component={EditInstallmentPaymentScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen

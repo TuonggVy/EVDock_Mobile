@@ -6,19 +6,31 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerContractService from '../../services/customerContractService';
-import { ArrowLeft, Pencil, Trash2, NotepadText } from 'lucide-react-native';
+import installmentContractService from '../../services/installmentContractService';
+import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
 const CustomerContractDetailScreen = ({ navigation, route }) => {
-  const { contractId } = route.params || {};
+  const { contractId, selectedInstallmentPlan } = route.params || {};
   const { alertConfig, hideAlert, showSuccess, showError, showDeleteConfirm } = useCustomAlert();
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState(null);
+  const [hasInstallmentContract, setHasInstallmentContract] = useState(false);
 
   useEffect(() => {
     loadContractDetail();
   }, [contractId]);
+
+  // Handle selected installment plan when returning from ChooseInstallmentPlan screen
+  useEffect(() => {
+    if (selectedInstallmentPlan) {
+      showSuccess(
+        'Installment Plan Selected',
+        `Plan "${selectedInstallmentPlan.name}" has been selected successfully.`
+      );
+    }
+  }, [selectedInstallmentPlan]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -35,6 +47,8 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       const response = await customerContractService.getCustomerContractDetail(contractId);
       if (response.success && response.data) {
         setContract(response.data);
+        // Check if this contract has an installment contract
+        await checkInstallmentContract();
       } else {
         showError('Error', response.error || 'Failed to load contract details');
         setTimeout(() => navigation.goBack(), 2000);
@@ -45,6 +59,16 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       setTimeout(() => navigation.goBack(), 2000);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkInstallmentContract = async () => {
+    try {
+      const response = await installmentContractService.getInstallmentContractByCustomerContract(contractId);
+      setHasInstallmentContract(response.success && response.data !== null);
+    } catch (error) {
+      console.error('Error checking installment contract:', error);
+      setHasInstallmentContract(false);
     }
   };
 
@@ -116,6 +140,14 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
     );
   };
 
+  const handleChooseInstallmentPlan = () => {
+    navigation.navigate('ChooseInstallmentPlan', { contractId });
+  };
+
+  const handleShowInstallmentContract = () => {
+    navigation.navigate('InstallmentContractManagement', { customerContractId: contractId });
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -132,7 +164,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
-            <Text style={styles.title}>Contract Details</Text>
+            <Text style={styles.title}>Customer Contract Details</Text>
           </View>
           <View style={styles.headerSpacer} />
         </View>
@@ -152,6 +184,13 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           {/* Contract Information */}
           <View style={styles.infoCard}>
             <Text style={styles.sectionTitle}>Contract Information</Text>
+
+            {(contract.id || contractId) && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Customer Contract ID:</Text>
+                <Text style={styles.infoValue}>#{contract.id || contractId}</Text>
+              </View>
+            )}
 
             {contract.contractCode && (
               <View style={styles.infoRow}>
@@ -315,18 +354,34 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-          <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Pencil color={COLORS.TEXT.WHITE} size={20} />
-            <Text style={styles.buttonText}>Edit Contract</Text>
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+            <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Pencil color={COLORS.TEXT.WHITE} size={20} />
+              <Text style={styles.buttonText}>Edit Contract</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Trash2 color={COLORS.TEXT.WHITE} size={20} />
+              <Text style={styles.buttonText}>Delete Contract</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
+          <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <CreditCard color={COLORS.TEXT.WHITE} size={20} />
+            <Text style={styles.buttonText}>Choose Installment Plan</Text>
           </LinearGradient>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Trash2 color={COLORS.TEXT.WHITE} size={20} />
-            <Text style={styles.buttonText}>Delete Contract</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {hasInstallmentContract && (
+          <TouchableOpacity style={styles.showInstallmentButton} onPress={handleShowInstallmentContract}>
+            <LinearGradient colors={COLORS.GRADIENT.INFO} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <FileText color={COLORS.TEXT.WHITE} size={20} />
+              <Text style={styles.buttonText}>Show Installment Contract</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
@@ -363,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
@@ -444,12 +499,27 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.LARGE,
   },
   footer: {
-    flexDirection: 'row',
-    padding: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.SMALL,
+    paddingBottom: SIZES.PADDING.SMALL,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderTopWidth: 1,
     borderTopColor: COLORS.BACKGROUND.SECONDARY,
-    gap: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+  },
+  installmentButton: {
+    width: '100%',
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  showInstallmentButton: {
+    width: '100%',
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.SMALL,
   },
   editButton: {
     flex: 1,
