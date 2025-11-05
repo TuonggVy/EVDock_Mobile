@@ -41,7 +41,6 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
-    { key: 'PAID', label: 'Paid', color: COLORS.SUCCESS },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
@@ -84,21 +83,36 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
     try {
       setLoadingDetails(prev => ({ ...prev, [orderId]: true }));
-      const response = await orderRestockService.getOrderRestockDetail(orderId);
       
-      if (response.success && response.data) {
-        const detail = {
-          warehouseName: response.data.warehouse?.name || null,
-          motorbikeName: response.data.electricMotorbike?.name || null,
-        };
+      // First, get order detail to find orderItemId
+      const orderResponse = await orderRestockService.getOrderRestockDetail(orderId);
+      
+      if (orderResponse.success && orderResponse.data) {
+        const firstItem = orderResponse.data.orderItems?.[0];
+        const orderItemId = firstItem?.id;
         
-        // Cache the detail
-        setOrderDetailsCache(prev => ({
-          ...prev,
-          [orderId]: detail
-        }));
+        if (!orderItemId) {
+          // No order item found, return null
+          return null;
+        }
         
-        return detail;
+        // Get order item detail to get full warehouse and motorbike info
+        const itemDetailResponse = await orderRestockService.getOrderItemDetail(orderItemId);
+        
+        if (itemDetailResponse.success && itemDetailResponse.data) {
+          const detail = {
+            warehouseName: itemDetailResponse.data.warehouse?.name || null,
+            motorbikeName: itemDetailResponse.data.electricMotorbike?.name || null,
+          };
+          
+          // Cache the detail
+          setOrderDetailsCache(prev => ({
+            ...prev,
+            [orderId]: detail
+          }));
+          
+          return detail;
+        }
       }
       return null;
     } catch (error) {
@@ -247,7 +261,6 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     const statusFlow = {
       'PENDING': 'APPROVED',
       'APPROVED': 'DELIVERED',
-      'DELIVERED': 'PAID',
     };
     return statusFlow[order?.status] || null;
   };
@@ -364,7 +377,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Quantity:</Text>
-          <Text style={styles.detailValue}>{order.quantity} units</Text>
+          <Text style={styles.detailValue}>{order.itemQuantity || 0} units</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Total:</Text>
@@ -389,7 +402,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
         
-        {order.status !== 'CANCELED' && order.status !== 'PAID' && (
+        {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.cancelButton]}
             onPress={(e) => {
