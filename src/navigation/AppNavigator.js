@@ -98,6 +98,10 @@ import CreditLineDetailScreen from '../screens/creditline/CreditLineDetailScreen
 import EVMStaffCreditLineManagementScreen from '../screens/creditline/EVMStaffCreditLineManagementScreen';
 import EVMStaffCreditLineDetailScreen from '../screens/creditline/EVMStaffCreditLineDetailScreen';
 import EVMStaffCreditLineEditScreen from '../screens/creditline/EVMStaffCreditLineEditScreen';
+import BatchManagementScreen from '../screens/batches/BatchManagementScreen';
+import CreateBatchScreen from '../screens/batches/CreateBatchScreen';
+import EditBatchScreen from '../screens/batches/EditBatchScreen';
+import BatchDetailScreen from '../screens/batches/BatchDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -600,6 +604,26 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="EVMStaffCreditLineEdit" 
               component={EVMStaffCreditLineEditScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="BatchManagement" 
+              component={BatchManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateBatch" 
+              component={CreateBatchScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditBatch" 
+              component={EditBatchScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="BatchDetail" 
+              component={BatchDetailScreen} 
               options={{ headerShown: false }}
             />
           </>
