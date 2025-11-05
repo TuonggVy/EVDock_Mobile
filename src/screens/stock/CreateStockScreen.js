@@ -16,6 +16,7 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useAuth } from '../../contexts/AuthContext';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
+import orderRestockManagerService from '../../services/orderRestockManagerService';
 import LoadingScreen from '../../components/common/LoadingScreen';
 import { ArrowLeft, Check } from 'lucide-react-native';
 
@@ -83,10 +84,62 @@ const CreateStockScreen = ({ navigation }) => {
 
   const loadMotorbikes = async () => {
     try {
-      const response = await motorbikeService.getAllMotorbikes({ limit: 1000 });
-      if (response.success) {
-        setMotorbikes(response.data || []);
+      if (!user?.agencyId) {
+        showError('Error', 'Agency information not found');
+        return;
       }
+
+      // Get order restock list from API
+      const orderRestockResponse = await orderRestockManagerService.getOrderRestockListByAgency(
+        parseInt(user.agencyId),
+        { limit: 1000 }
+      );
+
+      if (!orderRestockResponse.success) {
+        showError('Error', orderRestockResponse.error || 'Failed to load order restock list');
+        return;
+      }
+
+      // Extract unique electricMotorbikeIds from orderItems
+      const ordersList = orderRestockResponse.data || [];
+      const uniqueMotorbikeIds = new Set();
+      
+      ordersList.forEach((order) => {
+        if (order.orderItems && Array.isArray(order.orderItems)) {
+          order.orderItems.forEach((item) => {
+            if (item.electricMotorbikeId) {
+              uniqueMotorbikeIds.add(item.electricMotorbikeId);
+            }
+          });
+        }
+      });
+
+      // Fetch motorbike details for each unique ID
+      const motorbikePromises = Array.from(uniqueMotorbikeIds).map(async (motorbikeId) => {
+        try {
+          const response = await motorbikeService.getMotorbikeById(motorbikeId);
+          if (response.success) {
+            const motorbikeData = response.data?.data || response.data;
+            return {
+              id: motorbikeId,
+              name: motorbikeData?.name || `Motorbike ${motorbikeId}`,
+              model: motorbikeData?.model,
+              version: motorbikeData?.version,
+              makeFrom: motorbikeData?.makeFrom,
+              ...motorbikeData,
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error loading motorbike ${motorbikeId}:`, error);
+          return null;
+        }
+      });
+
+      const motorbikesList = await Promise.all(motorbikePromises);
+      const validMotorbikes = motorbikesList.filter(m => m !== null);
+      
+      setMotorbikes(validMotorbikes);
     } catch (error) {
       console.error('Error loading motorbikes:', error);
       showError('Error', 'Failed to load motorbikes list');
