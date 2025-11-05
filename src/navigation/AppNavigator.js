@@ -94,6 +94,9 @@ import CustomerContractDetailScreen from '../screens/contract/CustomerContractDe
 import CreditLineManagementScreen from '../screens/creditline/CreditLineManagementScreen';
 import CreateCreditLineScreen from '../screens/creditline/CreateCreditLineScreen';
 import CreditLineDetailScreen from '../screens/creditline/CreditLineDetailScreen';
+import EVMStaffCreditLineManagementScreen from '../screens/creditline/EVMStaffCreditLineManagementScreen';
+import EVMStaffCreditLineDetailScreen from '../screens/creditline/EVMStaffCreditLineDetailScreen';
+import EVMStaffCreditLineEditScreen from '../screens/creditline/EVMStaffCreditLineEditScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -576,6 +579,21 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="CreditLineDetail" 
               component={CreditLineDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineManagement" 
+              component={EVMStaffCreditLineManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineDetail" 
+              component={EVMStaffCreditLineDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineEdit" 
+              component={EVMStaffCreditLineEditScreen} 
               options={{ headerShown: false }}
             />
           </>
