@@ -19,8 +19,9 @@ import orderRestockManagerService from '../../services/orderRestockManagerServic
 import agencyService from '../../services/agencyService';
 
 const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
-  const { orderId, onStatusUpdate } = route.params || {};
-  const [order, setOrder] = useState(null);
+  const { orderId, orderItemId, orderInfo, onStatusUpdate } = route.params || {};
+  const [orderItem, setOrderItem] = useState(null);
+  const [order, setOrder] = useState(orderInfo || null); // Order info from list or params
   const [agencies, setAgencies] = useState([]);
   const [agencyDetail, setAgencyDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,14 +37,13 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
-    { key: 'PAID', label: 'Paid', color: COLORS.SUCCESS },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
   useEffect(() => {
     loadAgencies();
     loadOrderDetail();
-  }, [orderId]);
+  }, [orderItemId || orderId]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -68,82 +68,69 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const loadOrderDetail = async () => {
     try {
       setLoading(true);
-      const response = await orderRestockManagerService.getOrderRestockDetail(orderId);
+      
+      // API detail requires orderItemId, not orderId
+      if (!orderItemId) {
+        showError('Error', 'Order Item ID not found');
+        navigation.goBack();
+        return;
+      }
+      
+      // Get orderItem detail from API
+      const response = await orderRestockManagerService.getOrderRestockDetail(orderItemId);
       if (response.success) {
-        const detail = response.data;
-        setOrder(detail);
+        const orderItemDetail = response.data;
+        console.log('📦 [OrderRestockDetailManager] OrderItem detail response:', {
+          orderItemId: orderItemDetail.id,
+          orderId: orderItemDetail.orderId,
+          orderKeys: Object.keys(orderItemDetail || {}),
+          fullDetail: orderItemDetail
+        });
+        setOrderItem(orderItemDetail);
         
-        // Auto-update order status to PAID if bill is completed
-        if (detail.agencyBill && detail.agencyBill.isCompleted && detail.status !== 'PAID') {
-          try {
-            const updateResponse = await orderRestockManagerService.updateOrderRestockStatus(orderId, 'PAID');
-            if (updateResponse.success) {
-              // Reload order detail to get updated status
-              const reloadResponse = await orderRestockManagerService.getOrderRestockDetail(orderId);
-              if (reloadResponse.success) {
-                const updatedDetail = reloadResponse.data;
-                setOrder(updatedDetail);
-                if (onStatusUpdate) onStatusUpdate();
-                
-                // Update agency detail after reload
-                const agencyId = updatedDetail?.agencyId;
-                if (agencyId) {
-                  const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-                  const hasBill = !!updatedDetail.agencyBill;
-                  if (!existsInList && !hasBill) {
-                    const agencyResp = await agencyService.getAgencyById(agencyId);
-                    if (agencyResp?.success) {
-                      const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
-                      setAgencyDetail(detailAgency);
-                    } else {
-                      setAgencyDetail(null);
-                    }
-                  } else if (existsInList) {
-                    setAgencyDetail(existsInList);
-                  } else if (hasBill) {
-                    setAgencyDetail(updatedDetail.agencyBill);
-                  }
-                } else {
-                  setAgencyDetail(null);
-                }
-                return; // Exit early after successful update
+        // If we have orderId but no orderInfo, try to get order info from list
+        if (orderItemDetail.orderId && !order) {
+          await loadOrderInfo(orderItemDetail.orderId);
+        }
+        
+        // Load agency info if needed
+        if (orderItemDetail.orderId && order) {
+          const agencyId = order?.agencyId;
+          if (agencyId) {
+            const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
+            if (existsInList) {
+              setAgencyDetail(existsInList);
+            } else {
+              const agencyResp = await agencyService.getAgencyById(agencyId);
+              if (agencyResp?.success) {
+                const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
+                setAgencyDetail(detailAgency);
               }
             }
-          } catch (updateError) {
-            console.error('Error auto-updating order status to PAID:', updateError);
-            // Don't show error to user, just log it and continue with normal flow
           }
-        }
-        
-        const agencyId = detail?.agencyId;
-        if (agencyId) {
-          const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-          const hasBill = !!detail.agencyBill;
-          if (!existsInList && !hasBill) {
-            const agencyResp = await agencyService.getAgencyById(agencyId);
-            if (agencyResp?.success) {
-              const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
-              setAgencyDetail(detailAgency);
-            } else {
-              setAgencyDetail(null);
-            }
-          } else if (existsInList) {
-            setAgencyDetail(existsInList);
-          } else if (hasBill) {
-            setAgencyDetail(detail.agencyBill);
-          }
-        } else {
-          setAgencyDetail(null);
         }
       } else {
-        showError('Lỗi', response.error || 'Không thể tải chi tiết đơn hàng');
+        showError('Error', response.error || 'Unable to load order details');
         navigation.goBack();
       }
     } catch (error) {
-      showError('Lỗi', 'Không thể tải chi tiết đơn hàng');
+      console.error('Error loading order detail:', error);
+      showError('Error', 'Unable to load order details');
       navigation.goBack();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load order info from list API if needed
+  const loadOrderInfo = async (orderIdToLoad) => {
+    try {
+      // Note: This is a workaround - ideally we'd have a direct order detail API
+      // For now, we rely on orderInfo passed from the list screen
+      // If orderInfo is not passed, we can't get order status/orderAt without calling list API
+      console.log('⚠️ [OrderRestockDetailManager] Order info should be passed from list screen for orderId:', orderIdToLoad);
+    } catch (error) {
+      console.error('Error loading order info:', error);
     }
   };
 
@@ -186,38 +173,46 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const renderStatusModal = () => null;
 
   const handleCreateBill = async (paymentType) => {
+    if (!order || !order.id) {
+      showError('Lỗi', 'Không tìm thấy thông tin đơn hàng');
+      return;
+    }
     try {
       const response = await orderRestockManagerService.createOrderRestockBill(order.id, paymentType);
       if (response.success) {
-        showSuccess('Thành công', response.message || 'Tạo hóa đơn thành công!');
+        showSuccess('Success', response.message || 'Bill created successfully!');
         setShowBillModal(false);
         // Reload order detail to get updated bill information
         await loadOrderDetail();
         if (onStatusUpdate) onStatusUpdate();
       } else {
-        showError('Lỗi', response.error || 'Không thể tạo hóa đơn');
+        showError('Error', response.error || 'Unable to create bill');
       }
     } catch (error) {
       console.error('Error creating bill:', error);
-      showError('Lỗi', 'Không thể tạo hóa đơn');
+      showError('Error', 'Unable to create bill');
     }
   };
 
   const handlePayment = async () => {
+    if (!order) {
+      showError('Error', 'Order information not found');
+      return;
+    }
     if (!order.agencyBill || !order.agencyBill.id) {
-      showError('Lỗi', 'Không tìm thấy thông tin hóa đơn');
+      showError('Error', 'Bill information not found');
       return;
     }
 
     if (order.agencyBill.isCompleted) {
-      showError('Thông báo', 'Hóa đơn đã được thanh toán');
+      showError('Notification', 'Bill has already been paid');
       return;
     }
 
     try {
       showConfirm(
-        'Xác nhận thanh toán',
-        `Bạn có chắc chắn muốn thanh toán hóa đơn #${order.agencyBill.id}?\nSố tiền: ${formatPrice(order.agencyBill.amount)}`,
+        'Confirm Payment',
+        `Are you sure you want to pay bill #${order.agencyBill.id}?\nAmount: ${formatPrice(order.agencyBill.amount)}`,
         async () => {
           try {
             const response = await orderRestockManagerService.getVNPayPaymentUrl(order.agencyBill.id);
@@ -238,20 +233,20 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                    loadOrderDetail();
                  }, 10000);
                } else {
-                showError('Lỗi', 'Không thể mở URL thanh toán');
+                showError('Error', 'Unable to open payment URL');
               }
             } else {
-              showError('Lỗi', response.error || 'Không thể lấy URL thanh toán');
+              showError('Error', response.error || 'Unable to get payment URL');
             }
           } catch (error) {
             console.error('Error getting payment URL:', error);
-            showError('Lỗi', 'Không thể xử lý thanh toán');
+            showError('Error', 'Unable to process payment');
           }
         }
       );
     } catch (error) {
       console.error('Error in payment flow:', error);
-      showError('Lỗi', 'Không thể xử lý thanh toán');
+      showError('Error', 'Unable to process payment');
     }
   };
 
@@ -267,8 +262,8 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Chọn hình thức thanh toán</Text>
-            <Text style={styles.modalSubtitle}>Đơn hàng #{order.id} đã được giao</Text>
+            <Text style={styles.modalTitle}>Select Payment Method</Text>
+            <Text style={styles.modalSubtitle}>Order #{order?.id || orderItem?.orderId || 'N/A'} has been delivered</Text>
 
             <View style={styles.paymentTypeContainer}>
               <TouchableOpacity
@@ -297,13 +292,13 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                         styles.paymentTypeTitle,
                         selectedPaymentType === 'FULL' && styles.paymentTypeTitleSelected
                       ]}>
-                        Thanh toán đầy đủ
+                        Full Payment
                       </Text>
                       <Text style={[
                         styles.paymentTypeSubtitle,
                         selectedPaymentType === 'FULL' && styles.paymentTypeSubtitleSelected
                       ]}>
-                        Thanh toán một lần (FULL)
+                        One-time payment (FULL)
                       </Text>
                     </View>
                     {selectedPaymentType === 'FULL' && (
@@ -341,13 +336,13 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                         styles.paymentTypeTitle,
                         selectedPaymentType === 'DEFERRED' && styles.paymentTypeTitleSelected
                       ]}>
-                        Thanh toán trả chậm
+                        Deferred Payment
                       </Text>
                       <Text style={[
                         styles.paymentTypeSubtitle,
                         selectedPaymentType === 'DEFERRED' && styles.paymentTypeSubtitleSelected
                       ]}>
-                        Thanh toán sau (DEFERRED)
+                        Pay later (DEFERRED)
                       </Text>
                     </View>
                     {selectedPaymentType === 'DEFERRED' && (
@@ -365,13 +360,13 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                 style={[styles.modalButton, styles.modalButtonCancel]}
                 onPress={() => setShowBillModal(false)}
               >
-                <Text style={styles.modalButtonCancelText}>Hủy</Text>
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonConfirm]}
                 onPress={() => handleCreateBill(selectedPaymentType)}
               >
-                <Text style={styles.modalButtonConfirmText}>Xác nhận</Text>
+                <Text style={styles.modalButtonConfirmText}>Confirm</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -384,17 +379,17 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Đang tải...</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (!order) {
+  if (!orderItem) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Không tìm thấy đơn hàng</Text>
+          <Text style={styles.loadingText}>Order not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -409,7 +404,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
         >
           <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+        <Text style={styles.headerTitle}>Order Details</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -418,133 +413,131 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <Text style={styles.statusTitle}>Trạng thái đơn hàng</Text>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-              <Text style={styles.statusText}>{getStatusLabel(order.status)}</Text>
-            </View>
-          </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Order Information</Text>
+          {renderInfoRow('Order Item ID', `#${orderItem.id}`)}
+          {renderInfoRow('Order ID', `#${orderItem.orderId || 'N/A'}`)}
+          {order && order.orderAt && renderInfoRow('Order Date', formatDate(order.orderAt))}
+          {renderInfoRow('Quantity', `${orderItem.quantity || 0} units`)}
+          {order && order.itemQuantity && renderInfoRow('Item Quantity', `${order.itemQuantity} items`)}
+          {order && renderInfoRow('Order Type', order.orderType === 'FULL' ? 'Full Payment' : 'Deferred Payment')}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
-          {renderInfoRow('Mã đơn hàng', `#${order.id}`)}
-          {renderInfoRow('Ngày đặt hàng', formatDate(order.orderAt))}
-          {renderInfoRow('Số lượng', `${order.quantity} xe`)}
+          <Text style={styles.sectionTitle}>Vehicle Information</Text>
+          {renderInfoRow('Vehicle Name', orderItem.electricMotorbike?.name || 'N/A')}
+          {renderInfoRow('Vehicle ID', orderItem.electricMotorbikeId?.toString() || 'N/A')}
+          {renderInfoRow('Color', orderItem.color?.colorType || orderItem.colorId?.toString() || 'N/A')}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin xe</Text>
-          {renderInfoRow('Tên xe', order.electricMotorbike?.name || 'N/A')}
+          <Text style={styles.sectionTitle}>Warehouse Information</Text>
+          {renderInfoRow('Warehouse Name', orderItem.warehouse?.name || 'N/A')}
+          {renderInfoRow('Location', orderItem.warehouse?.location || 'N/A')}
+          {renderInfoRow('Address', orderItem.warehouse?.address || 'N/A')}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin kho</Text>
-          {renderInfoRow('Tên kho', order.warehouse?.name || 'N/A')}
-          {renderInfoRow('Địa điểm', order.warehouse?.location || 'N/A')}
-          {renderInfoRow('Địa chỉ', order.warehouse?.address || 'N/A')}
+          <Text style={styles.sectionTitle}>Price Information</Text>
+          {renderInfoRow('Base Price', formatPrice(orderItem.basePrice || 0))}
+          {renderInfoRow('Wholesale Price', formatPrice(orderItem.wholesalePrice || 0))}
+          {renderInfoRow('Discount', formatPrice(orderItem.discountTotal || 0))}
+          {renderInfoRow('Promotion', formatPrice(orderItem.promotionTotal || 0))}
+          {renderInfoRow('Final Price', formatPrice(orderItem.finalPrice || 0))}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin giá</Text>
-          {renderInfoRow('Giá cơ bản', formatPrice(order.basePrice))}
-          {renderInfoRow('Giá bán buôn', formatPrice(order.wholesalePrice))}
-          {renderInfoRow('Giá cuối cùng', formatPrice(order.finalPrice))}
-          {renderInfoRow('Giảm giá', formatPrice(order.discountTotal))}
-          {renderInfoRow('Khuyến mãi', formatPrice(order.promotionTotal))}
-          {renderInfoRow('Tổng tiền', formatPrice(order.subtotal), { 
-            color: COLORS.SUCCESS, 
-            fontWeight: 'bold',
-            fontSize: SIZES.FONT.MEDIUM 
-          })}
+          <Text style={styles.sectionTitle}>Policy Information</Text>
+          {renderInfoRow('Price Policy', orderItem.pricePolicyId?.toString() || 'N/A')}
+          {renderInfoRow('Discount', orderItem.discountId ? `#${orderItem.discountId}` : 'N/A')}
+          {renderInfoRow('Promotion', orderItem.promotionId ? `#${orderItem.promotionId}` : 'N/A')}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin chính sách</Text>
-          {renderInfoRow('Chính sách giá', order.pricePolicyId?.toString() || 'N/A')}
-          {renderInfoRow('Giảm giá', order.discountId?.toString() || 'N/A')}
-          {renderInfoRow('Khuyến mãi', order.promotionId?.toString() || 'N/A')}
-          {renderInfoRow('Màu sắc', order.colorId?.toString() || 'N/A')}
-        </View>
-
-        {order.agencyBill && (
+        {order && order.agencyBill && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Thông tin hóa đơn</Text>
-            {renderInfoRow('Mã hóa đơn', `#${order.agencyBill.id || 'N/A'}`)}
-            {renderInfoRow('Số tiền', formatPrice(order.agencyBill.amount))}
-            {renderInfoRow('Loại thanh toán', order.agencyBill.type === 'FULL' ? 'Thanh toán đầy đủ' : 'Thanh toán trả chậm')}
-            {renderInfoRow('Ngày tạo', formatDate(order.agencyBill.createAt))}
-            {order.agencyBill.paidAt && renderInfoRow('Ngày thanh toán', formatDate(order.agencyBill.paidAt))}
-            {renderInfoRow('Trạng thái', order.agencyBill.isCompleted ? 'Đã hoàn thành' : 'Chưa hoàn thành', {
+            <Text style={styles.sectionTitle}>Bill Information</Text>
+            {renderInfoRow('Bill ID', `#${order.agencyBill.id || 'N/A'}`)}
+            {renderInfoRow('Amount', formatPrice(order.agencyBill.amount))}
+            {renderInfoRow('Payment Type', order.agencyBill.type === 'FULL' ? 'Full Payment' : 'Deferred Payment')}
+            {renderInfoRow('Created Date', formatDate(order.agencyBill.createAt))}
+            {order.agencyBill.paidAt && renderInfoRow('Paid Date', formatDate(order.agencyBill.paidAt))}
+            {renderInfoRow('Status', order.agencyBill.isCompleted ? 'Completed' : 'Pending', {
               color: order.agencyBill.isCompleted ? COLORS.SUCCESS : COLORS.WARNING
             })}
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.fixedActionsContainer}>
-        {order.status === 'DRAFT' ? (
-          <>
+      {order && (
+        <View style={styles.fixedActionsContainer}>
+          {order.status === 'DRAFT' ? (
+            <>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={async () => {
+                  try {
+                    const resp = await orderRestockManagerService.acceptOrderRestock(order.id);
+                    if (resp.success) {
+                      setOrder(resp.data);
+                      showSuccess('Success', 'Order has been confirmed!');
+                      if (onStatusUpdate) onStatusUpdate();
+                    } else {
+                      showError('Error', resp.error || 'Unable to confirm order');
+                    }
+                  } catch (e) {
+                    showError('Error', 'Unable to confirm order');
+                  }
+                }}
+              >
+                <Text style={styles.actionButtonText}>Accept</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.deleteActionButton]}
+                onPress={() => {
+                  showConfirm(
+                    'Confirm Delete',
+                    'Are you sure you want to delete this order? This action cannot be undone.',
+                    async () => {
+                      try {
+                        const resp = await orderRestockManagerService.deleteOrderRestock(order.id);
+                        if (resp.success) {
+                          showSuccess('Success', 'Order has been deleted!');
+                          if (onStatusUpdate) onStatusUpdate();
+                          navigation.goBack();
+                        } else {
+                          showError('Error', resp.error || 'Unable to delete order');
+                        }
+                      } catch (e) {
+                        showError('Error', 'Unable to delete order');
+                      }
+                    }
+                  );
+                }}
+              >
+                <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
+              </TouchableOpacity>
+            </>
+          ) : order.status === 'DELIVERED' && !order.agencyBill ? (
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={async () => {
-                try {
-                  const resp = await orderRestockManagerService.acceptOrderRestock(order.id);
-                  if (resp.success) {
-                    setOrder(resp.data);
-                    showSuccess('Thành công', 'Đã xác nhận đơn hàng!');
-                    if (onStatusUpdate) onStatusUpdate();
-                  } else {
-                    showError('Lỗi', resp.error || 'Không thể xác nhận đơn hàng');
-                  }
-                } catch (e) {
-                  showError('Lỗi', 'Không thể xác nhận đơn hàng');
-                }
+              onPress={() => {
+                setSelectedPaymentType('FULL');
+                setShowBillModal(true);
               }}
             >
-              <Text style={styles.actionButtonText}>Accept</Text>
+              <Text style={styles.actionButtonText}>Create Bill</Text>
             </TouchableOpacity>
-
+          ) : order.agencyBill && !order.agencyBill.isCompleted ? (
             <TouchableOpacity
-              style={[styles.actionButton, styles.deleteActionButton]}
-              onPress={async () => {
-                try {
-                  const resp = await orderRestockManagerService.deleteOrderRestock(order.id);
-                  if (resp.success) {
-                    showSuccess('Thành công', 'Đã xóa đơn hàng!');
-                    if (onStatusUpdate) onStatusUpdate();
-                    navigation.goBack();
-                  } else {
-                    showError('Lỗi', resp.error || 'Không thể xóa đơn hàng');
-                  }
-                } catch (e) {
-                  showError('Lỗi', 'Không thể xóa đơn hàng');
-                }
-              }}
+              style={styles.actionButton}
+              onPress={handlePayment}
             >
-              <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
+              <Text style={styles.actionButtonText}>Pay</Text>
             </TouchableOpacity>
-          </>
-        ) : order.status === 'DELIVERED' && !order.agencyBill ? (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {
-              setSelectedPaymentType('FULL');
-              setShowBillModal(true);
-            }}
-          >
-            <Text style={styles.actionButtonText}>Tạo hóa đơn</Text>
-          </TouchableOpacity>
-        ) : order.agencyBill && !order.agencyBill.isCompleted ? (
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handlePayment}
-          >
-            <Text style={styles.actionButtonText}>Thanh toán</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+          ) : null}
+        </View>
+      )}
 
       {renderBillModal()}
 
@@ -606,7 +599,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100,
+    paddingBottom: 160,
   },
   loadingContainer: {
     flex: 1,

@@ -26,7 +26,8 @@ import CustomerManagementScreen from '../screens/customer/CustomerManagementScre
 import CustomerDetailScreen from '../screens/customer/CustomerDetailScreen';
 import CreateCustomerScreen from '../screens/customer/CreateCustomerScreen';
 import EditCustomerScreen from '../screens/customer/EditCustomerScreen';
-import OrderManagementScreen from '../screens/order/OrderManagementScreen';
+import OrderManagementScreen from '../screens/orderrestockmanager/OrderManagementScreen';
+import CreateOrderRestockScreen from '../screens/orderrestockmanager/CreateOrderRestockScreen';
 import AllocationManagementScreen from '../screens/allocation/AllocationManagementScreen';
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
 import AddInventoryScreen from '../screens/inventory/AddInventoryScreen';
@@ -71,7 +72,7 @@ import PromotionManagementScreen from '../screens/promotion/PromotionManagementS
 import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
 import OrderRestockManagementScreen from '../screens/order/OrderRestockManagementScreen';
 import OrderRestockDetailScreen from '../screens/order/OrderRestockDetailScreen';
-import OrderRestockDetailManagerScreen from '../screens/order/OrderRestockDetailManagerScreen';
+import OrderRestockDetailManagerScreen from '../screens/orderrestockmanager/OrderRestockDetailManagerScreen';
 import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
 import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
 import EditPricePolicyScreen from '../screens/pricepolicy/EditPricePolicyScreen';
@@ -244,6 +245,11 @@ const AppNavigator = () => {
             <Stack.Screen
               name="OrderManagement"
               component={OrderManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CreateOrderRestock"
+              component={CreateOrderRestockScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
