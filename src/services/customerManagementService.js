@@ -57,7 +57,19 @@ class CustomerManagementService {
       const response = await api.post(ENDPOINTS.BASE, customerData);
       return response.data?.data || null;
     } catch (error) {
-      console.error('Error creating customer:', error);
+      // Check if error is due to duplicate customer (expected behavior)
+      const errorStatus = error.response?.status;
+      const errorMessage = error.response?.data?.message || error.message || '';
+      const isDuplicateError = errorStatus === 400 || errorStatus === 409 || 
+                               errorMessage.toLowerCase().includes('duplicate') ||
+                               errorMessage.toLowerCase().includes('already exists') ||
+                               errorMessage.toLowerCase().includes('already registered');
+      
+      // Only log errors that are NOT duplicate errors (duplicates are expected and handled gracefully)
+      if (!isDuplicateError) {
+        console.error('Error creating customer:', error);
+      }
+      
       throw error;
     }
   }

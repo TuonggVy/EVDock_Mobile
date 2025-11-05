@@ -26,7 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import motorbikeService from '../../services/motorbikeService';
 import customerManagementService from '../../services/customerManagementService';
 import agencyStockService from '../../services/agencyStockService';
-import { ArrowLeft, Calendar, Check, Search } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Check } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -48,8 +48,18 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     battery: null,
     safeFeature: null,
   });
-  const [customerId, setCustomerId] = useState('');
-  const [loadedCustomerInfo, setLoadedCustomerInfo] = useState(null);
+  const [customerId, setCustomerId] = useState(null);
+  const [customerFormData, setCustomerFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    credentialId: '',
+    dob: null,
+  });
+  const [customerErrors, setCustomerErrors] = useState({});
+  const [showCustomerDobPicker, setShowCustomerDobPicker] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [pricing, setPricing] = useState({
     basePrice: Number(vehicle?.price) || 0,
     colorPrice: 0,
@@ -376,25 +386,190 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     });
   };
 
-  // Load customer info by ID
-  const loadCustomerInfo = async () => {
-    if (!customerId || !customerId.trim()) {
-      setLoadedCustomerInfo(null);
+  // Handle customer form input change
+  const handleCustomerInputChange = (field, value) => {
+    setCustomerFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear error when user starts typing
+    if (customerErrors[field]) {
+      setCustomerErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  // Handle customer date of birth change
+  const handleCustomerDobChange = (event, selectedDate) => {
+    setShowCustomerDobPicker(Platform.OS === 'ios');
+    
+    if (event.type === 'dismissed') {
+      return;
+    }
+    
+    if (selectedDate) {
+      handleCustomerInputChange('dob', selectedDate);
+    }
+  };
+
+  // Validate customer form
+  const validateCustomerForm = () => {
+    const newErrors = {};
+
+    if (!customerFormData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+
+    if (!customerFormData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(customerFormData.email)) {
+        newErrors.email = 'Invalid email format';
+      }
+    }
+
+    if (!customerFormData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else {
+      const phoneRegex = /^[0-9]{10,11}$/;
+      if (!phoneRegex.test(customerFormData.phone.replace(/\s/g, ''))) {
+        newErrors.phone = 'Invalid phone number (10-11 digits)';
+      }
+    }
+
+    if (customerFormData.dob) {
+      const date = new Date(customerFormData.dob);
+      if (isNaN(date.getTime())) {
+        newErrors.dob = 'Invalid date of birth';
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (date > today) {
+          newErrors.dob = 'Date of birth cannot be in the future';
+        }
+      }
+    }
+
+    setCustomerErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Helper function to find customer by email or phone
+  const findExistingCustomer = async (email, phone) => {
+    try {
+      const customers = await customerManagementService.getCustomers(parseInt(user.agencyId), { limit: 1000 });
+      
+      // Search by email first (more unique)
+      if (email) {
+        const customerByEmail = customers.find(c => 
+          c.email && c.email.toLowerCase() === email.toLowerCase()
+        );
+        if (customerByEmail) {
+          return customerByEmail;
+        }
+      }
+      
+      // Search by phone
+      if (phone) {
+        const normalizedPhone = phone.replace(/\s/g, '');
+        const customerByPhone = customers.find(c => {
+          const customerPhone = c.phone ? c.phone.replace(/\s/g, '') : '';
+          return customerPhone === normalizedPhone;
+        });
+        if (customerByPhone) {
+          return customerByPhone;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error searching for existing customer:', error);
+      return null;
+    }
+  };
+
+  // Create customer
+  const handleCreateCustomer = async () => {
+    if (!validateCustomerForm()) {
+      showError('Validation Error', 'Please check your input fields');
       return;
     }
 
+    if (!user?.agencyId) {
+      showError('Authentication Error', 'User information not found. Please login again.');
+      return;
+    }
+
+    setCreatingCustomer(true);
     try {
-      const response = await customerManagementService.getCustomerDetail(parseInt(customerId));
-      if (response) {
-        setLoadedCustomerInfo(response);
+      const customerData = {
+        name: customerFormData.name.trim(),
+        email: customerFormData.email.trim(),
+        phone: customerFormData.phone.trim(),
+        address: customerFormData.address.trim() || undefined,
+        credentialId: customerFormData.credentialId.trim() || undefined,
+        dob: customerFormData.dob ? new Date(customerFormData.dob).toISOString() : undefined,
+        agencyId: parseInt(user.agencyId),
+      };
+
+      const newCustomer = await customerManagementService.createCustomer(customerData);
+
+      if (newCustomer && newCustomer.id) {
+        setCustomerId(newCustomer.id);
+        showSuccess('Customer Created', 'Customer information has been saved successfully.');
       } else {
-        setLoadedCustomerInfo(null);
-        showError('Customer Not Found', 'No customer information found with this ID');
+        throw new Error('Failed to create customer - no ID returned');
       }
     } catch (error) {
-      console.error('Error loading customer info:', error);
-      setLoadedCustomerInfo(null);
-      showError('Loading Error', 'Failed to load customer information. Please check the ID again.');
+      // Check if error is due to duplicate customer
+      const errorStatus = error.response?.status;
+      const errorMessage = error.response?.data?.message || error.message || '';
+      const isDuplicateError = errorStatus === 400 || errorStatus === 409 || 
+                               errorMessage.toLowerCase().includes('duplicate') ||
+                               errorMessage.toLowerCase().includes('already exists') ||
+                               errorMessage.toLowerCase().includes('already registered');
+      
+      // Only log errors that are NOT duplicate errors (duplicates are expected behavior)
+      if (!isDuplicateError) {
+        console.error('Error creating customer:', error);
+      }
+      
+      if (isDuplicateError) {
+        // Try to find existing customer
+        const existingCustomer = await findExistingCustomer(
+          customerFormData.email.trim(),
+          customerFormData.phone.trim()
+        );
+        
+        if (existingCustomer && existingCustomer.id) {
+          // Use existing customer and update form data with existing customer info
+          setCustomerId(existingCustomer.id);
+          // Update form data with existing customer information for display
+          setCustomerFormData(prev => ({
+            ...prev,
+            name: existingCustomer.name || prev.name,
+            email: existingCustomer.email || prev.email,
+            phone: existingCustomer.phone || prev.phone,
+            address: existingCustomer.address || prev.address,
+            credentialId: existingCustomer.credentialId || prev.credentialId,
+            dob: existingCustomer.dob ? new Date(existingCustomer.dob) : prev.dob,
+          }));
+          showInfo(
+            'Customer Already Exists',
+            'This customer already exists in the system. Using existing customer information.',
+          );
+        } else {
+          // Couldn't find existing customer, show error
+          showError(
+            'Customer Already Exists',
+            'This customer may already exist in the system. Please check the email or phone number, or try again later.'
+          );
+        }
+      } else {
+        // Other errors
+        const displayMessage = errorMessage || 'Failed to create customer. Please try again.';
+        showError('Error', displayMessage);
+      }
+    } finally {
+      setCreatingCustomer(false);
     }
   };
 
@@ -405,14 +580,8 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     }
 
     // Validate customerId
-    if (!customerId || !customerId.trim()) {
-      showError('Missing Information', 'Please enter customer ID');
-      return;
-    }
-
-    // Validate loaded customer info
-    if (!loadedCustomerInfo) {
-      showError('Missing Information', 'Customer information not found. Please check the ID.');
+    if (!customerId) {
+      showError('Missing Information', 'Please create customer information first');
       return;
     }
 
@@ -441,7 +610,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         promotionPrice: pricing.promotionDiscount,
         finalPrice: pricing.finalPricePerUnit,
         validUntil: validUntilDate.toISOString(), // User selected date
-        customerId: parseInt(customerId),
+        customerId: customerId,
         motorbikeId: parseInt(vehicle.id),
         colorId: selectedColorId,
         dealerStaffId: parseInt(user.id),
@@ -478,8 +647,16 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   };
 
   const resetForm = () => {
-    setCustomerId('');
-    setLoadedCustomerInfo(null);
+    setCustomerId(null);
+    setCustomerFormData({
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      credentialId: '',
+      dob: null,
+    });
+    setCustomerErrors({});
     setSelectedColor((Array.isArray(vehicle?.colors) && vehicle.colors[0]) || 'Black');
   };
 
@@ -786,49 +963,191 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const renderCustomerInfo = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Customer Information</Text>
-        <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Customer ID *</Text>
-        <View style={styles.searchInputContainer}>
-          <TextInput
-            style={styles.searchInput}
-            value={customerId}
-            onChangeText={(text) => setCustomerId(text)}
-            placeholder="Enter customer ID"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
+  const renderCustomerInfo = () => {
+    const formatDateForDisplay = (date) => {
+      if (!date) return '';
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    // If customer already created, show customer info
+    if (customerId) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Customer Information</Text>
+          <View style={styles.customerInfoCard}>
+            <Text style={styles.customerInfoTitle}>Customer Created Successfully</Text>
+            <View style={styles.customerInfoRow}>
+              <Text style={styles.customerInfoLabel}>Name:</Text>
+              <Text style={styles.customerInfoValue}>{customerFormData.name || 'N/A'}</Text>
+            </View>
+            <View style={styles.customerInfoRow}>
+              <Text style={styles.customerInfoLabel}>Email:</Text>
+              <Text style={styles.customerInfoValue}>{customerFormData.email || 'N/A'}</Text>
+            </View>
+            <View style={styles.customerInfoRow}>
+              <Text style={styles.customerInfoLabel}>Phone:</Text>
+              <Text style={styles.customerInfoValue}>{customerFormData.phone || 'N/A'}</Text>
+            </View>
+            {customerFormData.address && (
+              <View style={styles.customerInfoRow}>
+                <Text style={styles.customerInfoLabel}>Address:</Text>
+                <Text style={styles.customerInfoValue}>{customerFormData.address}</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity
-            style={styles.searchButton}
-            onPress={loadCustomerInfo}
-            disabled={!customerId || !customerId.trim()}
+            style={styles.editCustomerButton}
+            onPress={() => {
+              setCustomerId(null);
+              setCustomerErrors({});
+            }}
           >
-            <Search color={COLORS.TEXT.WHITE} size={20} />
+            <Text style={styles.editCustomerButtonText}>Edit Customer Information</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      
-      {loadedCustomerInfo && (
-        <View style={styles.customerInfoCard}>
-          <Text style={styles.customerInfoTitle}>Customer Information</Text>
-          <View style={styles.customerInfoRow}>
-            <Text style={styles.customerInfoLabel}>Name:</Text>
-            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.name || 'N/A'}</Text>
-          </View>
-          <View style={styles.customerInfoRow}>
-            <Text style={styles.customerInfoLabel}>Email:</Text>
-            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.email || 'N/A'}</Text>
-          </View>
-          <View style={styles.customerInfoRow}>
-            <Text style={styles.customerInfoLabel}>Phone:</Text>
-            <Text style={styles.customerInfoValue}>{loadedCustomerInfo.phone || 'N/A'}</Text>
-          </View>
+      );
+    }
+
+    // Show customer creation form
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Customer Information</Text>
+        <Text style={styles.sectionSubtitle}>Please fill in customer information to create quotation</Text>
+        
+        {/* Name */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>
+            Name <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={[styles.textInput, customerErrors.name && styles.inputError]}
+            placeholder="Enter customer name"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={customerFormData.name}
+            onChangeText={(text) => handleCustomerInputChange('name', text)}
+            autoCapitalize="words"
+          />
+          {customerErrors.name && (
+            <Text style={styles.errorText}>{customerErrors.name}</Text>
+          )}
         </View>
-      )}
-    </View>
-  );
+
+        {/* Email */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>
+            Email <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={[styles.textInput, customerErrors.email && styles.inputError]}
+            placeholder="Enter email"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={customerFormData.email}
+            onChangeText={(text) => handleCustomerInputChange('email', text)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {customerErrors.email && (
+            <Text style={styles.errorText}>{customerErrors.email}</Text>
+          )}
+        </View>
+
+        {/* Phone */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>
+            Phone <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={[styles.textInput, customerErrors.phone && styles.inputError]}
+            placeholder="Enter phone number (10-11 digits)"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={customerFormData.phone}
+            onChangeText={(text) => handleCustomerInputChange('phone', text)}
+            keyboardType="phone-pad"
+          />
+          {customerErrors.phone && (
+            <Text style={styles.errorText}>{customerErrors.phone}</Text>
+          )}
+        </View>
+
+        {/* Address */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Address</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            placeholder="Enter address (optional)"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={customerFormData.address}
+            onChangeText={(text) => handleCustomerInputChange('address', text)}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Credential ID */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>ID Card</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Enter ID card number (optional)"
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={customerFormData.credentialId}
+            onChangeText={(text) => handleCustomerInputChange('credentialId', text)}
+          />
+        </View>
+
+        {/* Date of Birth */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Date of Birth</Text>
+          <TouchableOpacity
+            style={[styles.dateInput, customerErrors.dob && styles.inputError]}
+            onPress={() => setShowCustomerDobPicker(true)}
+          >
+            <Text style={[
+              styles.dateInputText,
+              !customerFormData.dob && styles.dateInputPlaceholder
+            ]}>
+              {customerFormData.dob ? formatDateForDisplay(customerFormData.dob) : 'Select date of birth (optional)'}
+            </Text>
+            <Text style={styles.datePickerIcon}><Calendar color="#FFFFFF" size={16} /></Text>
+          </TouchableOpacity>
+          {customerErrors.dob && (
+            <Text style={styles.errorText}>{customerErrors.dob}</Text>
+          )}
+        </View>
+
+        {/* Create Customer Button */}
+        <TouchableOpacity
+          style={[styles.createCustomerButton, creatingCustomer && styles.disabledButton]}
+          onPress={handleCreateCustomer}
+          disabled={creatingCustomer}
+        >
+          {creatingCustomer ? (
+            <ActivityIndicator color={COLORS.TEXT.WHITE} />
+          ) : (
+            <Text style={styles.createCustomerButtonText}>Create Customer</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Date Picker */}
+        {showCustomerDobPicker && (
+          <DateTimePicker
+            value={customerFormData.dob || new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleCustomerDobChange}
+            maximumDate={new Date()}
+            locale="vi-VN"
+          />
+        )}
+      </View>
+    );
+  };
 
 
   // Helper to format promotion discount value
@@ -932,9 +1251,9 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         <Text style={styles.resetButtonText}>Reset</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[styles.createButton, loading && styles.disabledButton]}
+        style={[styles.createButton, (loading || !customerId) && styles.disabledButton]}
         onPress={handleCreateQuotation}
-        disabled={loading}
+        disabled={loading || !customerId}
       >
         {loading ? (
           <ActivityIndicator color={COLORS.TEXT.WHITE} />
@@ -1258,29 +1577,49 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  sectionSubtitle: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    fontStyle: 'italic',
   },
-  searchButton: {
-    width: 48,
-    height: 48,
-    borderRadius: SIZES.RADIUS.SMALL,
+  required: {
+    color: COLORS.ERROR,
+  },
+  inputError: {
+    borderColor: COLORS.ERROR,
+    borderWidth: 2,
+  },
+  createCustomerButton: {
     backgroundColor: COLORS.PRIMARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: SIZES.PADDING.SMALL,
+  },
+  createCustomerButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  editCustomerButton: {
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  editCustomerButtonText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+  },
+  dateInputPlaceholder: {
+    color: COLORS.TEXT.SECONDARY,
   },
   customerInfoCard: {
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
