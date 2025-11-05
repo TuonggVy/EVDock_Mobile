@@ -19,6 +19,9 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
   const [order, setOrder] = useState(null);
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Cache for order item details (motorbike, warehouse, color names)
+  const [orderItemDetails, setOrderItemDetails] = useState({});
+  const [loadingItemDetails, setLoadingItemDetails] = useState({});
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -26,7 +29,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
-    { key: 'PAID', label: 'Paid', color: COLORS.SUCCESS },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
@@ -56,6 +58,49 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     }
   };
 
+  const loadOrderItemDetail = async (orderItemId) => {
+    // Check cache first
+    if (orderItemDetails[orderItemId]) {
+      return orderItemDetails[orderItemId];
+    }
+
+    // Check if already loading
+    if (loadingItemDetails[orderItemId]) {
+      return null;
+    }
+
+    try {
+      setLoadingItemDetails(prev => ({ ...prev, [orderItemId]: true }));
+      const response = await orderRestockService.getOrderItemDetail(orderItemId);
+      
+      if (response.success && response.data) {
+        const detail = {
+          motorbikeName: response.data.electricMotorbike?.name || null,
+          warehouseName: response.data.warehouse?.name || null,
+          colorName: response.data.color?.colorType || null,
+        };
+        
+        // Cache the detail
+        setOrderItemDetails(prev => ({
+          ...prev,
+          [orderItemId]: detail
+        }));
+        
+        return detail;
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error loading order item detail ${orderItemId}:`, error);
+      return null;
+    } finally {
+      setLoadingItemDetails(prev => {
+        const newState = { ...prev };
+        delete newState[orderItemId];
+        return newState;
+      });
+    }
+  };
+
   const loadOrderDetail = async () => {
     try {
       setLoading(true);
@@ -63,6 +108,14 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
       
       if (response.success) {
         setOrder(response.data);
+        
+        // Load details for all order items
+        if (response.data.orderItems && response.data.orderItems.length > 0) {
+          const itemDetailPromises = response.data.orderItems.map(item => 
+            loadOrderItemDetail(item.id)
+          );
+          await Promise.all(itemDetailPromises);
+        }
       } else {
         showError('Error', response.error || 'Cannot load order details');
         navigation.goBack();
@@ -96,7 +149,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     const statusFlow = {
       'PENDING': 'APPROVED',
       'APPROVED': 'DELIVERED',
-      'DELIVERED': 'PAID',
     };
     return statusFlow[order?.status] || null;
   };
@@ -116,6 +168,13 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           const response = await orderRestockService.updateOrderRestockStatus(orderId, nextStatus);
           if (response.success) {
             setOrder(response.data);
+            // Reload order item details if orderItems exist
+            if (response.data.orderItems && response.data.orderItems.length > 0) {
+              const itemDetailPromises = response.data.orderItems.map(item => 
+                loadOrderItemDetail(item.id)
+              );
+              await Promise.all(itemDetailPromises);
+            }
             showSuccess('Success', 'Status updated successfully!');
             // Trigger refresh on parent screen immediately
             if (onStatusUpdate) {
@@ -132,6 +191,38 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     );
   };
 
+  const handleCheckCredit = () => {
+    showConfirm(
+      'Confirm Check Credit',
+      `Are you sure you want to check credit for order #${order.id}?`,
+      async () => {
+        try {
+          const response = await orderRestockService.checkOrderCredit(orderId);
+          if (response.success) {
+            setOrder(response.data);
+            // Reload order item details if orderItems exist
+            if (response.data.orderItems && response.data.orderItems.length > 0) {
+              const itemDetailPromises = response.data.orderItems.map(item => 
+                loadOrderItemDetail(item.id)
+              );
+              await Promise.all(itemDetailPromises);
+            }
+            showSuccess('Success', 'Credit checked successfully!');
+            // Trigger refresh on parent screen immediately
+            if (onStatusUpdate) {
+              onStatusUpdate();
+            }
+          } else {
+            showError('Error', response.error || 'Cannot check credit');
+          }
+        } catch (error) {
+          console.error('Error checking credit:', error);
+          showError('Error', 'Cannot check credit');
+        }
+      }
+    );
+  };
+
   const handleCancelOrder = () => {
     showConfirm(
       'Confirm Cancel Order',
@@ -141,6 +232,13 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           const response = await orderRestockService.updateOrderRestockStatus(orderId, 'CANCELED');
           if (response.success) {
             setOrder(response.data);
+            // Reload order item details if orderItems exist
+            if (response.data.orderItems && response.data.orderItems.length > 0) {
+              const itemDetailPromises = response.data.orderItems.map(item => 
+                loadOrderItemDetail(item.id)
+              );
+              await Promise.all(itemDetailPromises);
+            }
             showSuccess('Success', 'Order canceled successfully!');
             // Trigger refresh on parent screen immediately
             if (onStatusUpdate) {
@@ -247,7 +345,9 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>Order Information</Text>
           {renderInfoRow('Order ID', `#${order.id}`)}
           {renderInfoRow('Order Date', formatDate(order.orderAt))}
-          {renderInfoRow('Quantity', `${order.quantity} units`)}
+          {renderInfoRow('Quantity', `${order.itemQuantity || 0} units`)}
+          {renderInfoRow('Order Type', order.orderType || 'N/A')}
+          {renderInfoRow('Credit Checked', order.creditChecked ? 'Yes' : 'No')}
         </View>
 
         {/* Agency Info */}
@@ -266,49 +366,58 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           })()}
         </View>
 
-        {/* Vehicle Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vehicle Information</Text>
-          {renderInfoRow('Vehicle Name', order.electricMotorbike?.name || 'N/A')}
-          {renderInfoRow('Vehicle ID', order.electricMotorbikeId?.toString() || 'N/A')}
-        </View>
-
-        {/* Warehouse Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Warehouse Information</Text>
-          {renderInfoRow('Warehouse Name', order.warehouse?.name || 'N/A')}
-          {renderInfoRow('Location', order.warehouse?.location || 'N/A')}
-          {renderInfoRow('Address', order.warehouse?.address || 'N/A')}
-        </View>
+        {/* Order Items */}
+        {order.orderItems && order.orderItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Order Items ({order.orderItems.length})</Text>
+            {order.orderItems.map((item, index) => {
+              const itemDetail = orderItemDetails[item.id];
+              const isLoading = loadingItemDetails[item.id];
+              
+              return (
+                <View key={item.id || index} style={styles.orderItemContainer}>
+                  <Text style={styles.orderItemTitle}>Item #{index + 1}</Text>
+                  {renderInfoRow('Quantity', `${item.quantity} units`)}
+                  {renderInfoRow('Base Price', formatPrice(item.basePrice))}
+                  {renderInfoRow('Wholesale Price', formatPrice(item.wholesalePrice))}
+                  {renderInfoRow('Final Price', formatPrice(item.finalPrice))}
+                  {renderInfoRow('Discount', formatPrice(item.discountTotal))}
+                  {renderInfoRow('Promotion', formatPrice(item.promotionTotal))}
+                  {renderInfoRow('Vehicle', itemDetail?.motorbikeName || (isLoading ? 'Loading...' : `ID: ${item.electricMotorbikeId?.toString() || 'N/A'}`))}
+                  {renderInfoRow('Warehouse', itemDetail?.warehouseName || (isLoading ? 'Loading...' : `ID: ${item.warehouseId?.toString() || 'N/A'}`))}
+                  {renderInfoRow('Color', itemDetail?.colorName || (isLoading ? 'Loading...' : `ID: ${item.colorId?.toString() || 'N/A'}`))}
+                  {renderInfoRow('Price Policy ID', item.pricePolicyId?.toString() || 'N/A')}
+                  {renderInfoRow('Discount ID', item.discountId?.toString() || 'N/A')}
+                  {renderInfoRow('Promotion ID', item.promotionId?.toString() || 'N/A')}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Pricing Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pricing Information</Text>
-          {renderInfoRow('Base Price', formatPrice(order.basePrice))}
-          {renderInfoRow('Wholesale Price', formatPrice(order.wholesalePrice))}
-          {renderInfoRow('Final Price', formatPrice(order.finalPrice))}
-          {renderInfoRow('Discount', formatPrice(order.discountTotal))}
-          {renderInfoRow('Promotion', formatPrice(order.promotionTotal))}
+          <Text style={styles.sectionTitle}>Pricing Summary</Text>
           {renderInfoRow('Total', formatPrice(order.subtotal), { 
             color: COLORS.SUCCESS, 
             fontWeight: 'bold',
             fontSize: SIZES.FONT.MEDIUM 
           })}
         </View>
-
-        {/* Policy Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Policy Information</Text>
-          {renderInfoRow('Price Policy ID', order.pricePolicyId?.toString() || 'N/A')}
-          {renderInfoRow('Discount ID', order.discountId?.toString() || 'N/A')}
-          {renderInfoRow('Promotion ID', order.promotionId?.toString() || 'N/A')}
-          {renderInfoRow('Color ID', order.colorId?.toString() || 'N/A')}
-        </View>
       </ScrollView>
 
       {/* Fixed Actions Bar */}
       <View style={styles.fixedActionsContainer}>
         <View style={styles.actionsRow}>
+          {order.status === 'PENDING' && !order.creditChecked && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.checkCreditButton]}
+              onPress={handleCheckCredit}
+            >
+              <Text style={styles.actionButtonText}>Check Credit</Text>
+            </TouchableOpacity>
+          )}
+          
           {getNextStatus() && (
             <TouchableOpacity
               style={[styles.actionButton, styles.nextStatusButton]}
@@ -320,7 +429,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
           
-          {order.status !== 'CANCELED' && order.status !== 'PAID' && (
+          {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && (
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton]}
               onPress={handleCancelOrder}
@@ -516,6 +625,21 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.ERROR,
     fontWeight: '600',
+  },
+  checkCreditButton: {
+    backgroundColor: COLORS.WARNING,
+  },
+  orderItemContainer: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  orderItemTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
   },
 });
 
