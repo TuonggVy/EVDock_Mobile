@@ -133,6 +133,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       icon: '🔄',
       onPress: () => navigation.navigate('OrderRestockManagement'),
     },
+    {
+      title: 'Credit Line',
+      gradient: ['#FF6B6B', '#FF8E8E', '#FFB3B3'],
+      icon: '💳',
+      onPress: () => navigation.navigate('EVMStaffCreditLineManagement'),
+    },
   ];
 
 
