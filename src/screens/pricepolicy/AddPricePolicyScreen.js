@@ -15,7 +15,7 @@ import CustomAlert from '../../components/common/CustomAlert';
 import pricePolicyService from '../../services/pricePolicyService';
 import agencyService from '../../services/agencyService';
 import motorbikeService from '../../services/motorbikeService';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, ArrowLeft, X } from 'lucide-react-native';
 
 const AddPricePolicyScreen = ({ navigation, route }) => {
 
@@ -143,7 +143,7 @@ const AddPricePolicyScreen = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={24} color={COLORS.PRIMARY} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Price Policy</Text>
         <TouchableOpacity
@@ -227,7 +227,7 @@ const AddPricePolicyScreen = ({ navigation, route }) => {
                 ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
                 : 'Select agency'}
             </Text>
-            <Text style={styles.dropdownIcon}><ChevronDown size={14} /></Text>
+            <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
           </TouchableOpacity>
           {errors.agencyId && <Text style={styles.errorText}>{errors.agencyId}</Text>}
         </View>
@@ -246,7 +246,7 @@ const AddPricePolicyScreen = ({ navigation, route }) => {
                 ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
                 : 'Select motorbike'}
             </Text>
-            <Text style={styles.dropdownIcon}><ChevronDown size={14} /></Text>
+            <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
           </TouchableOpacity>
           {errors.motorbikeId && <Text style={styles.errorText}>{errors.motorbikeId}</Text>}
         </View>
@@ -264,7 +264,7 @@ const AddPricePolicyScreen = ({ navigation, route }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Agency</Text>
               <TouchableOpacity onPress={() => setAgencyModalVisible(false)}>
-                <Text style={styles.modalCloseButton}>✕</Text>
+                <X size={24} color={COLORS.TEXT.SECONDARY} />
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -294,7 +294,7 @@ const AddPricePolicyScreen = ({ navigation, route }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Motorbike</Text>
               <TouchableOpacity onPress={() => setMotorbikeModalVisible(false)}>
-                <Text style={styles.modalCloseButton}>✕</Text>
+                <X size={24} color={COLORS.TEXT.SECONDARY} />
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -330,7 +330,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
-  backIcon: { fontSize: 24, color: COLORS.PRIMARY, fontWeight: 'bold' },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -372,7 +371,6 @@ const styles = StyleSheet.create({
   },
   dropdownButtonText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
   dropdownButtonTextPlaceholder: { color: COLORS.TEXT.SECONDARY },
-  dropdownIcon: { color: COLORS.TEXT.SECONDARY },
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -393,7 +391,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EFEFEF',
   },
   modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
-  modalCloseButton: { fontSize: 24, color: COLORS.TEXT.SECONDARY },
   modalItem: { padding: SIZES.PADDING.MEDIUM, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
   modalItemText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
 });

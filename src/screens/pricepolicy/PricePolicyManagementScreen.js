@@ -15,7 +15,7 @@ import pricePolicyService from '../../services/pricePolicyService';
 import agencyService from '../../services/agencyService';
 import motorbikeService from '../../services/motorbikeService';
 import CustomAlert from '../../components/common/CustomAlert';
-import { Pencil, Trash2 } from 'lucide-react-native';
+import { Pencil, Trash2, ArrowLeft, Plus, Search, DollarSign } from 'lucide-react-native';
 
 const PricePolicyManagementScreen = ({ navigation }) => {
   const [pricePolicies, setPricePolicies] = useState([]);
@@ -174,19 +174,23 @@ const PricePolicyManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <ArrowLeft size={20} color={COLORS.PRIMARY} />
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Price Policy</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAdd}
         >
-          <Text style={styles.addButtonText}>+ Add</Text>
+          <Plus size={20} color={COLORS.PRIMARY} />
+          <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <View style={styles.searchIcon}>
+          <Search size={20} color={COLORS.TEXT.SECONDARY} />
+        </View>
         <TextInput
           style={styles.searchInput}
           placeholder="Search price policies..."
@@ -209,7 +213,7 @@ const PricePolicyManagementScreen = ({ navigation }) => {
         >
           {filteredPolicies.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>💵</Text>
+              <DollarSign size={64} color={COLORS.TEXT.SECONDARY} />
               <Text style={styles.emptyText}>No price policies found</Text>
             </View>
           ) : (
@@ -224,13 +228,13 @@ const PricePolicyManagementScreen = ({ navigation }) => {
                       style={[styles.iconButton, styles.editButton]}
                       onPress={() => handleEdit(policy)}
                     >
-                      <Text style={styles.iconText}><Pencil size={14} /></Text>
+                      <Pencil size={16} color={COLORS.PRIMARY} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.iconButton, styles.deleteButton]}
                       onPress={() => handleDelete(policy.id, policy.title)}
                     >
-                      <Text style={styles.iconText}><Trash2 size={14} /></Text>
+                      <Trash2 size={16} color={COLORS.ERROR} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -280,7 +284,10 @@ const styles = StyleSheet.create({
     paddingTop: SIZES.PADDING.XXXLARGE,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: SIZES.PADDING.SMALL,
+    gap: 4,
   },
   backButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -295,7 +302,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: SIZES.PADDING.SMALL,
+    gap: 4,
   },
   addButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -313,8 +323,6 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.SMALL,
   },
   searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
     marginRight: SIZES.PADDING.SMALL,
   },
   searchInput: {
@@ -374,9 +382,6 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: COLORS.ERROR + '20',
   },
-  iconText: {
-    fontSize: SIZES.FONT.MEDIUM,
-  },
   policyContent: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
@@ -408,10 +413,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyText: {
     fontSize: SIZES.FONT.MEDIUM,
