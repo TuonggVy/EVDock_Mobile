@@ -91,6 +91,9 @@ import CustomerContractManagementScreen from '../screens/contract/CustomerContra
 import CreateCustomerContractScreen from '../screens/contract/CreateCustomerContractScreen';
 import EditCustomerContractScreen from '../screens/contract/EditCustomerContractScreen';
 import CustomerContractDetailScreen from '../screens/contract/CustomerContractDetailScreen';
+import CreditLineManagementScreen from '../screens/creditline/CreditLineManagementScreen';
+import CreateCreditLineScreen from '../screens/creditline/CreateCreditLineScreen';
+import CreditLineDetailScreen from '../screens/creditline/CreditLineDetailScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -558,6 +561,21 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="EditCustomerContract" 
               component={EditCustomerContractScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreditLineManagement" 
+              component={CreditLineManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateCreditLine" 
+              component={CreateCreditLineScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreditLineDetail" 
+              component={CreditLineDetailScreen} 
               options={{ headerShown: false }}
             />
           </>
