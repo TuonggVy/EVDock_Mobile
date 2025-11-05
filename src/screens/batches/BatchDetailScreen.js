@@ -7,19 +7,24 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, SIZES } from '../../constants';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import batchManagementService from '../../services/batchManagementService';
 import agencyService from '../../services/agencyService';
+import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Edit, FileText, DollarSign, Calendar, Building, Package } from 'lucide-react-native';
 
 const BatchDetailScreen = ({ navigation, route }) => {
+  const { user } = useAuth();
   const { batchId } = route.params || {};
   const [batch, setBatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [agencies, setAgencies] = useState([]);
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+
+  // Check if user is Dealer Manager (read-only)
+  const isDealerManager = user?.role === USER_ROLES.DEALER_MANAGER;
 
   useEffect(() => {
     loadAgencies();
@@ -173,13 +178,17 @@ const BatchDetailScreen = ({ navigation, route }) => {
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Batch Detail</Text>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={handleEdit}
-        >
-          <Edit size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.editButtonText}>Edit</Text>
-        </TouchableOpacity>
+        {!isDealerManager ? (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={handleEdit}
+          >
+            <Edit size={20} color={COLORS.PRIMARY} />
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerRight} />
+        )}
       </View>
 
       <ScrollView
