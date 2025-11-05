@@ -139,6 +139,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       icon: '💳',
       onPress: () => navigation.navigate('EVMStaffCreditLineManagement'),
     },
+    {
+      title: 'Ap Batches Management',
+      gradient: ['#34495E', '#5D6D7E', '#85929E'],
+      icon: '📋',
+      onPress: () => navigation.navigate('BatchManagement'),
+    },
   ];
 
 
