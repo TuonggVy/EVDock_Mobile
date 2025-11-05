@@ -81,8 +81,9 @@ import EditStockScreen from '../screens/stock/EditStockScreen';
 import StockDetailScreen from '../screens/stock/StockDetailScreen';
 import StaffStockListScreen from '../screens/stock/StaffStockListScreen';
 import StaffStockDetailScreen from '../screens/stock/StaffStockDetailScreen';
-import StockPromotionManagementScreen from '../screens/stock/StockPromotionManagementScreen';
-import StockPromotionDetailScreen from '../screens/stock/StockPromotionDetailScreen';
+import StockPromotionManagementScreen from '../screens/stockpromotion/StockPromotionManagementScreen';
+import StockPromotionDetailScreen from '../screens/stockpromotion/StockPromotionDetailScreen';
+import CreateStockPromotionScreen from '../screens/stockpromotion/CreateStockPromotionScreen';
 import DriveTrialManagementScreen from '../screens/drivetrial/DriveTrialManagementScreen';
 import DriveTrialDetailScreen from '../screens/drivetrial/DriveTrialDetailScreen';
 import CreateDriveTrialScreen from '../screens/drivetrial/CreateDriveTrialScreen';
@@ -477,6 +478,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="StockPromotionDetail" 
               component={StockPromotionDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateStockPromotion" 
+              component={CreateStockPromotionScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 

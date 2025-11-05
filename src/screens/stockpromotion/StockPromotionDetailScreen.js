@@ -19,7 +19,7 @@ import stockPromotionService from '../../services/stockPromotionService';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Edit, Calendar, Trash2, CheckSquare, Square } from 'lucide-react-native';
+import { Edit, Calendar, Trash2, CheckSquare, Square, ArrowLeft, Package } from 'lucide-react-native';
 
 const StockPromotionDetailScreen = ({ navigation, route }) => {
   const { stockPromotionId } = route.params || {};
@@ -80,12 +80,12 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
       if (response.success) {
         setStockPromotion(response.data);
       } else {
-        showError('Lỗi', response.error || 'Không thể tải chi tiết stock promotion');
+        showError('Error', response.error || 'Failed to load stock promotion detail');
         navigation.goBack();
       }
     } catch (error) {
       console.error('❌ [StockPromotionDetail] Exception:', error);
-      showError('Lỗi', 'Không thể tải chi tiết stock promotion');
+      showError('Error', 'Failed to load stock promotion detail');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -153,14 +153,25 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
   const handleStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
     if (selectedDate) {
-      setStartDate(selectedDate);
-      const formattedDate = formatDateForAPI(selectedDate);
+      // On Android (date mode), preserve the time from current date or set to current time
+      let dateWithTime = selectedDate;
+      if (Platform.OS === 'android') {
+        const now = new Date();
+        dateWithTime = new Date(selectedDate);
+        dateWithTime.setHours(now.getHours());
+        dateWithTime.setMinutes(now.getMinutes());
+        dateWithTime.setSeconds(0);
+        dateWithTime.setMilliseconds(0);
+      }
+      
+      setStartDate(dateWithTime);
+      const formattedDate = formatDateForAPI(dateWithTime);
       setEditPromotion(prev => ({ ...prev, startAt: formattedDate }));
       
       // If end date is before start date, update end date
-      if (selectedDate > endDate) {
-        setEndDate(selectedDate);
-        setEditPromotion(prev => ({ ...prev, endAt: formatDateForAPI(selectedDate) }));
+      if (dateWithTime > endDate) {
+        setEndDate(dateWithTime);
+        setEditPromotion(prev => ({ ...prev, endAt: formattedDate }));
       }
     }
   };
@@ -168,13 +179,24 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
   const handleEndDateChange = (event, selectedDate) => {
     setShowEndDatePicker(false);
     if (selectedDate) {
+      // On Android (date mode), preserve the time from current date or set to end of day
+      let dateWithTime = selectedDate;
+      if (Platform.OS === 'android') {
+        const now = new Date();
+        dateWithTime = new Date(selectedDate);
+        dateWithTime.setHours(now.getHours());
+        dateWithTime.setMinutes(now.getMinutes());
+        dateWithTime.setSeconds(0);
+        dateWithTime.setMilliseconds(0);
+      }
+      
       // Ensure end date is not before start date
-      if (selectedDate < startDate) {
-        showError('Lỗi', 'Ngày kết thúc phải sau ngày bắt đầu');
+      if (dateWithTime < startDate) {
+        showError('Error', 'End date must be after start date');
         return;
       }
-      setEndDate(selectedDate);
-      const formattedDate = formatDateForAPI(selectedDate);
+      setEndDate(dateWithTime);
+      const formattedDate = formatDateForAPI(dateWithTime);
       setEditPromotion(prev => ({ ...prev, endAt: formattedDate }));
     }
   };
@@ -205,7 +227,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     
     // Validation
     if (!editPromotion.name || !editPromotion.description || !editPromotion.value || !editPromotion.startAt || !editPromotion.endAt) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ các trường bắt buộc');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -228,15 +250,15 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
       console.log('📥 [StockPromotionDetail] API Response:', response);
 
       if (response.success) {
-        showSuccess('Thành công', 'Cập nhật stock promotion thành công!');
+        showSuccess('Success', 'Stock promotion updated successfully!');
         setShowEditModal(false);
         await loadStockPromotionDetail();
       } else {
-        showError('Lỗi', response.error || 'Không thể cập nhật stock promotion');
+        showError('Error', response.error || 'Failed to update stock promotion');
       }
     } catch (error) {
       console.error('❌ [StockPromotionDetail] Exception:', error);
-      showError('Lỗi', 'Không thể cập nhật stock promotion');
+      showError('Error', 'Failed to update stock promotion');
     } finally {
       setUpdating(false);
     }
@@ -253,24 +275,24 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
       console.log('📥 [StockPromotionDetail] Delete Response:', response);
 
       if (response.success) {
-        showSuccess('Thành công', 'Xóa stock promotion thành công!', () => {
+        showSuccess('Success', 'Stock promotion deleted successfully!', () => {
           navigation.goBack();
         });
       } else {
-        showError('Lỗi', response.error || 'Không thể xóa stock promotion');
+        showError('Error', response.error || 'Failed to delete stock promotion');
         setUpdating(false);
       }
     } catch (error) {
       console.error('❌ [StockPromotionDetail] Exception:', error);
-      showError('Lỗi', 'Không thể xóa stock promotion');
+      showError('Error', 'Failed to delete stock promotion');
       setUpdating(false);
     }
   };
 
   const confirmDelete = () => {
     showDeleteConfirm(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa promotion "${stockPromotion?.name || ''}"? Hành động này không thể hoàn tác.`,
+      'Confirm Delete',
+      `Are you sure you want to delete promotion "${stockPromotion?.name || ''}"? This action cannot be undone.`,
       handleDeletePromotion,
       () => {
         setUpdating(false);
@@ -334,7 +356,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     try {
       setLoadingStocks(true);
       if (!user?.agencyId) {
-        showError('Lỗi', 'Không tìm thấy thông tin đại lý');
+        showError('Error', 'Agency information not found');
         return;
       }
 
@@ -353,11 +375,11 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         // Load colors for the stocks
         await loadMotorbikeColors(stocksData);
       } else {
-        showError('Lỗi', response.error || 'Không thể tải danh sách stocks');
+        showError('Error', response.error || 'Failed to load stock list');
       }
     } catch (error) {
       console.error('❌ [StockPromotionDetail] Error loading stocks:', error);
-      showError('Lỗi', 'Không thể tải danh sách stocks');
+      showError('Error', 'Failed to load stock list');
     } finally {
       setLoadingStocks(false);
     }
@@ -391,7 +413,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
 
   const handleApplyPromotion = async () => {
     if (selectedStockIds.length === 0) {
-      showError('Lỗi', 'Vui lòng chọn ít nhất một stock');
+      showError('Error', 'Please select at least one stock');
       return;
     }
 
@@ -406,15 +428,15 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         // Close modal first
         setShowAssignmentModal(false);
         // Show success message and reload detail
-        showSuccess('Thành công', 'Áp dụng promotion cho stocks thành công!', async () => {
+        showSuccess('Success', 'Promotion applied to stocks successfully!', async () => {
           await loadStockPromotionDetail();
         });
       } else {
-        showError('Lỗi', response.error || 'Không thể áp dụng promotion cho stocks');
+        showError('Error', response.error || 'Failed to apply promotion to stocks');
       }
     } catch (error) {
       console.error('❌ [StockPromotionDetail] Exception:', error);
-      showError('Lỗi', 'Không thể áp dụng promotion cho stocks');
+      showError('Error', 'Failed to apply promotion to stocks');
     } finally {
       setApplying(false);
     }
@@ -447,7 +469,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Đang tải...</Text>
+          <ActivityIndicator size="large" color={COLORS.PRIMARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -457,7 +480,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Không tìm thấy stock promotion</Text>
+          <Package size={48} color={COLORS.TEXT.SECONDARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+          <Text style={styles.loadingText}>Stock promotion not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -470,9 +494,9 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chi tiết Stock Promotion</Text>
+        <Text style={styles.headerTitle}>Stock Promotion Detail</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.editButton, styles.headerActionButton, { marginLeft: 0 }]}
@@ -497,7 +521,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>
-            <Text style={styles.statusTitle}>Trạng thái</Text>
+            <Text style={styles.statusTitle}>Status</Text>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(stockPromotion.status) }]}>
               <Text style={styles.statusText}>{stockPromotion.status || 'N/A'}</Text>
             </View>
@@ -505,33 +529,33 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin chung</Text>
-          {renderInfoRow('Tên', stockPromotion.name || 'N/A')}
-          {renderInfoRow('Mô tả', stockPromotion.description || 'N/A')}
+          <Text style={styles.sectionTitle}>General Information</Text>
+          {renderInfoRow('Name', stockPromotion.name || 'N/A')}
+          {renderInfoRow('Description', stockPromotion.description || 'N/A')}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin giá trị</Text>
-          {renderInfoRow('Loại giảm giá', stockPromotion.valueType || 'N/A')}
-          {renderInfoRow('Giá trị gốc', stockPromotion.value?.toString() || 'N/A')}
-          {renderInfoRow('Giá trị', formatValue(stockPromotion.value, stockPromotion.valueType), {
+          <Text style={styles.sectionTitle}>Value Information</Text>
+          {renderInfoRow('Discount Type', stockPromotion.valueType || 'N/A')}
+          {renderInfoRow('Original Value', stockPromotion.value?.toString() || 'N/A')}
+          {renderInfoRow('Value', formatValue(stockPromotion.value, stockPromotion.valueType), {
             color: COLORS.SUCCESS,
             fontWeight: 'bold',
           })}
-          {renderInfoRow('Ngày bắt đầu', formatDate(stockPromotion.startAt))}
-          {renderInfoRow('Ngày kết thúc', formatDate(stockPromotion.endAt))}
+          {renderInfoRow('Start Date', formatDate(stockPromotion.startAt))}
+          {renderInfoRow('End Date', formatDate(stockPromotion.endAt))}
         </View>
 
         <TouchableOpacity
           style={styles.applyButton}
           onPress={handleOpenAssignmentModal}
         >
-          <Text style={styles.applyButtonText}>Áp dụng cho Stocks</Text>
+          <Text style={styles.applyButtonText}>Apply to Stocks</Text>
         </TouchableOpacity>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            Danh sách Agency Stock Promotion
+            Agency Stock Promotion List
             {stockPromotion.agencyStockPromotion ? ` (${stockPromotion.agencyStockPromotion.length})` : ' (0)'}
           </Text>
           
@@ -546,38 +570,38 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                     <Text style={styles.stockTitle}>Agency Stock #{stock.id}</Text>
                   </View>
                   
-                  <Text style={styles.stockSubtitle}>Thông tin Stock</Text>
-                  {renderInfoRow('Số lượng', `${stock.quantity || 0} đơn vị`)}
-                  {renderInfoRow('Giá gốc (VND)', stock.price?.toString() || 'N/A')}
-                  {renderInfoRow('Giá', formatPrice(stock.price), {
+                  <Text style={styles.stockSubtitle}>Stock Information</Text>
+                  {renderInfoRow('Quantity', `${stock.quantity || 0} units`)}
+                  {renderInfoRow('Original Price (VND)', stock.price?.toString() || 'N/A')}
+                  {renderInfoRow('Price', formatPrice(stock.price), {
                     color: COLORS.SUCCESS,
                     fontWeight: 'bold',
                   })}
 
                   {stock.motorbike ? (
                     <>
-                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Thông tin Xe máy</Text>
-                      {renderInfoRow('Tên xe', stock.motorbike.name || 'N/A')}
+                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Motorbike Information</Text>
+                      {renderInfoRow('Name', stock.motorbike.name || 'N/A')}
                       {renderInfoRow('Model', stock.motorbike.model || 'N/A')}
                       {renderInfoRow('Version', stock.motorbike.version || 'N/A')}
-                      {renderInfoRow('Xuất xứ', stock.motorbike.makeFrom || 'N/A')}
+                      {renderInfoRow('Origin', stock.motorbike.makeFrom || 'N/A')}
                     </>
                   ) : (
                     <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
-                      <Text style={styles.stockSubtitle}>Thông tin Xe máy</Text>
+                      <Text style={styles.stockSubtitle}>Motorbike Information</Text>
                       <Text style={styles.infoValue}>N/A</Text>
                     </View>
                   )}
 
                   {stock.color ? (
                     <>
-                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Thông tin Màu sắc</Text>
-                      {renderInfoRow('Loại màu', stock.color.colorType || 'N/A')}
+                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Color Information</Text>
+                      {renderInfoRow('Color Type', stock.color.colorType || 'N/A')}
                       {stock.color.id && renderInfoRow('Color ID', stock.color.id?.toString() || 'N/A')}
                     </>
                   ) : (
                     <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
-                      <Text style={styles.stockSubtitle}>Thông tin Màu sắc</Text>
+                      <Text style={styles.stockSubtitle}>Color Information</Text>
                       <Text style={styles.infoValue}>N/A</Text>
                     </View>
                   )}
@@ -586,7 +610,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             })
           ) : (
             <View style={styles.emptyStockList}>
-              <Text style={styles.emptyStockText}>Không có agency stock nào trong promotion này</Text>
+              <Text style={styles.emptyStockText}>No agency stocks in this promotion</Text>
             </View>
           )}
         </View>
@@ -617,9 +641,9 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
               style={styles.modalCloseButton}
               onPress={() => setShowEditModal(false)}
             >
-              <Text style={styles.modalCloseText}>Hủy</Text>
+              <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Chỉnh sửa Stock Promotion</Text>
+            <Text style={styles.modalTitle}>Edit Stock Promotion</Text>
             <TouchableOpacity
               style={styles.modalSaveButton}
               onPress={handleUpdatePromotion}
@@ -628,30 +652,30 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
               {updating ? (
                 <ActivityIndicator color={COLORS.TEXT.WHITE} />
               ) : (
-                <Text style={styles.modalSaveText}>Lưu</Text>
+                <Text style={styles.modalSaveText}>Save</Text>
               )}
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tên promotion *</Text>
+              <Text style={styles.inputLabel}>Promotion Name *</Text>
               <TextInput
                 style={styles.textInput}
                 value={editPromotion.name}
                 onChangeText={(text) => setEditPromotion(prev => ({ ...prev, name: text }))}
-                placeholder="Nhập tên promotion"
+                placeholder="Enter promotion name"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Mô tả *</Text>
+              <Text style={styles.inputLabel}>Description *</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
                 value={editPromotion.description}
                 onChangeText={(text) => setEditPromotion(prev => ({ ...prev, description: text }))}
-                placeholder="Nhập mô tả"
+                placeholder="Enter description"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 multiline
                 numberOfLines={4}
@@ -659,7 +683,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Loại giảm giá *</Text>
+              <Text style={styles.inputLabel}>Discount Type *</Text>
               <View style={styles.selectorRow}>
                 <TouchableOpacity
                   style={[
@@ -694,19 +718,19 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Giá trị *</Text>
+              <Text style={styles.inputLabel}>Value *</Text>
               <TextInput
                 style={styles.textInput}
                 value={editPromotion.value}
                 onChangeText={(text) => setEditPromotion(prev => ({ ...prev, value: text }))}
-                placeholder={editPromotion.valueType === 'PERCENT' ? "Nhập phần trăm (ví dụ: 10)" : "Nhập số tiền (ví dụ: 50000)"}
+                placeholder={editPromotion.valueType === 'PERCENT' ? "Enter percentage (e.g., 10)" : "Enter amount (e.g., 50000)"}
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 keyboardType="numeric"
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Ngày bắt đầu *</Text>
+              <Text style={styles.inputLabel}>Start Date *</Text>
               <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => setShowStartDatePicker(true)}
@@ -715,7 +739,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                   styles.dateInputText,
                   !editPromotion.startAt && styles.dateInputTextPlaceholder
                 ]}>
-                  {editPromotion.startAt ? formatDateForDisplay(editPromotion.startAt) : 'Chọn ngày bắt đầu'}
+                  {editPromotion.startAt ? formatDateForDisplay(editPromotion.startAt) : 'Select start date'}
                 </Text>
                 <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
               </TouchableOpacity>
@@ -724,15 +748,15 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             {showStartDatePicker && (
               <DateTimePicker
                 value={startDate}
-                mode="datetime"
+                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
                 is24Hour={true}
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleStartDateChange}
               />
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Ngày kết thúc *</Text>
+              <Text style={styles.inputLabel}>End Date *</Text>
               <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => setShowEndDatePicker(true)}
@@ -741,7 +765,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                   styles.dateInputText,
                   !editPromotion.endAt && styles.dateInputTextPlaceholder
                 ]}>
-                  {editPromotion.endAt ? formatDateForDisplay(editPromotion.endAt) : 'Chọn ngày kết thúc'}
+                  {editPromotion.endAt ? formatDateForDisplay(editPromotion.endAt) : 'Select end date'}
                 </Text>
                 <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
               </TouchableOpacity>
@@ -750,16 +774,16 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             {showEndDatePicker && (
               <DateTimePicker
                 value={endDate}
-                mode="datetime"
+                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
                 is24Hour={true}
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleEndDateChange}
                 minimumDate={startDate}
               />
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Trạng thái *</Text>
+              <Text style={styles.inputLabel}>Status *</Text>
               <View style={styles.selectorRow}>
                 <TouchableOpacity
                   style={[
@@ -808,9 +832,9 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
               style={styles.modalCloseButton}
               onPress={() => setShowAssignmentModal(false)}
             >
-              <Text style={styles.modalCloseText}>Hủy</Text>
+              <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Chọn Stocks</Text>
+            <Text style={styles.modalTitle}>Select Stocks</Text>
             <TouchableOpacity
               style={styles.modalSaveButton}
               onPress={handleApplyPromotion}
@@ -823,7 +847,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                   styles.modalSaveText,
                   selectedStockIds.length === 0 && styles.modalSaveTextDisabled
                 ]}>
-                  Áp dụng ({selectedStockIds.length})
+                  Apply ({selectedStockIds.length})
                 </Text>
               )}
             </TouchableOpacity>
@@ -832,8 +856,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
           <ScrollView style={styles.modalContent}>
             {loadingStocks ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-                <Text style={styles.loadingText}>Đang tải danh sách stocks...</Text>
+                <ActivityIndicator size="large" color={COLORS.PRIMARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+                <Text style={styles.loadingText}>Loading stock list...</Text>
               </View>
             ) : (() => {
               const availableStocks = getAvailableStocks();
@@ -842,8 +866,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyText}>
                       {stocks.length === 0 
-                        ? 'Không có stock nào' 
-                        : 'Tất cả stocks đã được áp dụng promotion này'}
+                        ? 'No stocks available' 
+                        : 'All stocks have been applied to this promotion'}
                     </Text>
                   </View>
                 );
@@ -878,9 +902,9 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                         {motorbikeName} - {colorType}
                       </Text>
                       <View style={styles.stockSelectRow}>
-                        <Text style={styles.stockSelectLabel}>Số lượng: </Text>
+                        <Text style={styles.stockSelectLabel}>Quantity: </Text>
                         <Text style={styles.stockSelectValue}>{stock.quantity || 0}</Text>
-                        <Text style={[styles.stockSelectLabel, { marginLeft: SIZES.PADDING.MEDIUM }]}>Giá: </Text>
+                        <Text style={[styles.stockSelectLabel, { marginLeft: SIZES.PADDING.MEDIUM }]}>Price: </Text>
                         <Text style={[styles.stockSelectValue, styles.priceValue]}>
                           {new Intl.NumberFormat('vi-VN', {
                             style: 'currency',
@@ -924,11 +948,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
