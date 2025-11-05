@@ -209,7 +209,7 @@ const CustomerContractManagementScreen = ({ navigation }) => {
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Main', { screen: 'Home' })}>
           <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
@@ -293,75 +293,71 @@ const CustomerContractManagementScreen = ({ navigation }) => {
   );
 
   const renderContractCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.contractCard}
-      onPress={() => navigation.navigate('CustomerContractDetail', { contractId: item.id })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.contractCardHeader}>
-        <View style={styles.contractCardTitleRow}>
-          <NotepadText color={COLORS.PRIMARY} size={20} />
-          <Text style={styles.contractTitle} numberOfLines={1}>
-            {item.title || 'Untitled Contract'}
-          </Text>
+    <View style={styles.contractCard}>
+      <TouchableOpacity
+        style={styles.contractCardContent}
+        onPress={() => navigation.navigate('CustomerContractDetail', { contractId: item.id })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.contractCardHeader}>
+          <View style={styles.contractCardTitleRow}>
+            <NotepadText color={COLORS.PRIMARY} size={20} />
+            <Text style={styles.contractTitle} numberOfLines={1}>
+              {item.title || 'Untitled Contract'}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
 
-      <View style={styles.contractCardBody}>
-        <View style={styles.contractInfoRow}>
-          <Text style={styles.contractInfoLabel}>Contract Code:</Text>
-          <Text style={styles.contractInfoValue}>{item.contractCode || `#${item.id}`}</Text>
-        </View>
-        <View style={styles.contractInfoRow}>
-          <Text style={styles.contractInfoLabel}>Type:</Text>
-          <Text style={styles.contractInfoValue}>{getContractTypeLabel(item.contractPaidType)}</Text>
-        </View>
-        <View style={styles.contractInfoRow}>
-          <Text style={styles.contractInfoLabel}>Final Price:</Text>
-          <Text style={[styles.contractInfoValue, styles.priceText]}>
-            {formatPrice(item.finalPrice || 0)}
-          </Text>
-        </View>
-        {item.signDate && (
+        <View style={styles.contractCardBody}>
           <View style={styles.contractInfoRow}>
-            <Text style={styles.contractInfoLabel}>Sign Date:</Text>
-            <Text style={styles.contractInfoValue}>{formatDate(item.signDate)}</Text>
+            <Text style={styles.contractInfoLabel}>Contract Code:</Text>
+            <Text style={styles.contractInfoValue}>{item.contractCode || `#${item.id}`}</Text>
           </View>
-        )}
-        {item.deliveryDate && (
           <View style={styles.contractInfoRow}>
-            <Text style={styles.contractInfoLabel}>Delivery Date:</Text>
-            <Text style={styles.contractInfoValue}>{formatDate(item.deliveryDate)}</Text>
+            <Text style={styles.contractInfoLabel}>Type:</Text>
+            <Text style={styles.contractInfoValue}>{getContractTypeLabel(item.contractPaidType)}</Text>
           </View>
-        )}
-      </View>
+          <View style={styles.contractInfoRow}>
+            <Text style={styles.contractInfoLabel}>Final Price:</Text>
+            <Text style={[styles.contractInfoValue, styles.priceText]}>
+              {formatPrice(item.finalPrice || 0)}
+            </Text>
+          </View>
+          {item.signDate && (
+            <View style={styles.contractInfoRow}>
+              <Text style={styles.contractInfoLabel}>Sign Date:</Text>
+              <Text style={styles.contractInfoValue}>{formatDate(item.signDate)}</Text>
+            </View>
+          )}
+          {item.deliveryDate && (
+            <View style={styles.contractInfoRow}>
+              <Text style={styles.contractInfoLabel}>Delivery Date:</Text>
+              <Text style={styles.contractInfoValue}>{formatDate(item.deliveryDate)}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
 
       <View style={styles.contractCardFooter}>
         <TouchableOpacity
           style={styles.editButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            navigation.navigate('EditCustomerContract', { contractId: item.id });
-          }}
+          onPress={() => navigation.navigate('EditCustomerContract', { contractId: item.id })}
         >
           <Pencil color={COLORS.PRIMARY} size={16} />
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteContract(item.id);
-          }}
+          onPress={() => handleDeleteContract(item.id)}
         >
           <Trash2 color={COLORS.ERROR} size={16} />
           <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   if (loading && contracts.length === 0) {
@@ -552,6 +548,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  contractCardContent: {
+    flex: 1,
   },
   contractCardHeader: {
     flexDirection: 'row',
