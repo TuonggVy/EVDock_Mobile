@@ -161,6 +161,12 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       icon: '💰',
       onPress: () => navigation.navigate('PricePolicyManagement'),
     },
+    {
+      title: 'Credit Line',
+      gradient: ['#FF6B9D', '#C44569', '#A020F0'],
+      icon: '💳',
+      onPress: () => navigation.navigate('CreditLineManagement'),
+    },
   ];
 
   // Filter category cards based on search query
