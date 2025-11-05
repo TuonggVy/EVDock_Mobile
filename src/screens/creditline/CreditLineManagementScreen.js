@@ -24,6 +24,7 @@ const CreditLineManagementScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'blocked'
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
 
@@ -155,8 +156,17 @@ const CreditLineManagementScreen = ({ navigation }) => {
     const matchesSearch = agencyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       creditLine.id?.toString().includes(searchQuery);
     
-    return matchesSearch;
+    // Filter by tab status
+    const matchesTab = activeTab === 'active' 
+      ? !creditLine.isBlocked  // Active tab: isBlocked = false
+      : creditLine.isBlocked;   // Blocked tab: isBlocked = true
+    
+    return matchesSearch && matchesTab;
   });
+
+  // Calculate counts for each tab
+  const activeCount = creditLines.filter(cl => !cl.isBlocked).length;
+  const blockedCount = creditLines.filter(cl => cl.isBlocked).length;
 
   return (
     <View style={styles.container}>
@@ -197,6 +207,38 @@ const CreditLineManagementScreen = ({ navigation }) => {
         />
       </View>
 
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'active' && styles.activeTabButton
+          ]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'active' && styles.activeTabText
+          ]}>
+            Active ({activeCount})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'blocked' && styles.activeTabButton
+          ]}
+          onPress={() => setActiveTab('blocked')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'blocked' && styles.activeTabText
+          ]}>
+            Blocked ({blockedCount})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Credit Lines List */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -212,7 +254,11 @@ const CreditLineManagementScreen = ({ navigation }) => {
           {filteredCreditLines.length === 0 ? (
             <View style={styles.emptyContainer}>
               <CreditCard size={60} color={COLORS.TEXT.SECONDARY} />
-              <Text style={styles.emptyText}>No credit lines found</Text>
+              <Text style={styles.emptyText}>
+                {activeTab === 'active' 
+                  ? 'No active credit lines found' 
+                  : 'No blocked credit lines found'}
+              </Text>
             </View>
           ) : (
             filteredCreditLines.map((creditLine) => (
@@ -420,6 +466,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTabButton: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  tabText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+  },
+  activeTabText: {
+    color: COLORS.TEXT.WHITE,
   },
 });
 
