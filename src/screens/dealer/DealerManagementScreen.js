@@ -17,6 +17,7 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import agencyService from '../../services/agencyService';
+import { ArrowLeft, Plus, Search, CheckCircle, XCircle, HelpCircle, Building2, AlertTriangle, Pencil, Trash2 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -39,8 +40,8 @@ const DealerManagementScreen = ({ navigation }) => {
 
   // Status options
   const statusOptions = [
-    { value: 'Active', label: 'Hoạt động', color: COLORS.SUCCESS },
-    { value: 'Inactive', label: 'Không hoạt động', color: COLORS.ERROR },
+    { value: 'Active', label: 'Active', color: COLORS.SUCCESS },
+    { value: 'Inactive', label: 'Inactive', color: COLORS.ERROR },
   ];
 
   useEffect(() => {
@@ -57,11 +58,11 @@ const DealerManagementScreen = ({ navigation }) => {
         console.log('Setting agencies:', res.data);
         setAgencies(res.data || []);
       } else {
-        showError('Lỗi', res?.error || 'Không thể tải danh sách đại lý');
+        showError('Error', res?.error || 'Unable to load agencies list');
       }
     } catch (error) {
       console.error('Error loading agencies:', error);
-      showError('Lỗi', 'Không thể tải danh sách đại lý');
+      showError('Error', 'Unable to load agencies list');
     }
   };
 
@@ -85,14 +86,14 @@ const DealerManagementScreen = ({ navigation }) => {
 
   const getStatusText = (status) => {
     const statusOption = statusOptions.find(option => option.value === status);
-    return statusOption ? statusOption.label : 'Không xác định';
+    return statusOption ? statusOption.label : 'Unknown';
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'Active': return '✅';
-      case 'Inactive': return '❌';
-      default: return '❓';
+      case 'Active': return <CheckCircle size={14} color={COLORS.TEXT.WHITE} />;
+      case 'Inactive': return <XCircle size={14} color={COLORS.TEXT.WHITE} />;
+      default: return <HelpCircle size={14} color={COLORS.TEXT.WHITE} />;
     }
   };
 
@@ -121,7 +122,7 @@ const DealerManagementScreen = ({ navigation }) => {
 
   const handleSaveDealer = async () => {
     if (!newAgency.name || !newAgency.location || !newAgency.address || !newAgency.contactInfo) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -149,13 +150,13 @@ const DealerManagementScreen = ({ navigation }) => {
         if (editingAgency) {
           setShowEditModal(false);
           setEditingAgency(null);
-          showSuccess('Thành công', 'Cập nhật đại lý thành công!');
+          showSuccess('Success', 'Agency updated successfully!');
         } else {
           setShowAddModal(false);
-          showSuccess('Thành công', 'Thêm mới đại lý thành công!');
+          showSuccess('Success', 'Agency added successfully!');
         }
       } else {
-        showError('Lỗi', res?.error || 'Không thể lưu thông tin đại lý');
+        showError('Error', res?.error || 'Unable to save agency information');
       }
 
       setNewAgency({
@@ -167,21 +168,21 @@ const DealerManagementScreen = ({ navigation }) => {
       });
     } catch (error) {
       console.error('Error saving agency:', error);
-      showError('Lỗi', 'Không thể lưu thông tin đại lý');
+      showError('Error', 'Unable to save agency information');
     }
   };
 
   const handleDeleteDealer = (agencyId) => {
     showConfirm(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa đại lý này?',
+      'Confirm Delete',
+      'Are you sure you want to delete this agency?',
       async () => {
         const res = await agencyService.deleteAgency(agencyId);
         if (res?.success) {
           await loadAgencies();
-          showSuccess('Thành công', 'Xóa đại lý thành công!');
+          showSuccess('Success', 'Agency deleted successfully!');
         } else {
-          showError('Lỗi', res?.error || 'Không thể xóa đại lý');
+          showError('Error', res?.error || 'Unable to delete agency');
         }
       }
     );
@@ -189,15 +190,15 @@ const DealerManagementScreen = ({ navigation }) => {
 
   const handleStatusChange = (agencyId, newStatus) => {
     showConfirm(
-      'Xác nhận thay đổi trạng thái',
-      `Bạn có chắc chắn muốn thay đổi trạng thái đại lý thành "${getStatusText(newStatus)}"?`,
+      'Confirm Status Change',
+      `Are you sure you want to change the agency status to "${getStatusText(newStatus)}"?`,
       async () => {
         const res = await agencyService.updateAgencyStatus(agencyId, newStatus);
         if (res?.success) {
           await loadAgencies();
-          showSuccess('Thành công', 'Cập nhật trạng thái thành công!');
+          showSuccess('Success', 'Status updated successfully!');
         } else {
-          showError('Lỗi', res?.error || 'Không thể cập nhật trạng thái');
+          showError('Error', res?.error || 'Unable to update status');
         }
       }
     );
@@ -219,7 +220,7 @@ const DealerManagementScreen = ({ navigation }) => {
         </View>
         <View style={styles.statusContainer}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(agency.status) }]}>
-            <Text style={styles.statusIcon}>{getStatusIcon(agency.status)}</Text>
+            {getStatusIcon(agency.status)}
             <Text style={styles.statusText}>{getStatusText(agency.status)}</Text>
           </View>
         </View>
@@ -227,12 +228,12 @@ const DealerManagementScreen = ({ navigation }) => {
 
       <View style={styles.cardContent}>
         <View style={styles.contactInfo}>
-          <Text style={styles.contactLabel}>Địa chỉ:</Text>
+          <Text style={styles.contactLabel}>Address:</Text>
           <Text style={styles.contactValue}>{agency.address}</Text>
         </View>
 
         <View style={styles.contactInfo}>
-          <Text style={styles.contactLabel}>Thông tin liên hệ:</Text>
+          <Text style={styles.contactLabel}>Contact Info:</Text>
           <Text style={styles.contactDetail}>{agency.contactInfo}</Text>
         </View>
       </View>
@@ -242,21 +243,21 @@ const DealerManagementScreen = ({ navigation }) => {
           style={styles.editButton}
           onPress={() => handleEditDealer(agency)}
         >
-          <Text style={styles.editButtonText}>Chỉnh sửa</Text>
+          <Pencil size={16} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteDealer(agency.id)}
+        >
+          <Trash2 size={16} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.statusButton}
           onPress={() => handleStatusChange(agency.id, agency.status === 'Active' ? 'Inactive' : 'Active')}
         >
           <Text style={styles.statusButtonText}>
-            {agency.status === 'Active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
+            {agency.status === 'Active' ? 'Deactivate' : 'Activate'}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteDealer(agency.id)}
-        >
-          <Text style={styles.deleteButtonText}>Xóa</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -285,49 +286,49 @@ const DealerManagementScreen = ({ navigation }) => {
               });
             }}
           >
-            <Text style={styles.modalCloseText}>Hủy</Text>
+            <Text style={styles.modalCloseText}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.modalTitle}>
-            {editingAgency ? 'Chỉnh sửa đại lý' : 'Thêm mới đại lý'}
+            {editingAgency ? 'Edit Agency' : 'Add New Agency'}
           </Text>
           <TouchableOpacity
             style={styles.modalSaveButton}
             onPress={handleSaveDealer}
           >
-            <Text style={styles.modalSaveText}>Lưu</Text>
+            <Text style={styles.modalSaveText}>Save</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.modalContent}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Tên đại lý *</Text>
+            <Text style={styles.inputLabel}>Agency Name *</Text>
             <TextInput
               style={styles.textInput}
               value={newAgency.name}
               onChangeText={(text) => setNewAgency({ ...newAgency, name: text })}
-              placeholder="Nhập tên đại lý"
+              placeholder="Enter agency name"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Khu vực *</Text>
+            <Text style={styles.inputLabel}>Location *</Text>
             <TextInput
               style={styles.textInput}
               value={newAgency.location}
               onChangeText={(text) => setNewAgency({ ...newAgency, location: text })}
-              placeholder="Nhập khu vực"
+              placeholder="Enter location"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Địa chỉ *</Text>
+            <Text style={styles.inputLabel}>Address *</Text>
             <TextInput
               style={[styles.textInput, styles.textArea]}
               value={newAgency.address}
               onChangeText={(text) => setNewAgency({ ...newAgency, address: text })}
-              placeholder="Nhập địa chỉ"
+              placeholder="Enter address"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
               multiline
               numberOfLines={2}
@@ -335,12 +336,12 @@ const DealerManagementScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Thông tin liên hệ *</Text>
+            <Text style={styles.inputLabel}>Contact Info *</Text>
             <TextInput
               style={styles.textInput}
               value={newAgency.contactInfo}
               onChangeText={(text) => setNewAgency({ ...newAgency, contactInfo: text })}
-              placeholder="Nhập thông tin liên hệ"
+              placeholder="Enter contact information"
               placeholderTextColor={COLORS.TEXT.SECONDARY}
               keyboardType="email-address"
             />
@@ -363,23 +364,23 @@ const DealerManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý Agencies</Text>
+        <Text style={styles.headerTitle}>Agency Management</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddDealer}
         >
-          <Text style={styles.addIcon}>+</Text>
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm đại lý, mã, liên hệ..."
+          placeholder="Search agencies, code, contact..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -390,15 +391,15 @@ const DealerManagementScreen = ({ navigation }) => {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{totalAgencies}</Text>
-          <Text style={styles.statLabel}>Tổng đại lý</Text>
+          <Text style={styles.statLabel}>Total Agencies</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{activeAgencies}</Text>
-          <Text style={styles.statLabel}>Hoạt động</Text>
+          <Text style={styles.statLabel}>Active</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{inactiveAgencies}</Text>
-          <Text style={styles.statLabel}>Không hoạt động</Text>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{inactiveAgencies}</Text>
+          <Text style={styles.statLabel}>Inactive</Text>
         </View>
       </View>
 
@@ -415,7 +416,7 @@ const DealerManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'Active' && styles.activeTabText
           ]}>
-            Đang hoạt động ({activeAgencies})
+            Active ({activeAgencies})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -429,7 +430,7 @@ const DealerManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'Inactive' && styles.activeTabText
           ]}>
-            Không hoạt động ({inactiveAgencies})
+            Inactive ({inactiveAgencies})
           </Text>
         </TouchableOpacity>
       </View>
@@ -444,19 +445,21 @@ const DealerManagementScreen = ({ navigation }) => {
           filteredAgencies.map(renderDealerCard)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>
-              {activeTab === 'Active' ? '🏢' : '⚠️'}
-            </Text>
+            {activeTab === 'Active' ? (
+              <Building2 size={64} color={COLORS.TEXT.SECONDARY} />
+            ) : (
+              <AlertTriangle size={64} color={COLORS.TEXT.SECONDARY} />
+            )}
             <Text style={styles.emptyTitle}>
               {activeTab === 'Active' 
-                ? 'Không có đại lý đang hoạt động' 
-                : 'Không có đại lý không hoạt động'
+                ? 'No Active Agencies' 
+                : 'No Inactive Agencies'
               }
             </Text>
             <Text style={styles.emptySubtitle}>
               {activeTab === 'Active'
-                ? 'Tất cả đại lý đều không hoạt động hoặc chưa có đại lý nào'
-                : 'Tất cả đại lý đều đang hoạt động'
+                ? 'All agencies are inactive or no agencies exist yet'
+                : 'All agencies are currently active'
               }
             </Text>
           </View>
@@ -508,11 +511,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -524,14 +522,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search
@@ -548,11 +541,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -577,7 +566,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SUCCESS,
     marginBottom: 4,
   },
   statLabel: {
@@ -623,7 +612,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   tabText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -669,7 +658,7 @@ const styles = StyleSheet.create({
   dealerName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     marginBottom: 4,
   },
   dealerCity: {
@@ -687,7 +676,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.SMALL,
   },
   statusIcon: {
-    fontSize: SIZES.FONT.SMALL,
     marginRight: 4,
   },
   statusText: {
@@ -772,18 +760,16 @@ const styles = StyleSheet.create({
     gap: SIZES.PADDING.SMALL,
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#000000",
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
   statusButton: {
-    backgroundColor: COLORS.WARNING,
+    backgroundColor: "#000000",
     borderRadius: SIZES.RADIUS.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
@@ -794,15 +780,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR,
+    backgroundColor: "#000000",
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
 
   // Empty State
@@ -812,7 +796,6 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyIcon: {
-    fontSize: 64,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
@@ -861,7 +844,7 @@ const styles = StyleSheet.create({
   },
   modalSaveText: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '600',
   },
   modalContent: {
