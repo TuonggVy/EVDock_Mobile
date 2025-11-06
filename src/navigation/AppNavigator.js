@@ -103,6 +103,7 @@ import AgencyBatchManagementScreen from '../screens/batches/AgencyBatchManagemen
 import CreateBatchScreen from '../screens/batches/CreateBatchScreen';
 import EditBatchScreen from '../screens/batches/EditBatchScreen';
 import BatchDetailScreen from '../screens/batches/BatchDetailScreen';
+import ReportsScreen from '../screens/reports/ReportsScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -630,6 +631,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="BatchDetail" 
               component={BatchDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Reports" 
+              component={ReportsScreen} 
               options={{ headerShown: false }}
             />
           </>
