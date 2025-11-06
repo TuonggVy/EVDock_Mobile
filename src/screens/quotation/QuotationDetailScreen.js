@@ -644,7 +644,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               });
             }}
           >
-            <Pencil size={18} color={COLORS.PRIMARY} />
+            <Pencil size={18} color="#009DFF" />
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         </View>
@@ -1247,11 +1247,11 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.SMALL,
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
     borderWidth: 1,
-    borderColor: COLORS.PRIMARY,
+    borderColor: "#009DFF",
   },
   editButtonText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -1443,7 +1443,7 @@ const styles = StyleSheet.create({
   },
   contractButton: {
     flex: 1,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',

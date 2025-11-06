@@ -316,7 +316,7 @@ const EditDepositScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -360,7 +360,7 @@ const EditDepositScreen = ({ navigation, route }) => {
               {loadingQuotation && (
                 <ActivityIndicator 
                   size="small" 
-                  color={COLORS.PRIMARY} 
+                  color="#009DFF" 
                   style={styles.loadingIndicator}
                 />
               )}
@@ -459,11 +459,11 @@ const EditDepositScreen = ({ navigation, route }) => {
             disabled={loading}
           >
             <LinearGradient
-              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : COLORS.GRADIENT.BLUE}
+              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : ['#009DFF', '#009DFF']}
               style={styles.submitButtonGradient}
             >
               {loading ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                <ActivityIndicator color="#009DFF" />
               ) : (
                 <Text style={styles.submitButtonText}>Update Deposit</Text>
               )}
@@ -745,8 +745,8 @@ const styles = StyleSheet.create({
     borderColor: '#E9ECEF',
   },
   statusOptionSelected: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
+    borderColor: "#009DFF",
   },
   statusOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
