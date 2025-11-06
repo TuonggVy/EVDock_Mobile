@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { ArrowLeft, Warehouse, Pencil, Trash2 } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -80,7 +82,7 @@ const WarehouseDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
       </SafeAreaView>
     );
@@ -91,7 +93,7 @@ const WarehouseDetailScreen = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Warehouse Detail</Text>
         <View style={styles.headerActions}>
@@ -102,7 +104,7 @@ const WarehouseDetailScreen = ({ navigation, route }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Warehouse Icon */}
         <View style={styles.iconContainer}>
-          <Text style={styles.warehouseIcon}>🏭</Text>
+          <Warehouse size={80} color="#009DFF" />
         </View>
 
         {/* Basic Information */}
@@ -150,18 +152,31 @@ const WarehouseDetailScreen = ({ navigation, route }) => {
             style={[styles.actionButton, styles.editButton]}
             onPress={handleEdit}
           >
-            <Text style={styles.editButtonText}>✏️ Edit Warehouse</Text>
+            <Pencil size={20} color={COLORS.TEXT.WHITE} />
+            <Text style={styles.editButtonText}>Edit Warehouse</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={handleDelete}
           >
-            <Text style={styles.deleteButtonText}>🗑️ Delete Warehouse</Text>
+            <Trash2 size={20} color={COLORS.TEXT.WHITE} />
+            <Text style={styles.deleteButtonText}>Delete Warehouse</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      <CustomAlert {...alertConfig} />
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
@@ -186,10 +201,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.XXLARGE,
-    color: COLORS.TEXT.WHITE,
-  },
   headerTitle: {
     fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
@@ -212,17 +223,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.SECONDARY,
-  },
   iconContainer: {
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
     backgroundColor: COLORS.SURFACE,
-  },
-  warehouseIcon: {
-    fontSize: 80,
   },
   section: {
     paddingHorizontal: SIZES.PADDING.LARGE,
@@ -283,7 +287,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.PADDING.SMALL,
     marginBottom: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -292,7 +299,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   editButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -300,7 +307,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR,
+    backgroundColor: "#000000",
   },
   deleteButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
