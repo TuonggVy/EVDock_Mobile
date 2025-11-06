@@ -10,11 +10,13 @@ import {
   Image,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import { Bell, ChartColumnIncreasing, UserRound } from 'lucide-react-native';
+import reportService from '../../services/reportService';
 
 const EVMAdminHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -22,11 +24,63 @@ const EVMAdminHomeScreen = ({ navigation }) => {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Quick Stats state
+  const [quickStats, setQuickStats] = useState({
+    totalAgencies: 0,
+    totalWarehouses: 0,
+    totalMotorbikes: 0,
+    totalRevenue: 0,
+    loading: true,
+  });
+  
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
   const fadeAnim = useState(new Animated.Value(1))[0];
   const slideAnim = useState(new Animated.Value(0))[0];
+
+  // Load Quick Stats
+  useEffect(() => {
+    loadQuickStats();
+    
+    // Refresh stats when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadQuickStats();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadQuickStats = async () => {
+    try {
+      setQuickStats(prev => ({ ...prev, loading: true }));
+      const agencyId = user?.agencyId || null;
+
+      // Fetch all stats in parallel
+      const [
+        agenciesRes,
+        warehousesRes,
+        motorbikesRes,
+        revenueRes,
+      ] = await Promise.all([
+        reportService.getTotalAgencies(),
+        reportService.getTotalWarehouses(),
+        reportService.getTotalMotorbikes(),
+        reportService.getTotalContractRevenue(agencyId),
+      ]);
+
+      setQuickStats({
+        totalAgencies: agenciesRes?.data?.totalAgencies || agenciesRes?.data || 0,
+        totalWarehouses: warehousesRes?.data?.totalWarehouses || warehousesRes?.data || 0,
+        totalMotorbikes: motorbikesRes?.data?.totalMotorbikes || motorbikesRes?.data || 0,
+        totalRevenue: revenueRes?.data?.totalContractRevenue || 0,
+        loading: false,
+      });
+    } catch (error) {
+      console.error('Error loading quick stats:', error);
+      setQuickStats(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   // Auto-slide effect with smooth transitions
   useEffect(() => {
@@ -153,7 +207,7 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       title: 'Reports',
       gradient: COLORS.GRADIENT.PURPLE,
       icon: '📊',
-      onPress: () => Alert.alert('Tính năng', 'Báo cáo toàn diện - Sắp ra mắt'),
+      onPress: () => navigation.navigate('Reports'),
     },
     {
       title: 'Price Policy',
@@ -292,20 +346,50 @@ const EVMAdminHomeScreen = ({ navigation }) => {
           <View style={styles.statsContainer}>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>15</Text>
-                <Text style={styles.statLabel}>Đại lý</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalAgencies}</Text>
+                    <Text style={styles.statLabel}>Đại lý</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>1,234</Text>
-                <Text style={styles.statLabel}>Xe trong kho</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalMotorbikes.toLocaleString()}</Text>
+                    <Text style={styles.statLabel}>Xe trong kho</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>$2.5M</Text>
-                <Text style={styles.statLabel}>Doanh thu tháng</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>
+                      {quickStats.totalRevenue >= 1000000 
+                        ? `$${(quickStats.totalRevenue / 1000000).toFixed(1)}M`
+                        : quickStats.totalRevenue >= 1000
+                        ? `$${(quickStats.totalRevenue / 1000).toFixed(1)}K`
+                        : `$${quickStats.totalRevenue.toLocaleString()}`}
+                    </Text>
+                    <Text style={styles.statLabel}>Doanh thu</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>98.5%</Text>
-                <Text style={styles.statLabel}>Tỷ lệ hoàn thành</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalWarehouses}</Text>
+                    <Text style={styles.statLabel}>Kho</Text>
+                  </>
+                )}
               </View>
             </View>
           </View>
