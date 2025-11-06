@@ -447,7 +447,7 @@ if (!vehicleId) {
           
           {renderInput('Version', 'version', formData.version, 'e.g., 2025')}
 
-          {renderInput('Price ($)', 'price', formData.price, 'e.g., 150000', 'numeric')}
+          {renderInput('Price (VNĐ)', 'price', formData.price, 'e.g., 150000', 'numeric')}
           {renderInput('Description', 'description', formData.description, 'Enter product description...', 'default', true)}
         </View>
 
@@ -583,7 +583,7 @@ if (!vehicleId) {
             disabled={loading}
           >
             <LinearGradient
-              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : COLORS.GRADIENT.BLUE}
+              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : ['#009DFF', '#009DFF']}
               style={styles.submitGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
