@@ -16,6 +16,7 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
 import * as ImagePicker from 'expo-image-picker';
+import { ArrowLeft, Check, Camera, X } from 'lucide-react-native';
 
 const EditProductScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -730,7 +731,7 @@ const EditProductScreen = ({ navigation, route }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.headerTitleText}>Edit Product</Text>
@@ -896,7 +897,7 @@ const EditProductScreen = ({ navigation, route }) => {
                       {/* Selection Overlay */}
                       {selectedImages.includes(index) && (
                         <View style={styles.selectedOverlay}>
-                          <Text style={styles.checkmark}>✓</Text>
+                          <Check size={40} color={COLORS.TEXT.WHITE} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -936,7 +937,10 @@ const EditProductScreen = ({ navigation, route }) => {
           )}
 
           <TouchableOpacity style={styles.imageUploadButton} onPress={handleSelectMotorbikeImages}>
-            <Text style={styles.imageUploadButtonText}>📷 Add Images</Text>
+            <View style={styles.imageUploadButtonContent}>
+              <Camera size={18} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.imageUploadButtonText}>Add Images</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -953,14 +957,20 @@ const EditProductScreen = ({ navigation, route }) => {
                   style={styles.removeColorImageButton}
                   onPress={removeColorImage}
                 >
-                  <Text style={styles.removeImageButtonText}>✕ Remove</Text>
+                  <View style={styles.removeImageButtonContent}>
+                    <X size={16} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.removeImageButtonText}>Remove</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             )}
 
             {!colorImage && (
               <TouchableOpacity style={styles.imageUploadButton} onPress={handleSelectColorImage}>
-                <Text style={styles.imageUploadButtonText}>📷 Select Color Image</Text>
+                <View style={styles.imageUploadButtonContent}>
+                  <Camera size={18} color={COLORS.TEXT.WHITE} />
+                  <Text style={styles.imageUploadButtonText}>Select Color Image</Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
@@ -981,7 +991,7 @@ const EditProductScreen = ({ navigation, route }) => {
             disabled={loading}
           >
             <LinearGradient
-              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : COLORS.GRADIENT.BLUE}
+              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : ['#009DFF', '#009DFF']}
               style={styles.submitGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -1034,11 +1044,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   headerTitle: {
     flex: 1,
@@ -1236,11 +1241,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: COLORS.PRIMARY,
   },
-  checkmark: {
-    fontSize: 40,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   selectionActions: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
@@ -1302,15 +1302,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   imageUploadButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
+  },
+  imageUploadButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.PADDING.SMALL,
   },
   imageUploadButtonText: {
     color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
+  },
+  removeImageButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.PADDING.XSMALL,
   },
   colorImageContainer: {
     marginBottom: SIZES.PADDING.MEDIUM,

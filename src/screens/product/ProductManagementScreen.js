@@ -11,9 +11,10 @@ import {
   RefreshControl,
   Modal,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Funnel } from 'lucide-react-native';
+import { Funnel, Pencil, Trash2, X, ArrowLeft, Plus, Search, Car } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import motorbikeService from '../../services/motorbikeService';
@@ -355,7 +356,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
         </View>
         
         <View style={styles.productFooter}>
-          <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
+          <Text style={styles.productPrice}>{item.price.toLocaleString()} VNĐ</Text>
           {!isVehicleManagement && (
             <Text style={styles.stockText}>Stock: {item.stock}</Text>
           )}
@@ -367,13 +368,13 @@ const ProductManagementScreen = ({ navigation, route }) => {
           style={styles.actionButton}
           onPress={() => handleEditProduct(item)}
         >
-          <Text style={styles.actionIcon}>✏️</Text>
+          <Pencil size={18} color="#009DFF" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDeleteProduct(item)}
         >
-          <Text style={styles.actionIcon}>🗑️</Text>
+          <Trash2 size={18} color="#009DFF" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -396,7 +397,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
                 style={styles.closeButton}
                 onPress={() => setShowFilterModal(false)}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <X size={18} color={COLORS.TEXT.SECONDARY} />
               </TouchableOpacity>
             </View>
 
@@ -513,7 +514,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.headerTitleText}>{isVehicleManagement ? 'Vehicles' : 'Product Management'}</Text>
@@ -523,7 +524,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             style={styles.addButton}
             onPress={handleAddProduct}
           >
-            <Text style={styles.addIcon}>+</Text>
+            <Plus size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
       </View>
@@ -531,7 +532,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
       {/* Search and Filters */}
       <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={18} color={COLORS.TEXT.SECONDARY} />
           <TextInput
             style={styles.searchInput}
             placeholder={isVehicleManagement ? 'Search vehicles...' : 'Search products...'}
@@ -558,7 +559,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading products...</Text>
+            <ActivityIndicator size="large" color="#009DFF" />
           </View>
         ) : (
           <FlatList
@@ -572,7 +573,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🚗</Text>
+                <Car size={64} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.emptyTitle}>{isVehicleManagement ? 'No vehicles found' : 'No products found'}</Text>
                 <Text style={styles.emptySubtitle}>
                   {searchQuery ? 'Try adjusting your search' : (isVehicleManagement ? 'Add your first vehicle' : 'Add your first product')}
@@ -626,11 +627,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     flex: 1,
     alignItems: 'center',
@@ -649,14 +645,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search section
@@ -677,11 +668,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -727,10 +714,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
   },
   modalBody: {
     paddingHorizontal: SIZES.PADDING.LARGE,
@@ -934,9 +917,6 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#FFE5E5',
   },
-  actionIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-  },
 
   // Loading and empty states
   loadingContainer: {
@@ -956,7 +936,6 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyIcon: {
-    fontSize: 64,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {

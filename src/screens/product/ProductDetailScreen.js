@@ -9,12 +9,14 @@ import {
   Alert,
   Share,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import motorbikeService from '../../services/motorbikeService';
+import { ArrowLeft, Car, CheckCircle, DollarSign, Globe, Pencil, Share2, Trash2, XCircle, Zap } from 'lucide-react-native';
 
 const { width: ScreenWidth } = Dimensions.get('window');
 
@@ -348,11 +350,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
       <Text style={styles.tabSubtitle}>Basic information and specifications</Text>
       
       <View style={styles.specsContainer}>
-        {renderSpecificationItem('Model', product.model || product.category, '🚗')}
-        {renderSpecificationItem('Version', product.version, '⚡')}
-        {renderSpecificationItem('Make From', product.makeFrom, '🌍')}
-        {renderSpecificationItem('Price', `$${product.price?.toLocaleString()}`, '💰')}
-        {renderSpecificationItem('Status', product.isDeleted ? 'Out of Stock' : 'Available', product.isDeleted ? '❌' : '✅')}
+        {renderSpecificationItem('Model', product.model || product.category, <Car size={20} color="#009DFF" />)}
+        {renderSpecificationItem('Version', product.version, <Zap size={20} color="#009DFF" />)}
+        {renderSpecificationItem('Make From', product.makeFrom, <Globe size={20} color="#009DFF" />)}
+        {renderSpecificationItem('Price', `${product.price?.toLocaleString()} VNĐ`, <DollarSign size={20} color="#009DFF" />)}
+        {renderSpecificationItem('Status', product.isDeleted ? 'Out of Stock' : 'Available', product.isDeleted ? <XCircle size={20} color={COLORS.ERROR} /> : <CheckCircle size={20} color={COLORS.SUCCESS} />)}
       </View>
 
       {/* Quick summary of configurations */}
@@ -408,7 +410,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.headerTitleText}>Product Details</Text>
@@ -417,7 +419,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
             style={styles.shareButton}
             onPress={handleShare}
           >
-            <Text style={styles.shareIcon}>📤</Text>
+            <Share2 size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
       </View>
@@ -469,7 +471,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
         <View style={styles.infoSection}>
           <View style={styles.titleRow}>
             <Text style={styles.productName}>{product.name}</Text>
-            <Text style={styles.productPrice}>${product.price.toLocaleString()}</Text>
+            <Text style={styles.productPrice}>{product.price.toLocaleString()} VNĐ</Text>
           </View>
           
           <View style={styles.categoryRow}>
@@ -570,7 +572,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
           {/* Tab Content */}
           {loadingConfigs ? (
             <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading configurations...</Text>
+              <ActivityIndicator size="large" color="#009DFF" />
             </View>
           ) : (
             renderTabContent()
@@ -609,12 +611,15 @@ const ProductDetailScreen = ({ navigation, route }) => {
             onPress={handleEdit}
           >
             <LinearGradient
-              colors={COLORS.GRADIENT.BLUE}
+              colors={['#009DFF', '#009DFF']}
               style={styles.buttonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.editButtonText}>✏️ Edit Product</Text>
+              <View style={styles.editButtonContent}>
+                <Pencil size={18} color={COLORS.TEXT.WHITE} />
+                <Text style={styles.editButtonText}>Edit Product</Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -623,9 +628,12 @@ const ProductDetailScreen = ({ navigation, route }) => {
             onPress={handleDelete}
             disabled={loading}
           >
-            <Text style={styles.deleteButtonText}>
-              {loading ? 'Deleting...' : '🗑️ Delete Product'}
-            </Text>
+            <View style={styles.deleteButtonContent}>
+              <Trash2 size={18} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.deleteButtonText}>
+                {loading ? 'Deleting...' : 'Delete Product'}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -671,11 +679,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     flex: 1,
     alignItems: 'center',
@@ -692,9 +695,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  shareIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
   },
 
   // Content
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   categoryBadge: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     borderRadius: SIZES.RADIUS.MEDIUM,
@@ -934,9 +934,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZES.PADDING.MEDIUM,
   },
-  specIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-  },
   specContent: {
     flex: 1,
   },
@@ -998,6 +995,11 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
   },
+  editButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.PADDING.SMALL,
+  },
   editButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
@@ -1011,6 +1013,11 @@ const styles = StyleSheet.create({
   },
   deleteButtonDisabled: {
     opacity: 0.6,
+  },
+  deleteButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.PADDING.SMALL,
   },
   deleteButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1038,7 +1045,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   tabButtonText: {
     fontSize: SIZES.FONT.SMALL,
