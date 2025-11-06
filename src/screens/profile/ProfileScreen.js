@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.BACKGROUND.PRIMARY,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   infoLeft: {
     flexDirection: 'row',
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.BACKGROUND.PRIMARY,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   menuLeft: {
     flexDirection: 'row',

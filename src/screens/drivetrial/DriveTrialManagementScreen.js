@@ -8,8 +8,7 @@ import {
   FlatList,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Calendar, Clock, Mail, Phone, Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Clock, Mail, Phone, Search } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import driveTrialService from '../../services/driveTrialService';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -144,13 +143,8 @@ const DriveTrialManagementScreen = ({ navigation }) => {
       onPress={() => handleBookingPress(item)}
       activeOpacity={0.7}
     >
-      {/* Header with gradient background */}
-      <LinearGradient
-        colors={['#3B82F6', '#1D4ED8']}
-        style={styles.bookingCardHeader}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
+      {/* Header with white background */}
+      <View style={styles.bookingCardHeader}>
         <View style={styles.bookingHeaderContent}>
           <View style={styles.bookingAvatar}>
             <Text style={styles.bookingAvatarText}>
@@ -167,7 +161,7 @@ const DriveTrialManagementScreen = ({ navigation }) => {
             </Text>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Content */}
       <View style={styles.bookingCardContent}>
@@ -263,12 +257,7 @@ const DriveTrialManagementScreen = ({ navigation }) => {
               {filteredBookings.length} bookings
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('CreateDriveTrial')}
-          >
-            <Plus color="#FFFFFF" size={18} />
-          </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
       </View>
 
@@ -339,14 +328,6 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
     fontSize: SIZES.FONT.LARGE,
@@ -424,6 +405,9 @@ const styles = StyleSheet.create({
   },
   bookingCardHeader: {
     padding: SIZES.PADDING.LARGE,
+    backgroundColor: COLORS.TEXT.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   bookingHeaderContent: {
     flexDirection: 'row',
@@ -433,7 +417,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: COLORS.BACKGROUND.CARD,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SIZES.PADDING.MEDIUM,
@@ -449,12 +433,12 @@ const styles = StyleSheet.create({
   bookingCardName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   bookingStatus: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.SECONDARY,
   },
   bookingCardContent: {
     padding: SIZES.PADDING.LARGE,
