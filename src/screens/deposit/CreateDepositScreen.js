@@ -289,7 +289,7 @@ const CreateDepositScreen = ({ navigation, route }) => {
               {loadingQuotation && (
                 <ActivityIndicator 
                   size="small" 
-                  color={COLORS.PRIMARY} 
+                  color="#009DFF" 
                   style={styles.loadingIndicator}
                 />
               )}
@@ -373,11 +373,11 @@ const CreateDepositScreen = ({ navigation, route }) => {
             disabled={loading}
           >
             <LinearGradient
-              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : COLORS.GRADIENT.BLUE}
+              colors={loading ? [COLORS.TEXT.SECONDARY, COLORS.TEXT.SECONDARY] : ['#009DFF', '#009DFF']}
               style={styles.submitButtonGradient}
             >
               {loading ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                <ActivityIndicator color="#009DFF" />
               ) : (
                 <Text style={styles.submitButtonText}>Create Deposit</Text>
               )}
