@@ -133,7 +133,7 @@ const ChooseInstallmentPlanScreen = ({ navigation, route }) => {
                     <Text style={styles.planName}>{plan.name}</Text>
                     <View style={styles.radioButton}>
                       {isSelected ? (
-                        <Circle color={COLORS.PRIMARY} size={24} fill={COLORS.PRIMARY} />
+                        <Circle color="#009DFF" size={24} fill="#009DFF" />
                       ) : (
                         <Circle color={COLORS.TEXT.SECONDARY} size={24} />
                       )}
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitleText: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
@@ -281,8 +281,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER.PRIMARY,
   },
   planCardSelected: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.05)',
+    borderColor: "#009DFF",
+    backgroundColor: 'rgba(106, 163, 255, 0.05)',
   },
   planContent: {
     flex: 1,

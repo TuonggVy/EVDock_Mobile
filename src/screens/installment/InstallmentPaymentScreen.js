@@ -113,6 +113,9 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
           console.error('Error deleting payment:', error);
           showError('Error', 'Failed to delete payment');
         }
+      },
+      () => {
+        // onCancel - do nothing, just close the dialog
       }
     );
   };
@@ -222,19 +225,19 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
 
       <View style={styles.paymentActions}>
         <TouchableOpacity style={styles.actionButton} onPress={() => handleViewPayment(item)}>
-          <LinearGradient colors={COLORS.GRADIENT.INFO} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#000000', '#000000']} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Eye color={COLORS.TEXT.WHITE} size={16} />
             <Text style={styles.actionButtonText}>View</Text>
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => handleEditPayment(item)}>
-          <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#000000', '#000000']} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Pencil color={COLORS.TEXT.WHITE} size={16} />
             <Text style={styles.actionButtonText}>Edit</Text>
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => handleDeletePayment(item)}>
-          <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#000000', '#000000']} style={styles.actionButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Trash2 color={COLORS.TEXT.WHITE} size={16} />
             <Text style={styles.actionButtonText}>Delete</Text>
           </LinearGradient>
@@ -310,7 +313,7 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
             onPress={handleGenerateInterestPayments}
             disabled={generating}
           >
-            <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.generateButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.generateButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Plus color={COLORS.TEXT.WHITE} size={20} />
               <Text style={styles.generateButtonText}>
                 {generating ? 'Generating...' : 'Generate Interest Payments'}
@@ -347,8 +350,12 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={hideAlert}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
         onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
       />
     </SafeAreaView>
   );
@@ -383,7 +390,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitleText: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
