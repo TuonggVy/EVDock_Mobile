@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
   },
   logoutButton: {
-    backgroundColor: COLORS.ERROR,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.LARGE,
     padding: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',

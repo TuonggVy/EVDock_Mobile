@@ -13,6 +13,7 @@ import EVMAdminHomeScreen from '../screens/home/EVMAdminHomeScreen';
 import EVMStaffHomeScreen from '../screens/home/EVMStaffHomeScreen';
 import DealerManagerHomeScreen from '../screens/home/ManagerHomeScreen';
 import DealerStaffHomeScreen from '../screens/home/EmployeeHomeScreen';
+import AllCategoriesScreen from '../screens/home/AllCategoriesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import CatalogScreen from '../screens/catalog/CatalogScreen';
 import VehicleDetailScreen from '../screens/vehicle/VehicleDetailScreen';
@@ -185,6 +186,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="Main" 
               component={MainTabNavigator} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AllCategories" 
+              component={AllCategoriesScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 
