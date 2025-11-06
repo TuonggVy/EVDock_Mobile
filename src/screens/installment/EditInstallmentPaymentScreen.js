@@ -244,7 +244,7 @@ const EditInstallmentPaymentScreen = ({ navigation, route }) => {
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Text style={styles.buttonText}>Update Payment</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -353,8 +353,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER.PRIMARY,
   },
   typeOptionSelected: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: "#009DFF",
+    backgroundColor: 'rgba(106, 163, 255, 0.05)',
   },
   typeOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   typeOptionTextSelected: {
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '700',
   },
   footer: {

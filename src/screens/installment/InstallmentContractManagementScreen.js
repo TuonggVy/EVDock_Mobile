@@ -176,7 +176,7 @@ const InstallmentContractManagementScreen = ({ navigation, route }) => {
         style={styles.interestPaymentButton} 
         onPress={() => handleInterestPaymentPress(item)}
       >
-        <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.interestPaymentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.interestPaymentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
           <CreditCard color={COLORS.TEXT.WHITE} size={18} />
           <Text style={styles.interestPaymentButtonText}>Interest Payment</Text>
         </LinearGradient>
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitleText: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
