@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
-import { Bell, ChartColumnIncreasing, UserRound } from 'lucide-react-native';
+import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, CircleDollarSign, Building2, CarFront, Warehouse, Users, TicketPercent, Gift, PackageOpen, RefreshCcw, NotepadText, CreditCard, Search } from 'lucide-react-native';
 import reportService from '../../services/reportService';
 
 const EVMAdminHomeScreen = ({ navigation }) => {
@@ -151,74 +151,74 @@ const EVMAdminHomeScreen = ({ navigation }) => {
   const allCategoryCards = [
     {
       title: 'Pricing',
-      gradient: COLORS.GRADIENT.BLUE,
-      icon: '💰',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CircleDollarSign color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('PricingManagement'),
     },
     {
       title: 'Agencies',
-      gradient: COLORS.GRADIENT.PINK,
-      icon: '🏢',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Building2 color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('DealerManagement'),
     },
     {
       title: 'Vehicles',
-      gradient: COLORS.GRADIENT.GREEN,
-      icon: '🚗',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CarFront color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('VehicleManagement'),
     },
     {
       title: 'Warehouse',
-      gradient: COLORS.GRADIENT.PURPLE,
-      icon: '🏭',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Warehouse color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('WarehouseManagement'),
     },
     {
       title: 'Staff',
-      gradient: COLORS.GRADIENT.ORANGE,
-      icon: '👥',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Users color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('StaffManagement'),
     },
     {
       title: 'Discount',
-      gradient: ['#FF6B6B', '#FF8E8E', '#FFB3B3'],
-      icon: '🏷️',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <TicketPercent color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('DiscountManagement'),
     },
     {
       title: 'Promotions',
-      gradient: COLORS.GRADIENT.PINK_PURPLE,
-      icon: '🎁',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Gift color="#A1D9FF" size={50} />,
       onPress: () => navigation.navigate('PromotionManagement'),
     },
     {
       title: 'Inventory',
-      gradient: COLORS.GRADIENT.CYAN,
-      icon: '📦',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <PackageOpen color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('InventoryManagement'),
     },
     {
       title: 'Order Restock',
-      gradient: ['#9B59B6', '#8E44AD', '#7D3C98'],
-      icon: '🔄',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <RefreshCcw color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('OrderRestockManagement'),
     },
     {
       title: 'Reports',
-      gradient: COLORS.GRADIENT.PURPLE,
-      icon: '📊',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('Reports'),
     },
     {
       title: 'Price Policy',
-      gradient: ['#4CAF50', '#66BB6A', '#81C784'],
-      icon: '💰',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CircleDollarSign color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('PricePolicyManagement'),
     },
     {
       title: 'Credit Line',
-      gradient: ['#FF6B9D', '#C44569', '#A020F0'],
-      icon: '💳',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CreditCard color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('CreditLineManagement'),
     },
   ];
@@ -229,6 +229,10 @@ const EVMAdminHomeScreen = ({ navigation }) => {
     const query = searchQuery.toLowerCase();
     return card.title.toLowerCase().includes(query);
   });
+
+  // Display only first 5 cards on home screen
+  const displayedCards = categoryCards.slice(0, 5);
+  const hasMoreCards = categoryCards.length > 5;
 
 
   return (
@@ -241,21 +245,6 @@ const EVMAdminHomeScreen = ({ navigation }) => {
             <Text style={styles.userName}>{user?.name || 'Admin'}</Text>
             <Text style={styles.roleText}>EVM Administrator</Text>
           </View>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}><ChartColumnIncreasing color="#FFFFFF" size={16}  /></Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}><Bell color="#FFFFFF" size={16} /></Text>
-              <View style={styles.notificationDot} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Profile')}
-            >
-              <Text style={styles.iconText}><UserRound color="#FFFFFF" size={16} /></Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
@@ -263,7 +252,7 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       <View style={styles.topSection}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Search system, dealers..."
@@ -283,11 +272,17 @@ const EVMAdminHomeScreen = ({ navigation }) => {
 
         {/* Category Cards */}
         <View style={styles.categoriesContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-            {categoryCards.map((category, index) => (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.categoriesScroll}
+            contentContainerStyle={styles.categoriesScrollContent}
+          >
+            {displayedCards.map((category, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.categoryCard}
+                activeOpacity={0.85}
                 onPress={category.onPress}
               >
                 <LinearGradient
@@ -301,6 +296,15 @@ const EVMAdminHomeScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             ))}
+            {hasMoreCards && (
+              <TouchableOpacity
+                style={styles.seeAllCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('AllCategories', { categoryCards: categoryCards })}
+              >
+                <ChevronRight color={COLORS.TEXT.PRIMARY} size={25} />
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -449,32 +453,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
-  headerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
-    position: 'relative',
-  },
-  iconText: {
-    fontSize: SIZES.FONT.LARGE,
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.PRIMARY,
-  },
 
   /* ---------- search & categories (trên, nền đen) ---------- */
   searchContainer: {
@@ -522,6 +500,9 @@ const styles = StyleSheet.create({
   categoriesScroll: {
     paddingVertical: SIZES.PADDING.SMALL,
   },
+  categoriesScrollContent: {
+    alignItems: 'center',
+  },
   categoryCard: {
     width: 120,
     height: 100,
@@ -548,6 +529,20 @@ const styles = StyleSheet.create({
     right: -10,
     fontSize: 50,
     opacity: 0.3,
+  },
+  seeAllCard: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    marginRight: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   /* ---------- banner & activities & stats (dưới, nền trắng) ---------- */
