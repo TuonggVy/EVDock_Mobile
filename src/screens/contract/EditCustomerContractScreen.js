@@ -349,7 +349,7 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitButton, saving && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={saving}>
           <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            {saving ? <ActivityIndicator color={COLORS.TEXT.WHITE} /> : <Text style={styles.submitButtonText}>Update Contract</Text>}
+            {saving ? <ActivityIndicator color="#009DFF" /> : <Text style={styles.submitButtonText}>Update Contract</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>

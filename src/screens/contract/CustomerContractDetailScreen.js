@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
@@ -173,7 +173,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.contentSection}>
           <View style={styles.titleRow}>
-            <NotepadText color={COLORS.PRIMARY} size={24} />
+            <NotepadText color="#009DFF" size={24} />
             <Text style={styles.contractTitle}>{contract.title || 'Untitled Contract'}</Text>
           </View>
 
@@ -369,7 +369,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
-          <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <CreditCard color={COLORS.TEXT.WHITE} size={20} />
             <Text style={styles.buttonText}>Choose Installment Plan</Text>
           </LinearGradient>
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.SMALL,
     paddingBottom: SIZES.PADDING.SMALL,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.BACKGROUND.SECONDARY,
+    borderBottomColor: COLORS.BORDER.SECONDARY,
   },
   infoLabel: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   priceText: {
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontSize: SIZES.FONT.LARGE,
   },
   footer: {

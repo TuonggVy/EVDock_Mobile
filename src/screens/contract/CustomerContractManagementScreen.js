@@ -9,6 +9,8 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import customerContractService from '../../services/customerContractService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { ArrowLeft, NotepadText, Pencil, Plus, Search, Trash2, Filter } from 'lucide-react-native';
+import { ArrowLeft, NotepadText, Pencil, Plus, Search, Trash2, Filter, FileText } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 
 const CustomerContractManagementScreen = ({ navigation }) => {
@@ -206,25 +208,35 @@ const CustomerContractManagementScreen = ({ navigation }) => {
     }
   };
 
+  // Calculate statistics
+  const totalContracts = contracts.length;
+  const fullPaymentContracts = contracts.filter(contract => 
+    contract.contractPaidType?.toUpperCase() === 'FULL' || 
+    contract.contractType?.toUpperCase() === 'FULL'
+  ).length;
+  const debtContracts = contracts.filter(contract => 
+    contract.contractPaidType?.toUpperCase() === 'DEBT' || 
+    contract.contractType?.toUpperCase() === 'DEBT'
+  ).length;
+
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Main', { screen: 'Home' })}>
-          <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
-        <View style={styles.headerTitle}>
-          <Text style={styles.title}>Customer Contracts</Text>
-        </View>
+        <Text style={styles.headerTitle}>Customer Contracts</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('CreateCustomerContract')}>
-          <Plus color={COLORS.TEXT.WHITE} size={24} />
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Search color={COLORS.TEXT.SECONDARY} size={20} />
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search contracts..."
+          placeholder="Search contracts, code, title..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -235,59 +247,82 @@ const CustomerContractManagementScreen = ({ navigation }) => {
         >
           <Filter
             color={selectedFilter !== 'all' ? COLORS.TEXT.WHITE : COLORS.TEXT.SECONDARY}
-            size={20}
+            size={18}
           />
         </TouchableOpacity>
       </View>
 
-      {/* Tabs for Full Payment and Debt */}
-      <View style={styles.tabsContainer}>
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{totalContracts}</Text>
+          <Text style={styles.statLabel}>Total Contracts</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: '#009DFF' }]}>{fullPaymentContracts}</Text>
+          <Text style={styles.statLabel}>Full Payment</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: '#009DFF' }]}>{debtContracts}</Text>
+          <Text style={styles.statLabel}>Debt</Text>
+        </View>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'full' && styles.tabActive]}
+          style={[
+            styles.tabButton,
+            selectedTab === 'full' && styles.activeTabButton
+          ]}
           onPress={() => setSelectedTab('full')}
         >
-          <Text style={[styles.tabText, selectedTab === 'full' && styles.tabTextActive]}>
-            Full Payment
+          <Text style={[
+            styles.tabText,
+            selectedTab === 'full' && styles.activeTabText
+          ]}>
+            Full Payment ({fullPaymentContracts})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'debt' && styles.tabActive]}
+          style={[
+            styles.tabButton,
+            selectedTab === 'debt' && styles.activeTabButton
+          ]}
           onPress={() => setSelectedTab('debt')}
         >
-          <Text style={[styles.tabText, selectedTab === 'debt' && styles.tabTextActive]}>
-            Debt
+          <Text style={[
+            styles.tabText,
+            selectedTab === 'debt' && styles.activeTabText
+          ]}>
+            Debt ({debtContracts})
           </Text>
         </TouchableOpacity>
       </View>
 
       {showFilters && (
-        <>
-          {/* Filter Tabs - Status */}
-          <View style={styles.filterContainer}>
-            <Text style={styles.filterLabel}>Status:</Text>
-            {['all', 'pending', 'confirmed', 'processing', 'delivered', 'completed'].map((filter) => (
-              <TouchableOpacity
-                key={filter}
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Status:</Text>
+          {['all', 'pending', 'confirmed', 'processing', 'delivered', 'completed'].map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              style={[
+                styles.filterTab,
+                selectedFilter === filter && styles.filterTabActive,
+              ]}
+              onPress={() => setSelectedFilter(filter)}
+            >
+              <Text
                 style={[
-                  styles.filterTab,
-                  selectedFilter === filter && styles.filterTabActive,
+                  styles.filterTabText,
+                  selectedFilter === filter && styles.filterTabTextActive,
                 ]}
-                onPress={() => setSelectedFilter(filter)}
               >
-                <Text
-                  style={[
-                    styles.filterTabText,
-                    selectedFilter === filter && styles.filterTabTextActive,
-                  ]}
-                >
-                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-
-        </>
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -299,62 +334,55 @@ const CustomerContractManagementScreen = ({ navigation }) => {
         onPress={() => navigation.navigate('CustomerContractDetail', { contractId: item.id })}
         activeOpacity={0.7}
       >
-        <View style={styles.contractCardHeader}>
-          <View style={styles.contractCardTitleRow}>
-            <NotepadText color={COLORS.PRIMARY} size={20} />
-            <Text style={styles.contractTitle} numberOfLines={1}>
+        <View style={styles.cardHeader}>
+          <View style={styles.contractInfo}>
+            <Text style={styles.contractCode}>{item.contractCode || `#${item.id}`}</Text>
+            <Text style={styles.contractName} numberOfLines={1}>
               {item.title || 'Untitled Contract'}
             </Text>
+            <Text style={styles.contractType}>{getContractTypeLabel(item.contractPaidType)}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+              <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.contractCardBody}>
-          <View style={styles.contractInfoRow}>
-            <Text style={styles.contractInfoLabel}>Contract Code:</Text>
-            <Text style={styles.contractInfoValue}>{item.contractCode || `#${item.id}`}</Text>
-          </View>
-          <View style={styles.contractInfoRow}>
-            <Text style={styles.contractInfoLabel}>Type:</Text>
-            <Text style={styles.contractInfoValue}>{getContractTypeLabel(item.contractPaidType)}</Text>
-          </View>
-          <View style={styles.contractInfoRow}>
-            <Text style={styles.contractInfoLabel}>Final Price:</Text>
-            <Text style={[styles.contractInfoValue, styles.priceText]}>
+        <View style={styles.cardContent}>
+          <View style={styles.contactInfo}>
+            <Text style={styles.contactLabel}>Final Price:</Text>
+            <Text style={[styles.contactValue, styles.priceText]}>
               {formatPrice(item.finalPrice || 0)}
             </Text>
           </View>
           {item.signDate && (
-            <View style={styles.contractInfoRow}>
-              <Text style={styles.contractInfoLabel}>Sign Date:</Text>
-              <Text style={styles.contractInfoValue}>{formatDate(item.signDate)}</Text>
+            <View style={styles.contactInfo}>
+              <Text style={styles.contactLabel}>Sign Date:</Text>
+              <Text style={styles.contactDetail}>{formatDate(item.signDate)}</Text>
             </View>
           )}
           {item.deliveryDate && (
-            <View style={styles.contractInfoRow}>
-              <Text style={styles.contractInfoLabel}>Delivery Date:</Text>
-              <Text style={styles.contractInfoValue}>{formatDate(item.deliveryDate)}</Text>
+            <View style={styles.contactInfo}>
+              <Text style={styles.contactLabel}>Delivery Date:</Text>
+              <Text style={styles.contactDetail}>{formatDate(item.deliveryDate)}</Text>
             </View>
           )}
         </View>
       </TouchableOpacity>
 
-      <View style={styles.contractCardFooter}>
+      <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.editButton}
           onPress={() => navigation.navigate('EditCustomerContract', { contractId: item.id })}
         >
-          <Pencil color={COLORS.PRIMARY} size={16} />
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Pencil size={16} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDeleteContract(item.id)}
         >
-          <Trash2 color={COLORS.ERROR} size={16} />
-          <Text style={styles.deleteButtonText}>Delete</Text>
+          <Trash2 size={16} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
       </View>
     </View>
@@ -362,34 +390,38 @@ const CustomerContractManagementScreen = ({ navigation }) => {
 
   if (loading && contracts.length === 0) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading contracts...</Text>
         </View>
         <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {renderHeader()}
       <FlatList
         data={filteredContracts}
         renderItem={renderContractCard}
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.contractsContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.PRIMARY} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#009DFF" />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <NotepadText color={COLORS.TEXT.SECONDARY} size={64} />
-            <Text style={styles.emptyText}>No contracts found</Text>
-            <Text style={styles.emptySubtext}>
+          <View style={styles.emptyState}>
+            <FileText size={64} color={COLORS.TEXT.SECONDARY} />
+            <Text style={styles.emptyTitle}>
+              {searchQuery.trim() || selectedFilter !== 'all'
+                ? 'No contracts found'
+                : 'No contracts yet'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
               {searchQuery.trim() || selectedFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Create your first customer contract'}
@@ -398,7 +430,7 @@ const CustomerContractManagementScreen = ({ navigation }) => {
         }
       />
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -406,12 +438,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    paddingTop: 30,
   },
+  
+  // Header
   header: {
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
-    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingTop: Platform.OS === 'ios' ? 20 : 0,
     paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   headerTop: {
     flexDirection: 'row',
@@ -423,71 +460,46 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: 4,
-    marginBottom: SIZES.PADDING.MEDIUM,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: SIZES.PADDING.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: "#009DFF",
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
-  tabActive: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  tabText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  tabTextActive: {
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
+
+  // Search
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    marginBottom: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
-    marginLeft: SIZES.PADDING.SMALL,
-    marginRight: SIZES.PADDING.SMALL,
   },
   filterIconButton: {
     width: 36,
@@ -498,13 +510,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterIconButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
+
+  // Stats
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  statNumber: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: '#009DFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+  },
+
+  // Tab Navigation
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    backgroundColor: "#009DFF",
+  },
+  tabText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: COLORS.TEXT.WHITE,
+  },
+
+  // Filter Container
   filterContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    marginTop: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
     gap: SIZES.PADDING.SMALL,
   },
   filterLabel: {
@@ -522,8 +591,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   filterTabActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
+    borderColor: "#009DFF",
   },
   filterTabText: {
     fontSize: SIZES.FONT.SMALL,
@@ -534,16 +603,17 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
   },
-  listContainer: {
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.MEDIUM,
+
+  // Contracts List
+  contractsContent: {
+    padding: SIZES.PADDING.MEDIUM,
   },
   contractCard: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.LARGE,
+    padding: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.MEDIUM,
-    shadowColor: COLORS.SHADOW,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -552,110 +622,108 @@ const styles = StyleSheet.create({
   contractCardContent: {
     flex: 1,
   },
-  contractCardHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  contractInfo: {
+    flex: 1,
+  },
+  contractCode: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 4,
+  },
+  contractName: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: "#009DFF",
+    marginBottom: 4,
+  },
+  contractType: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  statusContainer: {
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  statusBadge: {
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: 4,
+    borderRadius: SIZES.RADIUS.SMALL,
+  },
+  statusText: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  cardContent: {
     marginBottom: SIZES.PADDING.MEDIUM,
   },
-  contractCardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SIZES.PADDING.SMALL,
+  contactInfo: {
+    marginBottom: SIZES.PADDING.SMALL,
   },
-  contractTitle: {
+  contactLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 4,
+  },
+  contactValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  contactDetail: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  priceText: {
+    color: "#009DFF",
+    fontSize: SIZES.FONT.MEDIUM,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.PADDING.SMALL,
+  },
+  editButton: {
+    backgroundColor: "#000000",
+    borderRadius: SIZES.RADIUS.SMALL,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
+  },
+  deleteButton: {
+    backgroundColor: "#000000",
+    borderRadius: SIZES.RADIUS.SMALL,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.XXXLARGE,
+  },
+  emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
-    marginLeft: SIZES.PADDING.SMALL,
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.XSMALL,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-  },
-  statusText: {
-    fontSize: SIZES.FONT.SMALL,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-  },
-  contractCardBody: {
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  contractInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.SMALL,
   },
-  contractInfoLabel: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: '500',
-  },
-  contractInfoValue: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
-  priceText: {
-    color: COLORS.PRIMARY,
-    fontSize: SIZES.FONT.MEDIUM,
-  },
-  contractCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SIZES.PADDING.MEDIUM,
-    paddingTop: SIZES.PADDING.MEDIUM,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BACKGROUND.SECONDARY,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    backgroundColor: COLORS.PRIMARY + '20',
-    gap: SIZES.PADDING.XSMALL,
-  },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    backgroundColor: COLORS.ERROR + '20',
-    gap: SIZES.PADDING.XSMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.ERROR,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: SIZES.PADDING.XXXLARGE * 2,
-  },
-  emptyText: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
-    marginTop: SIZES.PADDING.LARGE,
-  },
-  emptySubtext: {
+  emptySubtitle: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
-    marginTop: SIZES.PADDING.SMALL,
     textAlign: 'center',
   },
   loadingContainer: {

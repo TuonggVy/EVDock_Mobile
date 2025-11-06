@@ -10,7 +10,7 @@ import { COLORS, SIZES } from '../../constants';
 const LoadingScreen = () => {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+      <ActivityIndicator size="large" color="#009DFF" />
       <Text style={styles.text}>Loading...</Text>
     </View>
   );
