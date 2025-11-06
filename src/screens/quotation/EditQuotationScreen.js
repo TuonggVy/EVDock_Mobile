@@ -139,7 +139,7 @@ const EditQuotationScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -273,7 +273,7 @@ const EditQuotationScreen = ({ navigation, route }) => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color={COLORS.TEXT.WHITE} />
+            <ActivityIndicator color="#009DFF" />
           ) : (
             <Text style={styles.saveText}>Update</Text>
           )}
@@ -366,8 +366,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   optionButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
+    borderColor: "#009DFF",
   },
   optionText: {
     fontSize: SIZES.FONT.SMALL,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 2,
     paddingVertical: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1128,7 +1128,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
           disabled={creatingCustomer}
         >
           {creatingCustomer ? (
-            <ActivityIndicator color={COLORS.TEXT.WHITE} />
+            <ActivityIndicator color="#009DFF" />
           ) : (
             <Text style={styles.createCustomerButtonText}>Create Customer</Text>
           )}
@@ -1256,7 +1256,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         disabled={loading || !customerId}
       >
         {loading ? (
-          <ActivityIndicator color={COLORS.TEXT.WHITE} />
+          <ActivityIndicator color="#009DFF" />
         ) : (
           <Text style={styles.createButtonText}>Create Quotation</Text>
         )}

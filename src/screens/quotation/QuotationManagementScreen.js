@@ -10,6 +10,7 @@ import {
   RefreshControl,
   FlatList,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -553,6 +554,7 @@ const QuotationManagementScreen = ({ navigation }) => {
       <View style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#009DFF" />
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : (
@@ -637,7 +639,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -666,7 +668,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   tabText: {
     fontSize: SIZES.FONT.SMALL,
@@ -719,7 +721,7 @@ const styles = StyleSheet.create({
     marginRight: SIZES.PADDING.SMALL,
   },
   filterChipActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   filterChipText: {
     fontSize: SIZES.FONT.SMALL,
@@ -840,7 +842,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     borderRadius: SIZES.RADIUS.SMALL,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#000000",
     minWidth: 60,
     alignItems: 'center',
     justifyContent: 'center',
