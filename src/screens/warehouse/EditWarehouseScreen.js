@@ -9,7 +9,9 @@ import {
   Platform,
   TextInput,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
+import { ArrowLeft, Check, X } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -90,7 +92,7 @@ const EditWarehouseScreen = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Warehouse</Text>
         <View style={styles.headerActions}>
@@ -172,9 +174,17 @@ const EditWarehouseScreen = ({ navigation, route }) => {
                 ]}
                 onPress={() => setFormData({ ...formData, isActive: !formData.isActive })}
               >
-                <Text style={styles.switchText}>
-                  {formData.isActive ? '✓ Active' : '✗ Inactive'}
-                </Text>
+                {formData.isActive ? (
+                  <>
+                    <Check size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.switchText}>Active</Text>
+                  </>
+                ) : (
+                  <>
+                    <X size={18} color={COLORS.TEXT.WHITE} />
+                    <Text style={styles.switchText}>Inactive</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -183,9 +193,11 @@ const EditWarehouseScreen = ({ navigation, route }) => {
               onPress={handleSubmit}
               disabled={loading}
             >
-              <Text style={styles.submitButtonText}>
-                {loading ? 'Updating...' : 'Update Warehouse'}
-              </Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#009DFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Update Warehouse</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -215,10 +227,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.XXLARGE,
-    color: COLORS.TEXT.WHITE,
   },
   headerTitle: {
     fontSize: SIZES.FONT.XXLARGE,
@@ -288,7 +296,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.PADDING.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.MEDIUM,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.PADDING.SMALL,
   },
   switchActive: {
     backgroundColor: COLORS.SUCCESS,
@@ -299,7 +310,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
   },
   submitButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -307,7 +318,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.XXXLARGE,
   },
   submitButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: COLORS.SURFACE,
   },
   submitButtonText: {
     fontSize: SIZES.FONT.LARGE,
