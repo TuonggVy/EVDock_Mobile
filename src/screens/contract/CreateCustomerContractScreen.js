@@ -287,7 +287,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
                   disabled={Boolean(loadingQuotation || routeQuotationId || !quotationId.trim())}
                 >
                   {loadingQuotation ? (
-                    <ActivityIndicator size="small" color={COLORS.TEXT.WHITE} />
+                    <ActivityIndicator size="small" color="#009DFF" />
                   ) : (
                     <Text style={styles.loadQuotationButtonText}>Load</Text>
                   )}
@@ -383,8 +383,8 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
 
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitButton, loading && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={loading}>
-          <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            {loading ? <ActivityIndicator color={COLORS.TEXT.WHITE} /> : <Text style={styles.submitButtonText}>Create Contract</Text>}
+          <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            {loading ? <ActivityIndicator color="#009DFF" /> : <Text style={styles.submitButtonText}>Create Contract</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -478,10 +478,10 @@ const styles = StyleSheet.create({
   radioGroup: { flexDirection: 'row', gap: SIZES.PADDING.MEDIUM },
   radioButton: { flexDirection: 'row', alignItems: 'center', padding: SIZES.PADDING.MEDIUM, backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, flex: 1 },
   radioButtonSmall: { flex: 0, paddingHorizontal: SIZES.PADDING.SMALL, paddingVertical: SIZES.PADDING.SMALL, marginRight: SIZES.PADDING.SMALL },
-  radioButtonActive: { backgroundColor: COLORS.PRIMARY + '20', borderWidth: 1, borderColor: COLORS.PRIMARY },
+  radioButtonActive: { backgroundColor: "#009DFF" + '20', borderWidth: 1, borderColor: "#009DFF" },
   radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.TEXT.SECONDARY, marginRight: SIZES.PADDING.SMALL },
   radioCircleSmall: { width: 16, height: 16, borderRadius: 8, marginRight: SIZES.PADDING.XSMALL },
-  radioCircleActive: { borderColor: COLORS.PRIMARY, backgroundColor: COLORS.PRIMARY },
+  radioCircleActive: { borderColor: "#009DFF", backgroundColor: "#009DFF" },
   radioLabel: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.PRIMARY },
   footer: { padding: SIZES.PADDING.LARGE, backgroundColor: COLORS.BACKGROUND.PRIMARY, borderTopWidth: 1, borderTopColor: COLORS.BACKGROUND.SECONDARY },
   submitButton: { borderRadius: SIZES.RADIUS.LARGE, overflow: 'hidden' },
@@ -490,10 +490,10 @@ const styles = StyleSheet.create({
   submitButtonText: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.WHITE },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: COLORS.SURFACE, borderTopLeftRadius: SIZES.RADIUS.LARGE, borderTopRightRadius: SIZES.RADIUS.LARGE, maxHeight: '80%', paddingBottom: SIZES.PADDING.LARGE },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BACKGROUND.SECONDARY },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER.PRIMARY },
   modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
   modalClose: { fontSize: SIZES.FONT.XXLARGE, color: COLORS.TEXT.SECONDARY },
-  modalItem: { padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BACKGROUND.SECONDARY },
+  modalItem: { padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER.PRIMARY },
   modalItemTitle: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.XSMALL },
   modalItemSubtitle: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.SECONDARY },
   emptyModal: { padding: SIZES.PADDING.XXXLARGE, alignItems: 'center' },
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
   quotationIdContainer: { flexDirection: 'row', gap: SIZES.PADDING.SMALL },
   quotationIdInput: { flex: 1, backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY, borderWidth: 1, borderColor: '#D1D5DB' },
   quotationIdInputDisabled: { backgroundColor: '#F3F4F6', color: COLORS.TEXT.SECONDARY },
-  loadQuotationButton: { backgroundColor: COLORS.PRIMARY, borderRadius: SIZES.RADIUS.MEDIUM, paddingHorizontal: SIZES.PADDING.LARGE, justifyContent: 'center', alignItems: 'center', minWidth: 80 },
+  loadQuotationButton: { backgroundColor: "#009DFF", borderRadius: SIZES.RADIUS.MEDIUM, paddingHorizontal: SIZES.PADDING.LARGE, justifyContent: 'center', alignItems: 'center', minWidth: 80 },
   loadQuotationButtonDisabled: { opacity: 0.6 },
   loadQuotationButtonText: { color: COLORS.TEXT.WHITE, fontSize: SIZES.FONT.MEDIUM, fontWeight: '600' },
 });
