@@ -50,7 +50,7 @@ const CustomAlert = ({
         case 'success':
           return {
             icon: <CircleCheck size={32} color="white" />,
-            gradient: COLORS.GRADIENT.SUCCESS,
+            gradient: ['#009DFF', '#009DFF', '#009DFF'],
             iconBg: 'rgba(76, 175, 80, 0.1)',
           };
       case 'error':
@@ -62,7 +62,7 @@ const CustomAlert = ({
       case 'warning':
         return {
           icon: <AlertTriangle size={32} color="white" />,
-          gradient: COLORS.GRADIENT.WARNING,
+          gradient: ['#009DFF', '#009DFF', '#009DFF'],
           iconBg: 'rgba(255, 152, 0, 0.1)',
         };
       default:
