@@ -1141,7 +1141,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               disabled={paymentLoading}
             >
               {paymentLoading ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                <ActivityIndicator color="#009DFF" />
               ) : (
                 <Text style={styles.confirmButtonText}>Confirm Payment</Text>
               )}
@@ -1157,7 +1157,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading quotation details...</Text>
         </View>
       </SafeAreaView>
@@ -1264,7 +1264,7 @@ const styles = StyleSheet.create({
   quotationId: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
   },
   quoteCode: {
     fontSize: SIZES.FONT.SMALL,
@@ -1318,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   selectedColor: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '600',
     marginBottom: SIZES.PADDING.SMALL,
   },
@@ -1392,7 +1392,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
   },
   actionButtons: {
     flexDirection: 'row',
@@ -1456,7 +1456,7 @@ const styles = StyleSheet.create({
   },
   depositButton: {
     flex: 1,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
