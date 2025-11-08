@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
-  Modal,
   TextInput,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES } from '../../constants';
-import { UserPlus, Users, Search, Filter, Edit, Trash2, ArrowLeft } from 'lucide-react-native';
-import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
+import { UserPlus, Users, Search, Edit, Trash2, ArrowLeft, CheckCircle, XCircle } from 'lucide-react-native';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,37 +19,21 @@ import staffService from '../../services/staffService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DealerStaffManagementScreen = ({ navigation }) => {
-  const { showAlert } = useCustomAlert();
+  const {
+    alertConfig,
+    hideAlert,
+    showAlert,
+    showSuccess,
+    showError,
+  } = useCustomAlert();
   const { user } = useAuth();
   const [staffList, setStaffList] = useState([]);
   const [filteredStaff, setFilteredStaff] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingStaff, setEditingStaff] = useState(null);
   const [agencyId, setAgencyId] = useState(null);
   const [dealerStaffRole, setDealerStaffRole] = useState(null);
-  
-  // Form states for creating new staff
-  const [newStaff, setNewStaff] = useState({
-    username: '',
-    password: '',
-    fullname: '',
-    email: '',
-    phone: '',
-    address: '',
-  });
-
-  // Form states for editing staff
-  const [editStaffForm, setEditStaffForm] = useState({
-    username: '',
-    fullname: '',
-    email: '',
-    phone: '',
-    address: '',
-  });
 
   useEffect(() => {
     loadInitialData();
@@ -62,6 +42,14 @@ const DealerStaffManagementScreen = ({ navigation }) => {
   useEffect(() => {
     filterStaff();
   }, [searchQuery, staffList]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (agencyId) {
+        loadStaffList(agencyId);
+      }
+    }, [agencyId])
+  );
 
   const loadInitialData = async () => {
     try {
@@ -78,7 +66,7 @@ const DealerStaffManagementScreen = ({ navigation }) => {
       
       if (!managerAgencyId) {
         console.error('No agencyId found for Dealer Manager');
-        showAlert('Lỗi', 'Không tìm thấy thông tin agency. Vui lòng đăng nhập lại.');
+        showError('Error', 'Agency information not found. Please sign in again.');
         return;
       }
 
@@ -95,7 +83,7 @@ const DealerStaffManagementScreen = ({ navigation }) => {
       await loadStaffList(managerAgencyId);
     } catch (error) {
       console.error('Error loading initial data:', error);
-      showAlert('Lỗi', 'Không thể tải dữ liệu');
+      showError('Error', 'Unable to load data');
     }
   };
 
@@ -111,12 +99,12 @@ const DealerStaffManagementScreen = ({ navigation }) => {
         setStaffList(result.data || []);
       } else {
         console.error('Failed to load staff:', result?.error);
-        showAlert('Lỗi', result?.error || 'Không thể tải danh sách nhân viên');
+        showError('Error', result?.error || 'Unable to load staff list');
         setStaffList([]);
       }
     } catch (error) {
       console.error('Error loading staff list:', error);
-      showAlert('Lỗi', 'Không thể tải danh sách nhân viên');
+      showError('Error', 'Unable to load staff list');
       setStaffList([]);
     } finally {
       setIsLoading(false);
@@ -140,153 +128,66 @@ const DealerStaffManagementScreen = ({ navigation }) => {
     setFilteredStaff(filtered);
   };
 
-  const handleCreateStaff = async () => {
-    try {
-      console.log('🟢 handleCreateStaff pressed', { newStaff, agencyId, dealerStaffRole });
-      // Validation
-      if (!newStaff.username || !newStaff.password || !newStaff.fullname || !newStaff.email || !newStaff.phone) {
-        console.log('⛔ Validation failed: missing required fields', {
-          username: !!newStaff.username,
-          password: !!newStaff.password,
-          fullname: !!newStaff.fullname,
-          email: !!newStaff.email,
-          phone: !!newStaff.phone,
-        });
-        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc (username, password, fullname, email, phone)');
-        return;
-      }
+  const getResolvedRoleId = () => dealerStaffRole?.id ?? dealerStaffRole?.data?.id;
 
-      if (!agencyId) {
-        console.log('⛔ Validation failed: missing agencyId');
-        showAlert('Lỗi', 'Không tìm thấy thông tin agency');
-        return;
-      }
-
-      const resolvedRoleId = dealerStaffRole?.id ?? dealerStaffRole?.data?.id;
-      if (!resolvedRoleId) {
-        console.log('⛔ Validation failed: missing dealerStaffRole id (checked id and data.id)', { dealerStaffRole });
-        showAlert('Lỗi', 'Không tìm thấy thông tin role Dealer Staff');
-        return;
-      }
-
-      setIsLoading(true);
-
-      // Call API to create staff
-      const staffData = {
-        username: newStaff.username,
-        password: newStaff.password,
-        fullname: newStaff.fullname,
-        email: newStaff.email,
-        phone: newStaff.phone,
-        address: newStaff.address,
-        roleId: Number(resolvedRoleId),
-        agencyId: Number(agencyId),
-      };
-
-      console.log('🚀 Creating dealer staff with data:', staffData);
-
-      const result = await staffService.createDealerStaff(staffData);
-      
-      if (result.success) {
-        console.log('✅ Create dealer staff result:', result);
-        showAlert('Thành công', result.message || 'Tạo tài khoản nhân viên thành công');
-        setShowCreateModal(false);
-        setNewStaff({
-          username: '',
-          password: '',
-          fullname: '',
-          email: '',
-          phone: '',
-          address: '',
-        });
-        await loadStaffList(agencyId); // Reload the staff list
-      } else {
-        console.log('❌ Create dealer staff failed:', result);
-        showAlert('Lỗi', result.error || 'Không thể tạo tài khoản nhân viên');
-      }
-    } catch (error) {
-      console.error('Error creating staff:', error);
-      showAlert('Lỗi', error.message || 'Không thể tạo tài khoản nhân viên');
-    } finally {
-      setIsLoading(false);
+  const handleNavigateToCreate = () => {
+    if (!agencyId) {
+      showError('Error', 'Agency information not found');
+      return;
     }
-  };
 
-  const handleEditStaff = (staff) => {
-    setEditingStaff(staff);
-    setEditStaffForm({
-      username: staff.username || '',
-      fullname: staff.fullname || '',
-      email: staff.email || '',
-      phone: staff.phone || '',
-      address: staff.address || '',
+    const roleId = getResolvedRoleId();
+
+    if (!roleId) {
+      showError('Error', 'Dealer staff role information not found');
+      return;
+    }
+
+    navigation.navigate('CreateDealerStaff', {
+      agencyId: Number(agencyId),
+      roleId: Number(roleId),
     });
-    setShowEditModal(true);
   };
 
-  const handleUpdateStaff = async () => {
-    try {
-      if (!editStaffForm.username || !editStaffForm.fullname || !editStaffForm.email || !editStaffForm.phone) {
-        showAlert('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
-        return;
-      }
-
-      setIsLoading(true);
-      
-      const result = await staffService.updateDealerStaff(editingStaff.id, {
-        username: editStaffForm.username,
-        fullname: editStaffForm.fullname,
-        email: editStaffForm.email,
-        phone: editStaffForm.phone,
-        address: editStaffForm.address || '',
-      });
-      
-      if (result.success) {
-        showAlert('Thành công', result.message || 'Cập nhật thông tin nhân viên thành công');
-        setShowEditModal(false);
-        setEditingStaff(null);
-        await loadStaffList(agencyId); // Reload staff list
-      } else {
-        showAlert('Lỗi', result.error || 'Không thể cập nhật thông tin nhân viên');
-      }
-    } catch (error) {
-      console.error('Error updating staff:', error);
-      showAlert('Lỗi', error.message || 'Không thể cập nhật thông tin nhân viên');
-    } finally {
-      setIsLoading(false);
+  const handleNavigateToEdit = (staff) => {
+    if (!agencyId) {
+      showError('Error', 'Agency information not found');
+      return;
     }
+
+    navigation.navigate('EditDealerStaff', {
+      staff,
+      agencyId: Number(agencyId),
+    });
   };
 
   const handleDeleteStaff = (staff) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa nhân viên ${staff.fullname}?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              const result = await staffService.deleteDealerStaff(staff.id);
-              
-              if (result.success) {
-                showAlert('Thành công', result.message || 'Đã xóa nhân viên');
-                await loadStaffList(agencyId); // Reload staff list
-              } else {
-                showAlert('Lỗi', result.error || 'Không thể xóa nhân viên');
-              }
-            } catch (error) {
-              console.error('Error deleting staff:', error);
-              showAlert('Lỗi', error.message || 'Không thể xóa nhân viên');
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: 'Delete Staff',
+      message: `Are you sure you want to delete staff ${staff.fullname}?`,
+      type: 'error',
+      showCancel: true,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setIsLoading(true);
+          const result = await staffService.deleteDealerStaff(staff.id);
+
+          if (result.success) {
+            showSuccess('Success', result.message || 'Staff deleted successfully');
+            await loadStaffList(agencyId); // Reload staff list
+          } else {
+            showError('Error', result.error || 'Unable to delete staff');
+          }
+        } catch (error) {
+          console.error('Error deleting staff:', error);
+          showError('Error', error.message || 'Unable to delete staff');
+        } finally {
+          setIsLoading(false);
+        }
+      },
+    });
   };
 
   const onRefresh = () => {
@@ -301,269 +202,127 @@ const DealerStaffManagementScreen = ({ navigation }) => {
   const renderStaffItem = ({ item }) => {
     return (
       <View style={styles.staffCard}>
-        <View style={styles.staffInfo}>
-          <Text style={styles.staffName}>{item.fullname}</Text>
-          {item.username && (
-            <Text style={styles.staffUsername}>@{item.username}</Text>
-          )}
-          <Text style={styles.staffEmail}>{item.email}</Text>
-          <Text style={styles.staffPhone}>{item.phone}</Text>
-          {item.address && (
-            <Text style={styles.staffAddress}>{item.address}</Text>
-          )}
-          <View style={styles.staffDetails}>
-            <Text style={[styles.staffStatus, { color: getStatusColor(item.isActive) }]}>
-              {item.isActive ? 'Hoạt động' : 'Không hoạt động'}
-            </Text>
+        <View style={styles.cardHeader}>
+          <View style={styles.staffInfo}>
+            <Text style={styles.staffName}>{item.fullname}</Text>
+            {item.username ? (
+              <Text style={styles.staffUsername}>@{item.username}</Text>
+            ) : null}
+          </View>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.isActive) }]}>
+              {item.isActive ? (
+                <CheckCircle size={14} color={COLORS.TEXT.WHITE} />
+              ) : (
+                <XCircle size={14} color={COLORS.TEXT.WHITE} />
+              )}
+              <Text style={styles.statusText}>
+                {item.isActive ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
           </View>
         </View>
-        <View style={styles.staffActions}>
+
+        <View style={styles.cardContent}>
+          <View style={styles.contactInfo}>
+            <Text style={styles.contactLabel}>Email</Text>
+            <Text style={styles.contactValue}>{item.email || '—'}</Text>
+          </View>
+          <View style={styles.contactInfo}>
+            <Text style={styles.contactLabel}>Phone Number</Text>
+            <Text style={styles.contactValue}>{item.phone || '—'}</Text>
+          </View>
+          <View style={styles.contactInfo}>
+            <Text style={styles.contactLabel}>Address</Text>
+            <Text style={styles.contactValue}>{item.address || '—'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleEditStaff(item)}
+            onPress={() => handleNavigateToEdit(item)}
           >
-            <Edit size={16} color={COLORS.PRIMARY} />
+            <Edit size={16} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleDeleteStaff(item)}
           >
-            <Trash2 size={16} color={COLORS.ERROR} />
+            <Trash2 size={16} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
-  const renderCreateModal = () => (
-    <Modal
-      visible={showCreateModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Tạo tài khoản nhân viên</Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowCreateModal(false)}
-          >
-            <Text style={styles.closeButtonText}>Đóng</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <ScrollView style={styles.modalContent}>
-          <Input
-            label="Username *"
-            value={newStaff.username}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, username: text }))}
-            placeholder="Nhập username"
-            autoCapitalize="none"
-          />
-          
-          <Input
-            label="Password *"
-            value={newStaff.password}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, password: text }))}
-            placeholder="Nhập password"
-            secureTextEntry
-          />
-          
-          <Input
-            label="Họ và tên *"
-            value={newStaff.fullname}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, fullname: text }))}
-            placeholder="Nhập họ và tên"
-          />
-          
-          <Input
-            label="Email *"
-            value={newStaff.email}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, email: text }))}
-            placeholder="Nhập email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          
-          <Input
-            label="Số điện thoại *"
-            value={newStaff.phone}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, phone: text }))}
-            placeholder="Nhập số điện thoại"
-            keyboardType="phone-pad"
-          />
-          
-          <Input
-            label="Địa chỉ"
-            value={newStaff.address}
-            onChangeText={(text) => setNewStaff(prev => ({ ...prev, address: text }))}
-            placeholder="Nhập địa chỉ"
-          />
-        </ScrollView>
-        
-        <View style={styles.modalFooter}>
-          <Button
-            title="Tạo tài khoản"
-            onPress={handleCreateStaff}
-            loading={isLoading}
-            disabled={isLoading}
-            style={styles.createButton}
-          />
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-
-  const renderEditModal = () => (
-    <Modal
-      visible={showEditModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Chỉnh sửa thông tin nhân viên</Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => {
-              setShowEditModal(false);
-              setEditingStaff(null);
-            }}
-          >
-            <Text style={styles.closeButtonText}>Đóng</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <ScrollView style={styles.modalContent}>
-          <Input
-            label="Username *"
-            value={editStaffForm.username}
-            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, username: text }))}
-            placeholder="Nhập username"
-            autoCapitalize="none"
-            editable={false}
-          />
-          
-          <Input
-            label="Họ và tên *"
-            value={editStaffForm.fullname}
-            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, fullname: text }))}
-            placeholder="Nhập họ và tên"
-          />
-          
-          <Input
-            label="Email *"
-            value={editStaffForm.email}
-            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, email: text }))}
-            placeholder="Nhập email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          
-          <Input
-            label="Số điện thoại *"
-            value={editStaffForm.phone}
-            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, phone: text }))}
-            placeholder="Nhập số điện thoại"
-            keyboardType="phone-pad"
-          />
-          
-          <Input
-            label="Địa chỉ"
-            value={editStaffForm.address}
-            onChangeText={(text) => setEditStaffForm(prev => ({ ...prev, address: text }))}
-            placeholder="Nhập địa chỉ"
-          />
-        </ScrollView>
-        
-        <View style={styles.modalFooter}>
-          <Button
-            title="Cập nhật thông tin"
-            onPress={handleUpdateStaff}
-            style={styles.createButton}
-          />
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
-          </TouchableOpacity>
-          <View style={styles.headerTitle}>
-            <Text style={styles.title}>Quản lý Dealer Staff</Text>
-            <Text style={styles.subtitle}>Quản lý nhân viên đại lý</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowCreateModal(true)}
-          >
-            <UserPlus size={20} color={COLORS.TEXT.WHITE} />
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>Dealer Staff Management</Text>
+          <Text style={styles.headerSubtitle}>Manage dealer staff</Text>
         </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={handleNavigateToCreate}
+        >
+          <UserPlus size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
       </View>
 
-      {/* Search Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Search size={20} color={COLORS.TEXT.SECONDARY} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm kiếm nhân viên..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-          />
-        </View>
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search staff, username, email..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={COLORS.TEXT.SECONDARY}
+        />
       </View>
 
-      {/* Stats Section */}
-      <View style={styles.statsSection}>
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{filteredStaff.length}</Text>
-            <Text style={styles.statLabel}>Tổng nhân viên</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {filteredStaff.filter(s => s.isActive).length}
-            </Text>
-            <Text style={styles.statLabel}>Đang hoạt động</Text>
-          </View>
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{filteredStaff.length}</Text>
+          <Text style={styles.statLabel}>Total staff</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>
+            {filteredStaff.filter(s => s.isActive).length}
+          </Text>
+          <Text style={styles.statLabel}>Active staff</Text>
         </View>
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
-        <FlatList
-          data={filteredStaff}
-          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-          renderItem={renderStaffItem}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Users size={48} color={COLORS.TEXT.SECONDARY} />
-              <Text style={styles.emptyText}>Không có nhân viên nào</Text>
-            </View>
-          }
-        />
-      </View>
-
-      {renderCreateModal()}
-      {renderEditModal()}
-    </View>
+      <FlatList
+        data={filteredStaff}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        renderItem={renderStaffItem}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Users size={48} color={COLORS.TEXT.SECONDARY} />
+            <Text style={styles.emptyText}>No staff members found</Text>
+          </View>
+        }
+      />
+      <CustomAlert {...alertConfig} onClose={hideAlert} />
+    </SafeAreaView>
   );
 };
 
@@ -572,128 +331,120 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
-  
+
   // Header
   header: {
-    paddingTop: SIZES.PADDING.XXXLARGE,
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.LARGE,
-  },
-  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingTop: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: {
+  headerTitles: {
     flex: 1,
     alignItems: 'center',
+    gap: 2,
   },
-  title: {
-    fontSize: SIZES.FONT.HEADER,
+  headerTitle: {
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
-    marginBottom: 2,
+    textAlign: 'center',
   },
-  subtitle: {
-    fontSize: SIZES.FONT.SMALL,
+  headerSubtitle: {
+    fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
-    justifyContent: 'center',
+    backgroundColor: '#009DFF',
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Search Section
-  searchSection: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.LARGE,
-  },
+  // Search
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    margin: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
-    marginLeft: SIZES.PADDING.SMALL,
   },
 
-  // Stats Section
-  statsSection: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingBottom: SIZES.PADDING.LARGE,
-  },
+  // Stats
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    gap: 4,
   },
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
     alignItems: 'center',
-    marginHorizontal: SIZES.PADDING.XSMALL,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
   },
   statNumber: {
-    fontSize: SIZES.FONT.XXLARGE,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.PRIMARY,
-    marginBottom: SIZES.PADDING.XSMALL,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: SIZES.FONT.SMALL,
+    fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
   },
 
-  // Content
-  content: {
-    flex: 1,
-  },
+  // List
   listContainer: {
-    padding: SIZES.PADDING.LARGE,
+    padding: SIZES.PADDING.MEDIUM,
   },
   staffCard: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
     padding: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.MEDIUM,
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   staffInfo: {
     flex: 1,
@@ -708,45 +459,56 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
     fontStyle: 'italic',
-    marginBottom: 2,
   },
-  staffEmail: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: 2,
+  statusContainer: {
+    marginLeft: SIZES.PADDING.SMALL,
   },
-  staffPhone: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: 2,
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: 4,
+    borderRadius: SIZES.RADIUS.SMALL,
   },
-  staffAddress: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.SMALL,
-    opacity: 0.8,
+  statusText: {
+    fontSize: SIZES.FONT.XSMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
   },
-  staffDetails: {
+  cardContent: {
+    gap: SIZES.PADDING.XSMALL,
+  },
+  contactInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  staffStatus: {
-    fontSize: SIZES.FONT.XSMALL,
-    fontWeight: '500',
+  contactLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
   },
-  staffActions: {
+  contactValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  cardActions: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: SIZES.PADDING.SMALL,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    backgroundColor: '#000000',
+    borderRadius: SIZES.RADIUS.SMALL,
+    padding: SIZES.PADDING.SMALL,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
+    minWidth: 36,
+    minHeight: 36,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -757,47 +519,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     marginTop: SIZES.PADDING.MEDIUM,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.SURFACE,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER,
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  closeButton: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  closeButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '500',
-  },
-  modalContent: {
-    flex: 1,
-    padding: SIZES.PADDING.LARGE,
-  },
-  modalFooter: {
-    padding: SIZES.PADDING.LARGE,
-    backgroundColor: COLORS.SURFACE,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-  },
-  createButton: {
-    backgroundColor: COLORS.PRIMARY,
   },
 });
 
