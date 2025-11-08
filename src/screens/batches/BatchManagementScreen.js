@@ -422,6 +422,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.PADDING.LARGE,
     paddingTop: SIZES.PADDING.MEDIUM,
     paddingBottom: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },

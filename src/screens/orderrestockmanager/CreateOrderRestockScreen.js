@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -241,8 +242,18 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Create New Order</Text>
+          <View style={styles.headerActions} />
+        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -256,234 +267,247 @@ const CreateOrderRestockScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create New Order</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleCreateOrder}
-          disabled={creating}
-        >
-          {creating ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Create Order</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Order Type *</Text>
-          <View style={styles.vehicleSelector}>
-            <TouchableOpacity
-              style={[
-                styles.vehicleOption,
-                orderType === 'FULL' && styles.selectedVehicleOption
-              ]}
-              onPress={() => setOrderType('FULL')}
-            >
-              <Text style={[
-                styles.vehicleOptionText,
-                orderType === 'FULL' && styles.selectedVehicleOptionText
-              ]}>
-                Full Payment (FULL)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.vehicleOption,
-                orderType === 'DEFERRED' && styles.selectedVehicleOption
-              ]}
-              onPress={() => setOrderType('DEFERRED')}
-            >
-              <Text style={[
-                styles.vehicleOptionText,
-                orderType === 'DEFERRED' && styles.selectedVehicleOptionText
-              ]}>
-                Deferred Payment (DEFERRED)
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Quantity *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={orderItem.quantity}
-              onChangeText={(text) => setOrderItem({ ...orderItem, quantity: text })}
-              placeholder="Enter quantity"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Motorbike *</Text>
-          <View style={styles.vehicleSelector}>
-            {motorbikes.length > 0 ? (
-              motorbikes.map((mb) => (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.contentContainer}
+        >
+          <View style={styles.formSection}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Order Type *</Text>
+              <View style={styles.vehicleSelector}>
                 <TouchableOpacity
-                  key={mb.id}
                   style={[
                     styles.vehicleOption,
-                    orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOption
+                    orderType === 'FULL' && styles.selectedVehicleOption
                   ]}
-                  onPress={() => setOrderItem({ ...orderItem, motorbikeId: String(mb.id), colorId: '' })}
+                  onPress={() => setOrderType('FULL')}
                 >
                   <Text style={[
                     styles.vehicleOptionText,
-                    orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOptionText
+                    orderType === 'FULL' && styles.selectedVehicleOptionText
                   ]}>
-                    {mb.name || mb.model || `Motorbike ${mb.id}`}
+                    Full Payment
                   </Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noOptionsText}>Loading motorbikes...</Text>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Color *</Text>
-          <View style={styles.vehicleSelector}>
-            {motorbikeColors.length > 0 ? (
-              motorbikeColors.map((c) => (
                 <TouchableOpacity
-                  key={c.id}
                   style={[
                     styles.vehicleOption,
-                    orderItem.colorId === String(c.id) && styles.selectedVehicleOption
+                    orderType === 'DEFERRED' && styles.selectedVehicleOption
                   ]}
-                  onPress={() => setOrderItem({ ...orderItem, colorId: String(c.id) })}
+                  onPress={() => setOrderType('DEFERRED')}
                 >
                   <Text style={[
                     styles.vehicleOptionText,
-                    orderItem.colorId === String(c.id) && styles.selectedVehicleOptionText
+                    orderType === 'DEFERRED' && styles.selectedVehicleOptionText
                   ]}>
-                    {c.colorType}
+                    Deferred Payment
                   </Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noOptionsText}>Select motorbike first to display colors</Text>
-            )}
-          </View>
-        </View>
+              </View>
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Warehouse *</Text>
-          <View style={styles.vehicleSelector}>
-            {warehouses.length > 0 ? (
-              warehouses.map((wh) => (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Quantity *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={orderItem.quantity}
+                onChangeText={(text) => setOrderItem({ ...orderItem, quantity: text })}
+                placeholder="Enter quantity"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Motorbike *</Text>
+              <View style={styles.vehicleSelector}>
+                {motorbikes.length > 0 ? (
+                  motorbikes.map((mb) => (
+                    <TouchableOpacity
+                      key={mb.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, motorbikeId: String(mb.id), colorId: '' })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {mb.name || mb.model || `Motorbike ${mb.id}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Loading motorbikes...</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Color *</Text>
+              <View style={styles.vehicleSelector}>
+                {motorbikeColors.length > 0 ? (
+                  motorbikeColors.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.colorId === String(c.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, colorId: String(c.id) })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.colorId === String(c.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {c.colorType}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Select motorbike first to display colors</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Warehouse *</Text>
+              <View style={styles.vehicleSelector}>
+                {warehouses.length > 0 ? (
+                  warehouses.map((wh) => (
+                    <TouchableOpacity
+                      key={wh.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, warehouseId: String(wh.id) })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {wh.name || wh.location || `Warehouse`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Loading warehouses...</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Discount (optional)</Text>
+              <View style={styles.vehicleSelector}>
                 <TouchableOpacity
-                  key={wh.id}
                   style={[
                     styles.vehicleOption,
-                    orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOption
+                    !orderItem.discountId && styles.selectedVehicleOption
                   ]}
-                  onPress={() => setOrderItem({ ...orderItem, warehouseId: String(wh.id) })}
+                  onPress={() => setOrderItem({ ...orderItem, discountId: '' })}
                 >
                   <Text style={[
                     styles.vehicleOptionText,
-                    orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
+                    !orderItem.discountId && styles.selectedVehicleOptionText
                   ]}>
-                    {wh.name || wh.location || `Warehouse`}
+                    None
                   </Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noOptionsText}>Loading warehouses...</Text>
-            )}
-          </View>
-        </View>
+                {discounts.length > 0 ? (
+                  discounts.map((disc) => (
+                    <TouchableOpacity
+                      key={disc.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.discountId === String(disc.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, discountId: String(disc.id) })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.discountId === String(disc.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {disc.name || disc.description || `Discount ${disc.id}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>No discount codes available</Text>
+                )}
+              </View>
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Discount (optional)</Text>
-          <View style={styles.vehicleSelector}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Promotion (optional)</Text>
+              <View style={styles.vehicleSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.vehicleOption,
+                    !orderItem.promotionId && styles.selectedVehicleOption
+                  ]}
+                  onPress={() => setOrderItem({ ...orderItem, promotionId: '' })}
+                >
+                  <Text style={[
+                    styles.vehicleOptionText,
+                    !orderItem.promotionId && styles.selectedVehicleOptionText
+                  ]}>
+                    None
+                  </Text>
+                </TouchableOpacity>
+                {promotions.length > 0 ? (
+                  promotions
+                    .filter(p => !p.motorbikeId || String(p.motorbikeId) === String(orderItem.motorbikeId || ''))
+                    .map((promo) => (
+                      <TouchableOpacity
+                        key={promo.id}
+                        style={[
+                          styles.vehicleOption,
+                          orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
+                        ]}
+                        onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
+                      >
+                        <Text style={[
+                          styles.vehicleOptionText,
+                          orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
+                        ]}>
+                          {promo.name || `Promotion ${promo.id}`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Loading promotions...</Text>
+                )}
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={[
-                styles.vehicleOption,
-                !orderItem.discountId && styles.selectedVehicleOption
-              ]}
-              onPress={() => setOrderItem({ ...orderItem, discountId: '' })}
+              style={[styles.submitButton, creating && styles.submitButtonDisabled]}
+              onPress={handleCreateOrder}
+              disabled={creating}
             >
-              <Text style={[
-                styles.vehicleOptionText,
-                !orderItem.discountId && styles.selectedVehicleOptionText
-              ]}>
-                None
-              </Text>
+              {creating ? (
+                <ActivityIndicator size="small" color="#009DFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Create Order</Text>
+              )}
             </TouchableOpacity>
-            {discounts.length > 0 ? (
-              discounts.map((disc) => (
-                <TouchableOpacity
-                  key={disc.id}
-                  style={[
-                    styles.vehicleOption,
-                    orderItem.discountId === String(disc.id) && styles.selectedVehicleOption
-                  ]}
-                  onPress={() => setOrderItem({ ...orderItem, discountId: String(disc.id) })}
-                >
-                  <Text style={[
-                    styles.vehicleOptionText,
-                    orderItem.discountId === String(disc.id) && styles.selectedVehicleOptionText
-                  ]}>
-                    {disc.name || disc.description || `Discount ${disc.id}`}
-                  </Text>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noOptionsText}>No discount codes available</Text>
-            )}
           </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Promotion (optional)</Text>
-          <View style={styles.vehicleSelector}>
-            <TouchableOpacity
-              style={[
-                styles.vehicleOption,
-                !orderItem.promotionId && styles.selectedVehicleOption
-              ]}
-              onPress={() => setOrderItem({ ...orderItem, promotionId: '' })}
-            >
-              <Text style={[
-                styles.vehicleOptionText,
-                !orderItem.promotionId && styles.selectedVehicleOptionText
-              ]}>
-                None
-              </Text>
-            </TouchableOpacity>
-            {promotions.length > 0 ? (
-              promotions
-                .filter(p => !p.motorbikeId || String(p.motorbikeId) === String(orderItem.motorbikeId || ''))
-                .map((promo) => (
-                  <TouchableOpacity
-                    key={promo.id}
-                    style={[
-                      styles.vehicleOption,
-                      orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
-                    ]}
-                    onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
-                  >
-                    <Text style={[
-                      styles.vehicleOptionText,
-                      orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
-                    ]}>
-                      {promo.name || `Promotion ${promo.id}`}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-            ) : (
-              <Text style={styles.noOptionsText}>Loading promotions...</Text>
-            )}
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -505,46 +529,50 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  headerActions: {
+    width: 40,
+    alignItems: 'flex-end',
   },
-  saveButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+    overflow: 'hidden',
+  },
+  contentContainer: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   loadingContainer: {
     flex: 1,
@@ -557,21 +585,23 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
   },
   inputGroup: {
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
     fontWeight: '600',
   },
   textInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   vehicleSelector: {
     flexDirection: 'row',
@@ -585,11 +615,11 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   selectedVehicleOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0,157,255,0.12)',
   },
   vehicleOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -598,7 +628,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   selectedVehicleOptionText: {
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
   },
   noOptionsText: {
     fontSize: SIZES.FONT.SMALL,
@@ -606,6 +636,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: SIZES.PADDING.MEDIUM,
     fontStyle: 'italic',
+  },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.LARGE,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 

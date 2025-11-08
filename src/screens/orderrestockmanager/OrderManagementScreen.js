@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,9 @@ import {
   Modal,
   Dimensions,
   TextInput,
-  FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -37,6 +36,7 @@ const OrderManagementScreen = ({ navigation }) => {
   const [createdOrderIdMap, setCreatedOrderIdMap] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [availableVehicles, setAvailableVehicles] = useState([]); // Synced names from Catalog
   const [editingOrder, setEditingOrder] = useState(null);
@@ -49,6 +49,7 @@ const OrderManagementScreen = ({ navigation }) => {
   const [discounts, setDiscounts] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
   const [creating, setCreating] = useState(false);
+  const [activeStatusFilter, setActiveStatusFilter] = useState('ALL');
   const [newOrder, setNewOrder] = useState({
     vehicleModel: '',
     quantity: '',
@@ -60,6 +61,38 @@ const OrderManagementScreen = ({ navigation }) => {
     colorId: '',
     agencyId: '',
   });
+  
+  const statusCounts = useMemo(() => {
+    const baseCounts = {
+      ALL: 0,
+      DRAFT: 0,
+      PENDING: 0,
+      APPROVED: 0,
+      DELIVERED: 0,
+      CANCELED: 0,
+    };
+
+    return orders.reduce((acc, order) => {
+      acc.ALL += 1;
+      if (order.status) {
+        if (Object.prototype.hasOwnProperty.call(acc, order.status)) {
+          acc[order.status] += 1;
+        } else {
+          acc[order.status] = (acc[order.status] || 0) + 1;
+        }
+      }
+      return acc;
+    }, { ...baseCounts });
+  }, [orders]);
+
+  const statusFilters = [
+    { label: `All (${statusCounts.ALL})`, value: 'ALL' },
+    { label: `Draft (${statusCounts.DRAFT || 0})`, value: 'DRAFT' },
+    { label: `Pending (${statusCounts.PENDING || 0})`, value: 'PENDING' },
+    { label: `Approved (${statusCounts.APPROVED || 0})`, value: 'APPROVED' },
+    { label: `Delivered (${statusCounts.DELIVERED || 0})`, value: 'DELIVERED' },
+    { label: `Canceled (${statusCounts.CANCELED || 0})`, value: 'CANCELED' },
+  ];
   
   // Track permission errors
   const [permissionErrors, setPermissionErrors] = useState({
@@ -322,11 +355,13 @@ const OrderManagementScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (showLoader = true) => {
     try {
       console.log('🔄 [OrderManagement] Bắt đầu load orders...');
       console.log('🔄 [OrderManagement] Loading state:', true);
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       
       // Use new API endpoint /order-restock/list/{agencyId}
       if (!user?.agencyId) {
@@ -380,24 +415,41 @@ const OrderManagementScreen = ({ navigation }) => {
     } finally {
       console.log('🔄 [OrderManagement] Kết thúc load, set loading = false');
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    if (!searchQuery.trim()) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      order.id?.toString().toLowerCase().includes(searchLower) ||
-      order.status?.toLowerCase().includes(searchLower)
-    );
-  });
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadOrders(false);
+  };
+
+  const filteredOrders = useMemo(() => {
+    let list = [...orders];
+
+    if (activeStatusFilter !== 'ALL') {
+      list = list.filter(order => order.status === activeStatusFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      list = list.filter(order =>
+        order.id?.toString().toLowerCase().includes(searchLower) ||
+        order.status?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return list;
+  }, [orders, searchQuery, activeStatusFilter]);
   
   // Newest first by orderAt or createdAt
-  const sortedFilteredOrders = [...filteredOrders].sort((a, b) => {
-    const aTime = new Date(a.orderAt || a.createdAt || 0).getTime();
-    const bTime = new Date(b.orderAt || b.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
+  const sortedFilteredOrders = useMemo(() => {
+    return [...filteredOrders].sort((a, b) => {
+      const aTime = new Date(a.orderAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.orderAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }, [filteredOrders]);
 
   const handleCreateOrder = async () => {
     console.log('👉 [OrderManagement] Bấm Tạo đơn');
@@ -661,79 +713,88 @@ const OrderManagementScreen = ({ navigation }) => {
     });
   };
 
-  const renderOrderCard = (order) => (
-    <TouchableOpacity 
-      style={styles.orderCard}
-      onPress={() => handleViewOrder(order)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.orderHeader}>
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>#{order.id ?? '—'}</Text>
-          <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
-        </View>
-        <View style={styles.orderStatus}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
-          </View>
-        </View>
-      </View>
+  const renderOrderCard = (order) => {
+    const statusColor = getStatusColor(order.status);
 
-      <View style={styles.orderDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Quantity:</Text>
-          <Text style={styles.detailValue}>{order.itemQuantity || order.orderItems?.[0]?.quantity || 0} units</Text>
-        </View>
-        {order.orderItems?.[0] && (
-          <>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Base Price:</Text>
-              <Text style={styles.detailValue}>{formatPrice(order.orderItems[0].basePrice || 0)}</Text>
-            </View>
-            {order.orderItems[0].discountTotal > 0 && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Discount:</Text>
-                <Text style={[styles.detailValue, { color: COLORS.ERROR }]}>
-                  -{formatPrice(order.orderItems[0].discountTotal || 0)}
-                </Text>
-              </View>
-            )}
-            {order.orderItems[0].promotionTotal > 0 && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Promotion:</Text>
-                <Text style={[styles.detailValue, { color: COLORS.SUCCESS }]}>
-                  -{formatPrice(order.orderItems[0].promotionTotal || 0)}
-                </Text>
-              </View>
-            )}
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Final Price:</Text>
-              <Text style={[styles.detailValue, { fontWeight: 'bold' }]}>
-                {formatPrice(order.orderItems[0].finalPrice || 0)}
+    return (
+      <TouchableOpacity 
+        style={styles.orderCard}
+        onPress={() => handleViewOrder(order)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.orderHeader}>
+          <View style={styles.orderInfo}>
+            <Text style={styles.orderId}>#{order.id ?? '—'}</Text>
+            <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
+          </View>
+          <View style={styles.orderStatus}>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: `${statusColor}20` }
+            ]}>
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {getStatusText(order.status)}
               </Text>
             </View>
-          </>
-        )}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Total:</Text>
-          <Text style={[styles.detailValue, styles.priceValue]}>
-            {formatPrice(order.subtotal || 0)}
-          </Text>
+          </View>
         </View>
-      </View>
 
-      {order.status === 'DRAFT' && (
-        <View style={styles.orderActions}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => handleCancelOrder(order.id)}
-          >
-            <Text style={styles.cancelButtonText}>Delete Order</Text>
-          </TouchableOpacity>
+        <View style={styles.orderDetails}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Quantity:</Text>
+            <Text style={styles.detailValue}>{order.itemQuantity || order.orderItems?.[0]?.quantity || 0} units</Text>
+          </View>
+          {order.orderItems?.[0] && (
+            <>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Base Price:</Text>
+                <Text style={styles.detailValue}>{formatPrice(order.orderItems[0].basePrice || 0)}</Text>
+              </View>
+              {order.orderItems[0].discountTotal > 0 && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Discount:</Text>
+                  <Text style={[styles.detailValue, { color: COLORS.ERROR }]}>
+                    -{formatPrice(order.orderItems[0].discountTotal || 0)}
+                  </Text>
+                </View>
+              )}
+              {order.orderItems[0].promotionTotal > 0 && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Promotion:</Text>
+                  <Text style={[styles.detailValue, { color: COLORS.SUCCESS }]}>
+                    -{formatPrice(order.orderItems[0].promotionTotal || 0)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Final Price:</Text>
+                <Text style={[styles.detailValue, { fontWeight: 'bold' }]}>
+                  {formatPrice(order.orderItems[0].finalPrice || 0)}
+                </Text>
+              </View>
+            </>
+          )}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Total:</Text>
+            <Text style={[styles.detailValue, styles.priceValue]}>
+              {formatPrice(order.subtotal || 0)}
+            </Text>
+          </View>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+
+        {order.status === 'DRAFT' && (
+          <View style={styles.orderActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => handleCancelOrder(order.id)}
+            >
+              <Text style={styles.cancelButtonText}>Delete Order</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderCreateModal = () => (
     <Modal
@@ -770,7 +831,7 @@ const OrderManagementScreen = ({ navigation }) => {
             disabled={creating}
           >
             {creating ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#009DFF" />
             ) : (
               <Text style={styles.modalSaveText}>Create Order</Text>
             )}
@@ -971,95 +1032,6 @@ const OrderManagementScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => navigation.navigate('CreateOrderRestock')}
-        >
-          <Plus size={20} color={COLORS.TEXT.WHITE} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Search size={20} color={COLORS.TEXT.SECONDARY} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search orders..."
-          placeholderTextColor={COLORS.TEXT.SECONDARY}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{orders.length}</Text>
-          <Text style={styles.statLabel}>Total Orders</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>
-            {orders.filter(o => o.status === 'PENDING').length}
-          </Text>
-          <Text style={styles.statLabel}>Pending</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>
-            {orders.filter(o => o.status === 'APPROVED').length}
-          </Text>
-          <Text style={styles.statLabel}>Approved</Text>
-        </View>
-      </View>
-
-      {/* Orders List */}
-      <ScrollView
-        style={styles.ordersList}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.ordersContent}
-      >
-        {(() => {
-          console.log('🖥️ [OrderManagement] Render list:', {
-            loading,
-            ordersCount: orders.length,
-            filteredCount: sortedFilteredOrders.length
-          });
-          
-          if (loading && orders.length === 0) {
-            return (
-              <View style={styles.emptyState}>
-                <Clock size={64} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.emptyTitle}>Loading...</Text>
-              </View>
-            );
-          } else if (sortedFilteredOrders.length > 0) {
-            return sortedFilteredOrders.map((order, index) => (
-              <View key={getUniqueKey(order, index)}>
-                {renderOrderCard(order)}
-              </View>
-            ));
-          } else {
-            return (
-              <View style={styles.emptyState}>
-                <Package size={64} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.emptyTitle}>No Orders</Text>
-                <Text style={styles.emptySubtitle}>
-                  Create your first order from EVM
-                </Text>
-              </View>
-            );
-          }
-        })()}
-      </ScrollView>
-
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -1072,6 +1044,107 @@ const OrderManagementScreen = ({ navigation }) => {
         onCancel={alertConfig.onCancel}
         onClose={hideAlert}
       />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Order Management</Text>
+        <TouchableOpacity
+          style={styles.headerButtonPrimary}
+          onPress={() => navigation.navigate('CreateOrderRestock')}
+        >
+          <Plus size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search orders..."
+          placeholderTextColor={COLORS.TEXT.SECONDARY}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      {/* Status Tabs */}
+      <SafeAreaView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.statusTabsScroll}
+          contentContainerStyle={styles.statusTabsContent}
+        >
+          {statusFilters.map(filter => (
+            <TouchableOpacity
+              key={filter.value}
+              style={[
+                styles.statusTabButton,
+                activeStatusFilter === filter.value && styles.activeStatusTabButton,
+              ]}
+              onPress={() => setActiveStatusFilter(filter.value)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.statusTabText,
+                  activeStatusFilter === filter.value && styles.activeStatusTabText,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+
+      {loading && orders.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#009DFF" />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.ordersList}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.ordersContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {(() => {
+            console.log('🖥️ [OrderManagement] Render list:', {
+              loading,
+              ordersCount: orders.length,
+              filteredCount: sortedFilteredOrders.length
+            });
+            
+            if (sortedFilteredOrders.length > 0) {
+              return sortedFilteredOrders.map((order, index) => (
+                <View key={getUniqueKey(order, index)}>
+                  {renderOrderCard(order)}
+                </View>
+              ));
+            }
+
+            return (
+              <View style={styles.emptyState}>
+                <Package size={64} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.emptyTitle}>No Orders</Text>
+                <Text style={styles.emptySubtitle}>
+                  Create your first order from EVM
+                </Text>
+              </View>
+            );
+          })()}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
@@ -1080,7 +1153,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: 30,
   },
   
   // Header
@@ -1088,25 +1160,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.MEDIUM,
     paddingBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    marginTop: SIZES.PADDING.SMALL,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  backButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -1114,19 +1181,15 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
+    paddingHorizontal: SIZES.PADDING.SMALL,
   },
-  addButton: {
+  headerButtonPrimary: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search
@@ -1137,55 +1200,65 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    margin: SIZES.PADDING.MEDIUM,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  searchIcon: {
-    marginRight: SIZES.PADDING.SMALL,
-  },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
-    marginLeft: SIZES.PADDING.SMALL,
+  },
+
+  // Status Tabs
+  statusTabsScroll: {
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  statusTabsContent: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
+  },
+  statusTabButton: {
+    paddingVertical: SIZES.PADDING.XSMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    minWidth: 120,
+    height: 30,
+  },
+  activeStatusTabButton: {
+    backgroundColor: '#009DFF',
+  },
+  statusTabText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  activeStatusTabText: {
+    color: COLORS.TEXT.WHITE,
   },
 
   // Stats
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  statNumber: {
-    fontSize: SIZES.FONT.XXLARGE,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    textAlign: 'center',
-  },
-
   // Orders List
   ordersList: {
     flex: 1,
   },
   ordersContent: {
-    padding: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   orderCard: {
     backgroundColor: COLORS.SURFACE,
@@ -1210,7 +1283,7 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   vehicleModel: {
@@ -1234,7 +1307,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.WHITE,
     fontWeight: '600',
   },
   orderDetails: {
