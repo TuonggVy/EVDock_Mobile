@@ -15,9 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, PackageSearch, NotepadText, Users, Gift, CalendarClock, SquareChartGantt, Gem, CarFront, PackageOpen, ReceiptText, NotebookPen } from 'lucide-react-native';
+import useUserProfile from '../../hooks/useUserProfile';
 
 const DealerStaffHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { profile } = useUserProfile();
   
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -179,7 +181,7 @@ const DealerStaffHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Staff'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Staff'}</Text>
             <Text style={styles.roleText}>Dealer Staff</Text>
           </View>
         </View>

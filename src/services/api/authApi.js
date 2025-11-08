@@ -45,6 +45,21 @@ export const refreshToken = async (refreshToken) => {
 };
 
 /**
+ * Get profile by staff ID
+ * @param {number|string} staffId - Staff identifier
+ * @returns {Promise<Object>} Profile response
+ */
+export const getProfile = async (staffId) => {
+  try {
+    const response = await api.get(`/auth/profile/${staffId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get profile error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
  * Logout user account
  * @param {string} accessToken - Current access token (optional, handled by interceptor)
  * @returns {Promise<Object>} Logout response

@@ -16,10 +16,12 @@ import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, PackageOpen, Bus, Warehouse, NotepadText, CircleDollarSign, Gift, RefreshCcw, CreditCard, SquareChartGantt, Search } from 'lucide-react-native';
+import useUserProfile from '../../hooks/useUserProfile';
 
 const EVMStaffHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  const { profile } = useUserProfile();
   
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -159,7 +161,7 @@ const EVMStaffHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Staff'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Staff'}</Text>
             <Text style={styles.roleText}>EVM Staff</Text>
           </View>
         </View>

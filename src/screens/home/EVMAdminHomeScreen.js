@@ -17,9 +17,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, CircleDollarSign, Building2, CarFront, Warehouse, Users, TicketPercent, Gift, PackageOpen, RefreshCcw, NotepadText, CreditCard, Search } from 'lucide-react-native';
 import reportService from '../../services/reportService';
+import useUserProfile from '../../hooks/useUserProfile';
 
 const EVMAdminHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { profile } = useUserProfile();
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -242,7 +244,7 @@ const EVMAdminHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Admin'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Admin'}</Text>
             <Text style={styles.roleText}>EVM Administrator</Text>
           </View>
         </View>
