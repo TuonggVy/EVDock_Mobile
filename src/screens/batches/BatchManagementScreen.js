@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -30,6 +31,7 @@ const BatchManagementScreen = ({ navigation }) => {
   });
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [activeStatusFilter, setActiveStatusFilter] = useState('ALL');
 
 
   useEffect(() => {
@@ -45,7 +47,7 @@ const BatchManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterBatches();
-  }, [searchQuery, batches]);
+  }, [searchQuery, batches, activeStatusFilter]);
 
   const loadAgencies = async () => {
     try {
@@ -114,6 +116,10 @@ const BatchManagementScreen = ({ navigation }) => {
 
   const filterBatches = () => {
     let filtered = [...batches];
+
+    if (activeStatusFilter !== 'ALL') {
+      filtered = filtered.filter(batch => batch.status === activeStatusFilter);
+    }
 
     // Filter by search query (invoice number or agency name)
     if (searchQuery.trim()) {
@@ -224,6 +230,27 @@ const BatchManagementScreen = ({ navigation }) => {
     }
   };
 
+  const statusCounts = useMemo(() => {
+    return batches.reduce(
+      (acc, batch) => {
+        acc.ALL += 1;
+        if (batch.status) {
+          acc[batch.status] = (acc[batch.status] || 0) + 1;
+        }
+        return acc;
+      },
+      { ALL: 0, OPEN: 0, PARTIAL: 0, CLOSED: 0, OVERDUE: 0 }
+    );
+  }, [batches]);
+
+  const statusFilters = [
+    { label: `All (${statusCounts.ALL})`, value: 'ALL' },
+    { label: `Open (${statusCounts.OPEN})`, value: 'OPEN' },
+    { label: `Partial (${statusCounts.PARTIAL})`, value: 'PARTIAL' },
+    { label: `Closed (${statusCounts.CLOSED})`, value: 'CLOSED' },
+    { label: `Overdue (${statusCounts.OVERDUE})`, value: 'OVERDUE' },
+  ];
+
   const renderBatchCard = (batch) => {
     const statusColor = getStatusColor(batch.status);
 
@@ -248,13 +275,13 @@ const BatchManagementScreen = ({ navigation }) => {
                       style={[styles.iconButton, styles.editButton]}
                       onPress={(e) => handleEditBatch(batch, e)}
                     >
-                      <Pencil size={16} color={COLORS.PRIMARY} />
+                      <Pencil size={16} color="#FFFFFF" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.iconButton, styles.deleteButton]}
                       onPress={(e) => handleDeleteBatch(batch, e)}
                     >
-                      <Trash2 size={16} color={COLORS.ERROR} />
+                      <Trash2 size={16} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
         </View>
@@ -286,7 +313,7 @@ const BatchManagementScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
@@ -298,35 +325,62 @@ const BatchManagementScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.headerButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.backButtonText}>Back</Text>
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ap Batches Management</Text>
+        <Text style={styles.headerTitle}>AP Batches Management</Text>
         <TouchableOpacity
-          style={styles.addButton}
+          style={styles.headerButtonPrimary}
           onPress={handleCreateBatch}
         >
-          <Plus size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.addButtonText}>Add</Text>
+          <Plus size={18} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
       </View>
 
       {/* Search */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchIconContainer}>
-          <Search size={20} color={COLORS.TEXT.SECONDARY} />
-        </View>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search batches..."
+          placeholder="Search batches, invoice, agency..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
       </View>
+
+      {/* Status Tabs */}
+      <SafeAreaView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.statusTabsScroll}
+          contentContainerStyle={styles.statusTabsContent}
+        >
+          {statusFilters.map(filter => (
+            <TouchableOpacity
+              key={filter.value}
+              style={[
+                styles.statusTabButton,
+                activeStatusFilter === filter.value && styles.activeStatusTabButton,
+              ]}
+              onPress={() => setActiveStatusFilter(filter.value)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.statusTabText,
+                  activeStatusFilter === filter.value && styles.activeStatusTabText,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
 
       {/* Batch List */}
       {loading ? (
@@ -336,9 +390,11 @@ const BatchManagementScreen = ({ navigation }) => {
       ) : (
         <ScrollView
           style={styles.listContainer}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          showsVerticalScrollIndicator={false}
         >
           {filteredBatches.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -350,9 +406,7 @@ const BatchManagementScreen = ({ navigation }) => {
           )}
         </ScrollView>
       )}
-
-
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -365,56 +419,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  backButton: {
-    flexDirection: 'row',
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
+    justifyContent: 'center',
   },
-  backButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+  headerButtonPrimary: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: "#009DFF",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.HEADER,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  addButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    paddingHorizontal: SIZES.PADDING.SMALL,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.LARGE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-  },
-  searchIconContainer: {
-    marginRight: SIZES.PADDING.SMALL,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  statusTabsScroll: {
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  statusTabsContent: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
+  },
+  statusTabButton: {
+    paddingVertical: SIZES.PADDING.XSMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    minWidth: 120,
+    height: 30
+  },
+  activeStatusTabButton: {
+    backgroundColor: "#009DFF",
+  },
+  statusTabText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  activeStatusTabText: {
+    color: COLORS.TEXT.WHITE,
   },
   loadingContainer: {
     flex: 1,
@@ -423,24 +506,27 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
+  },
+  listContent: {
     paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   batchCard: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.LARGE,
+    padding: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
   batchHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
   },
   batchHeaderLeft: {
     flex: 1,
@@ -451,17 +537,19 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
   statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: 4,
     borderRadius: SIZES.RADIUS.SMALL,
     alignSelf: 'flex-start',
+    marginTop: SIZES.PADDING.XSMALL,
   },
   statusText: {
-    fontSize: SIZES.FONT.SMALL,
+    fontSize: SIZES.FONT.XSMALL,
     fontWeight: '600',
   },
   actionButtons: {
     flexDirection: 'row',
+    gap: SIZES.PADDING.XSMALL,
   },
   iconButton: {
     width: 36,
@@ -469,23 +557,24 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.SMALL,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.XSMALL,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY + '20',
+    backgroundColor: "#000000",
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR + '20',
+    backgroundColor: "#000000",
   },
   batchInfo: {
     borderTopWidth: 1,
     borderTopColor: '#EFEFEF',
     paddingTop: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SIZES.PADDING.XSMALL,
+    alignItems: 'center',
   },
   infoLabel: {
     fontSize: SIZES.FONT.SMALL,
@@ -495,13 +584,15 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+    marginLeft: SIZES.PADDING.SMALL,
     flex: 1,
     textAlign: 'right',
   },
   amountValue: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.SECONDARY,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginLeft: SIZES.PADDING.SMALL,
     flex: 1,
     textAlign: 'right',
   },
@@ -512,9 +603,9 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyText: {
+    marginTop: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
-    marginTop: SIZES.PADDING.MEDIUM,
   },
 });
 
