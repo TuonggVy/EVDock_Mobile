@@ -8,10 +8,8 @@ import {
   SafeAreaView,
   Platform,
   Modal,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -19,19 +17,14 @@ import stockPromotionService from '../../services/stockPromotionService';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Edit, Calendar, Trash2, CheckSquare, Square, ArrowLeft, Package } from 'lucide-react-native';
+import { Edit, Trash2, CheckSquare, Square, ArrowLeft, Package } from 'lucide-react-native';
 
 const StockPromotionDetailScreen = ({ navigation, route }) => {
   const { stockPromotionId } = route.params || {};
   const { user } = useAuth();
   const [stockPromotion, setStockPromotion] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
 
   // Assignment modal states
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -41,16 +34,6 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
   const [applying, setApplying] = useState(false);
   const [motorbikes, setMotorbikes] = useState([]);
   const [motorbikeColors, setMotorbikeColors] = useState({}); // { motorbikeId: { colorId: colorType } }
-
-  const [editPromotion, setEditPromotion] = useState({
-    name: '',
-    description: '',
-    valueType: 'PERCENT',
-    value: '',
-    startAt: '',
-    endAt: '',
-    status: 'ACTIVE',
-  });
 
   const { alertConfig, hideAlert, showSuccess, showError, showDeleteConfirm } = useCustomAlert();
 
@@ -131,137 +114,11 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     });
   };
 
-  // Date formatting functions for edit modal
-  const formatDateForAPI = (date) => {
-    if (!date) return '';
-    const d = new Date(date);
-    return d.toISOString();
-  };
-
-  const formatDateForDisplay = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
-  };
-
-  // Date picker handlers
-  const handleStartDateChange = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      // On Android (date mode), preserve the time from current date or set to current time
-      let dateWithTime = selectedDate;
-      if (Platform.OS === 'android') {
-        const now = new Date();
-        dateWithTime = new Date(selectedDate);
-        dateWithTime.setHours(now.getHours());
-        dateWithTime.setMinutes(now.getMinutes());
-        dateWithTime.setSeconds(0);
-        dateWithTime.setMilliseconds(0);
-      }
-      
-      setStartDate(dateWithTime);
-      const formattedDate = formatDateForAPI(dateWithTime);
-      setEditPromotion(prev => ({ ...prev, startAt: formattedDate }));
-      
-      // If end date is before start date, update end date
-      if (dateWithTime > endDate) {
-        setEndDate(dateWithTime);
-        setEditPromotion(prev => ({ ...prev, endAt: formattedDate }));
-      }
-    }
-  };
-
-  const handleEndDateChange = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      // On Android (date mode), preserve the time from current date or set to end of day
-      let dateWithTime = selectedDate;
-      if (Platform.OS === 'android') {
-        const now = new Date();
-        dateWithTime = new Date(selectedDate);
-        dateWithTime.setHours(now.getHours());
-        dateWithTime.setMinutes(now.getMinutes());
-        dateWithTime.setSeconds(0);
-        dateWithTime.setMilliseconds(0);
-      }
-      
-      // Ensure end date is not before start date
-      if (dateWithTime < startDate) {
-        showError('Error', 'End date must be after start date');
-        return;
-      }
-      setEndDate(dateWithTime);
-      const formattedDate = formatDateForAPI(dateWithTime);
-      setEditPromotion(prev => ({ ...prev, endAt: formattedDate }));
-    }
-  };
-
-  const handleOpenEditModal = () => {
+  const handleNavigateToEdit = () => {
     if (!stockPromotion) return;
-    
-    // Pre-fill form data
-    const start = stockPromotion.startAt ? new Date(stockPromotion.startAt) : new Date();
-    const end = stockPromotion.endAt ? new Date(stockPromotion.endAt) : new Date();
-    
-    setStartDate(start);
-    setEndDate(end);
-    setEditPromotion({
-      name: stockPromotion.name || '',
-      description: stockPromotion.description || '',
-      valueType: stockPromotion.valueType || 'PERCENT',
-      value: stockPromotion.value?.toString() || '',
-      startAt: stockPromotion.startAt || '',
-      endAt: stockPromotion.endAt || '',
-      status: stockPromotion.status || 'ACTIVE',
+    navigation.navigate('EditStockPromotion', {
+      stockPromotionId: stockPromotion.id,
     });
-    setShowEditModal(true);
-  };
-
-  const handleUpdatePromotion = async () => {
-    console.log('🔄 [StockPromotionDetail] Starting update promotion...');
-    
-    // Validation
-    if (!editPromotion.name || !editPromotion.description || !editPromotion.value || !editPromotion.startAt || !editPromotion.endAt) {
-      showError('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    setUpdating(true);
-    try {
-      const dataToSubmit = {
-        name: editPromotion.name,
-        description: editPromotion.description,
-        valueType: editPromotion.valueType,
-        value: parseFloat(editPromotion.value),
-        startAt: editPromotion.startAt,
-        endAt: editPromotion.endAt,
-        status: editPromotion.status,
-      };
-
-      console.log('📤 [StockPromotionDetail] Submitting update data:', dataToSubmit);
-
-      const response = await stockPromotionService.updateStockPromotion(stockPromotionId, dataToSubmit);
-
-      console.log('📥 [StockPromotionDetail] API Response:', response);
-
-      if (response.success) {
-        showSuccess('Success', 'Stock promotion updated successfully!');
-        setShowEditModal(false);
-        await loadStockPromotionDetail();
-      } else {
-        showError('Error', response.error || 'Failed to update stock promotion');
-      }
-    } catch (error) {
-      console.error('❌ [StockPromotionDetail] Exception:', error);
-      showError('Error', 'Failed to update stock promotion');
-    } finally {
-      setUpdating(false);
-    }
   };
 
   const handleDeletePromotion = async () => {
@@ -469,7 +326,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+          <ActivityIndicator size="large" color="#009DFF" style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -499,8 +356,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         <Text style={styles.headerTitle}>Stock Promotion Detail</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.editButton, styles.headerActionButton, { marginLeft: 0 }]}
-            onPress={handleOpenEditModal}
+            style={[styles.editButton, styles.headerActionButton]}
+            onPress={handleNavigateToEdit}
           >
             <Edit size={20} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
@@ -519,8 +376,8 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
+        <View style={styles.section}>
+          <View style={[styles.card, styles.statusCard]}>
             <Text style={styles.statusTitle}>Status</Text>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(stockPromotion.status) }]}>
               <Text style={styles.statusText}>{stockPromotion.status || 'N/A'}</Text>
@@ -530,89 +387,97 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>General Information</Text>
-          {renderInfoRow('Name', stockPromotion.name || 'N/A')}
-          {renderInfoRow('Description', stockPromotion.description || 'N/A')}
+          <View style={styles.card}>
+            {renderInfoRow('Name', stockPromotion.name || 'N/A')}
+            {renderInfoRow('Description', stockPromotion.description || 'N/A')}
+          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Value Information</Text>
-          {renderInfoRow('Discount Type', stockPromotion.valueType || 'N/A')}
-          {renderInfoRow('Original Value', stockPromotion.value?.toString() || 'N/A')}
-          {renderInfoRow('Value', formatValue(stockPromotion.value, stockPromotion.valueType), {
-            color: COLORS.SUCCESS,
-            fontWeight: 'bold',
-          })}
-          {renderInfoRow('Start Date', formatDate(stockPromotion.startAt))}
-          {renderInfoRow('End Date', formatDate(stockPromotion.endAt))}
+          <View style={styles.card}>
+            {renderInfoRow('Discount Type', stockPromotion.valueType || 'N/A')}
+            {renderInfoRow('Original Value', stockPromotion.value?.toString() || 'N/A')}
+            {renderInfoRow('Value', formatValue(stockPromotion.value, stockPromotion.valueType), {
+              color: COLORS.SUCCESS,
+              fontWeight: 'bold',
+            })}
+            {renderInfoRow('Start Date', formatDate(stockPromotion.startAt))}
+            {renderInfoRow('End Date', formatDate(stockPromotion.endAt))}
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.applyButton}
-          onPress={handleOpenAssignmentModal}
-        >
-          <Text style={styles.applyButtonText}>Apply to Stocks</Text>
-        </TouchableOpacity>
+        <View style={[styles.section, styles.actionsSection]}>
+          <TouchableOpacity
+            style={styles.applyButton}
+            onPress={handleOpenAssignmentModal}
+          >
+            <Text style={styles.applyButtonText}>Apply to Stocks</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             Agency Stock Promotion List
             {stockPromotion.agencyStockPromotion ? ` (${stockPromotion.agencyStockPromotion.length})` : ' (0)'}
           </Text>
-          
-          {stockPromotion.agencyStockPromotion && stockPromotion.agencyStockPromotion.length > 0 ? (
-            stockPromotion.agencyStockPromotion.map((item, index) => {
-              const stock = item?.agencyStock;
-              if (!stock) return null;
-              
-              return (
-                <View key={index} style={styles.stockItem}>
-                  <View style={styles.stockHeader}>
-                    <Text style={styles.stockTitle}>Agency Stock #{stock.id}</Text>
+
+          <View style={[styles.card, styles.stockCard]}>
+            {stockPromotion.agencyStockPromotion && stockPromotion.agencyStockPromotion.length > 0 ? (
+              stockPromotion.agencyStockPromotion.map((item, index) => {
+                const stock = item?.agencyStock;
+                if (!stock) return null;
+
+                return (
+                  <View key={index} style={styles.stockItem}>
+                    <View style={styles.stockHeader}>
+                      <Text style={styles.stockTitle}>Agency Stock #{stock.id}</Text>
+                    </View>
+
+                    <Text style={styles.stockSubtitle}>Stock Information</Text>
+                    {renderInfoRow('Quantity', `${stock.quantity || 0} units`)}
+                    {renderInfoRow('Original Price (VND)', stock.price?.toString() || 'N/A')}
+                    {renderInfoRow('Price', formatPrice(stock.price), {
+                      color: COLORS.SUCCESS,
+                      fontWeight: 'bold',
+                    })}
+
+                    {stock.motorbike ? (
+                      <>
+                        <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Motorbike Information</Text>
+                        {renderInfoRow('Name', stock.motorbike.name || 'N/A')}
+                        {renderInfoRow('Model', stock.motorbike.model || 'N/A')}
+                        {renderInfoRow('Version', stock.motorbike.version || 'N/A')}
+                        {renderInfoRow('Origin', stock.motorbike.makeFrom || 'N/A')}
+                      </>
+                    ) : (
+                      <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
+                        <Text style={styles.stockSubtitle}>Motorbike Information</Text>
+                        <Text style={styles.infoValue}>N/A</Text>
+                      </View>
+                    )}
+
+                    {stock.color ? (
+                      <>
+                        <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Color Information</Text>
+                        {renderInfoRow('Color Type', stock.color.colorType || 'N/A')}
+                        {stock.color.id && renderInfoRow('Color ID', stock.color.id?.toString() || 'N/A')}
+                      </>
+                    ) : (
+                      <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
+                        <Text style={styles.stockSubtitle}>Color Information</Text>
+                        <Text style={styles.infoValue}>N/A</Text>
+                      </View>
+                    )}
                   </View>
-                  
-                  <Text style={styles.stockSubtitle}>Stock Information</Text>
-                  {renderInfoRow('Quantity', `${stock.quantity || 0} units`)}
-                  {renderInfoRow('Original Price (VND)', stock.price?.toString() || 'N/A')}
-                  {renderInfoRow('Price', formatPrice(stock.price), {
-                    color: COLORS.SUCCESS,
-                    fontWeight: 'bold',
-                  })}
-
-                  {stock.motorbike ? (
-                    <>
-                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Motorbike Information</Text>
-                      {renderInfoRow('Name', stock.motorbike.name || 'N/A')}
-                      {renderInfoRow('Model', stock.motorbike.model || 'N/A')}
-                      {renderInfoRow('Version', stock.motorbike.version || 'N/A')}
-                      {renderInfoRow('Origin', stock.motorbike.makeFrom || 'N/A')}
-                    </>
-                  ) : (
-                    <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
-                      <Text style={styles.stockSubtitle}>Motorbike Information</Text>
-                      <Text style={styles.infoValue}>N/A</Text>
-                    </View>
-                  )}
-
-                  {stock.color ? (
-                    <>
-                      <Text style={[styles.stockSubtitle, { marginTop: SIZES.PADDING.MEDIUM }]}>Color Information</Text>
-                      {renderInfoRow('Color Type', stock.color.colorType || 'N/A')}
-                      {stock.color.id && renderInfoRow('Color ID', stock.color.id?.toString() || 'N/A')}
-                    </>
-                  ) : (
-                    <View style={{ marginTop: SIZES.PADDING.MEDIUM }}>
-                      <Text style={styles.stockSubtitle}>Color Information</Text>
-                      <Text style={styles.infoValue}>N/A</Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.emptyStockList}>
-              <Text style={styles.emptyStockText}>No agency stocks in this promotion</Text>
-            </View>
-          )}
+                );
+              })
+            ) : (
+              <View style={styles.emptyStockList}>
+                <Text style={styles.emptyStockText}>No agency stocks in this promotion</Text>
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -628,197 +493,6 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
         onCancel={alertConfig.onCancel}
         onClose={hideAlert}
       />
-
-      {/* Edit Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowEditModal(false)}
-            >
-              <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Stock Promotion</Text>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleUpdatePromotion}
-              disabled={updating}
-            >
-              {updating ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
-              ) : (
-                <Text style={styles.modalSaveText}>Save</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Promotion Name *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editPromotion.name}
-                onChangeText={(text) => setEditPromotion(prev => ({ ...prev, name: text }))}
-                placeholder="Enter promotion name"
-                placeholderTextColor={COLORS.TEXT.SECONDARY}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Description *</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                value={editPromotion.description}
-                onChangeText={(text) => setEditPromotion(prev => ({ ...prev, description: text }))}
-                placeholder="Enter description"
-                placeholderTextColor={COLORS.TEXT.SECONDARY}
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Discount Type *</Text>
-              <View style={styles.selectorRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorOption,
-                    editPromotion.valueType === 'PERCENT' && styles.selectedOption
-                  ]}
-                  onPress={() => setEditPromotion(prev => ({ ...prev, valueType: 'PERCENT' }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    editPromotion.valueType === 'PERCENT' && styles.selectedOptionText
-                  ]}>
-                    PERCENT (%)
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorOption,
-                    { marginLeft: SIZES.PADDING.SMALL },
-                    editPromotion.valueType === 'FIXED' && styles.selectedOption
-                  ]}
-                  onPress={() => setEditPromotion(prev => ({ ...prev, valueType: 'FIXED' }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    editPromotion.valueType === 'FIXED' && styles.selectedOptionText
-                  ]}>
-                    FIXED (VND)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Value *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editPromotion.value}
-                onChangeText={(text) => setEditPromotion(prev => ({ ...prev, value: text }))}
-                placeholder={editPromotion.valueType === 'PERCENT' ? "Enter percentage (e.g., 10)" : "Enter amount (e.g., 50000)"}
-                placeholderTextColor={COLORS.TEXT.SECONDARY}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Start Date *</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowStartDatePicker(true)}
-              >
-                <Text style={[
-                  styles.dateInputText,
-                  !editPromotion.startAt && styles.dateInputTextPlaceholder
-                ]}>
-                  {editPromotion.startAt ? formatDateForDisplay(editPromotion.startAt) : 'Select start date'}
-                </Text>
-                <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-              </TouchableOpacity>
-            </View>
-
-            {showStartDatePicker && (
-              <DateTimePicker
-                value={startDate}
-                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-                is24Hour={true}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleStartDateChange}
-              />
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>End Date *</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowEndDatePicker(true)}
-              >
-                <Text style={[
-                  styles.dateInputText,
-                  !editPromotion.endAt && styles.dateInputTextPlaceholder
-                ]}>
-                  {editPromotion.endAt ? formatDateForDisplay(editPromotion.endAt) : 'Select end date'}
-                </Text>
-                <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-              </TouchableOpacity>
-            </View>
-
-            {showEndDatePicker && (
-              <DateTimePicker
-                value={endDate}
-                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-                is24Hour={true}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleEndDateChange}
-                minimumDate={startDate}
-              />
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Status *</Text>
-              <View style={styles.selectorRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorOption,
-                    editPromotion.status === 'ACTIVE' && styles.selectedOption
-                  ]}
-                  onPress={() => setEditPromotion(prev => ({ ...prev, status: 'ACTIVE' }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    editPromotion.status === 'ACTIVE' && styles.selectedOptionText
-                  ]}>
-                    ACTIVE
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.selectorOption,
-                    { marginLeft: SIZES.PADDING.SMALL },
-                    editPromotion.status === 'INACTIVE' && styles.selectedOption
-                  ]}
-                  onPress={() => setEditPromotion(prev => ({ ...prev, status: 'INACTIVE' }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    editPromotion.status === 'INACTIVE' && styles.selectedOptionText
-                  ]}>
-                    INACTIVE
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
 
       {/* Assignment Modal */}
       <Modal
@@ -841,7 +515,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
               disabled={applying || selectedStockIds.length === 0}
             >
               {applying ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                <ActivityIndicator color="#009DFF" />
               ) : (
                 <Text style={[
                   styles.modalSaveText,
@@ -853,10 +527,11 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.modalContentInner}>
             {loadingStocks ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.PRIMARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+                <ActivityIndicator size="large" color="#009DFF" style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
                 <Text style={styles.loadingText}>Loading stock list...</Text>
               </View>
             ) : (() => {
@@ -917,6 +592,7 @@ const StockPromotionDetailScreen = ({ navigation, route }) => {
                 );
               });
             })()}
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -928,18 +604,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
@@ -956,11 +629,12 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  placeholder: {
-    width: 40,
-  },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: SIZES.PADDING.SMALL,
+    minWidth: 84,
   },
   headerActionButton: {
     width: 40,
@@ -968,20 +642,22 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.ROUND,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   deleteButton: {
     backgroundColor: COLORS.ERROR || '#f44336',
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
   },
   contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100,
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   loadingContainer: {
     flex: 1,
@@ -992,18 +668,17 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
   },
-  statusCard: {
+  card: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
     padding: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  statusHeader: {
+  statusCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1024,20 +699,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   sectionTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   infoRow: {
@@ -1046,7 +713,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.SMALL,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: COLORS.BORDER?.PRIMARY || '#F0F0F0',
   },
   infoLabel: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1060,13 +727,16 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  stockCard: {
+    padding: SIZES.PADDING.MEDIUM,
+  },
   stockItem: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.MEDIUM,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.BORDER?.PRIMARY || 'rgba(0,0,0,0.05)',
   },
   stockHeader: {
     marginBottom: SIZES.PADDING.SMALL,
@@ -1105,10 +775,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   modalCloseButton: {
     padding: SIZES.PADDING.SMALL,
@@ -1127,9 +797,9 @@ const styles = StyleSheet.create({
   modalSaveButton: {
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    minWidth: 60,
+    minWidth: 90,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1140,79 +810,27 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
-  },
-  inputGroup: {
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  inputLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  textInput: {
     backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
+  modalContentInner: {
+    padding: SIZES.PADDING.LARGE,
   },
-  dateInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  dateInputText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    flex: 1,
-  },
-  dateInputTextPlaceholder: {
-    color: COLORS.TEXT.SECONDARY,
-  },
-  selectorRow: {
-    flexDirection: 'row',
-  },
-  selectorOption: {
-    flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  selectedOption: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
-  },
-  selectorOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
-  selectedOptionText: {
-    color: COLORS.TEXT.WHITE,
+  actionsSection: {
+    marginBottom: SIZES.PADDING.LARGE,
   },
   applyButton: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    margin: SIZES.PADDING.MEDIUM,
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   applyButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1221,17 +839,21 @@ const styles = StyleSheet.create({
   },
   stockSelectItem: {
     flexDirection: 'row',
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.BORDER?.PRIMARY || 'rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   stockSelectItemSelected: {
-    borderColor: COLORS.PRIMARY,
-    borderWidth: 2,
-    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
   stockSelectCheckbox: {
     marginRight: SIZES.PADDING.MEDIUM,
@@ -1244,16 +866,17 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
-    marginBottom: 4,
+    marginBottom: SIZES.PADDING.XSMALL,
   },
   stockSelectDetail: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-    marginBottom: 4,
+    marginBottom: SIZES.PADDING.SMALL,
   },
   stockSelectRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   stockSelectLabel: {
     fontSize: SIZES.FONT.SMALL,

@@ -16,7 +16,15 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import stockPromotionService from '../../services/stockPromotionService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Search, Plus, ArrowLeft, Package } from 'lucide-react-native';
+import {
+  Search,
+  Plus,
+  ArrowLeft,
+  Package,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+} from 'lucide-react-native';
 
 const StockPromotionManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -28,7 +36,7 @@ const StockPromotionManagementScreen = ({ navigation }) => {
   const [paginationInfo, setPaginationInfo] = useState({
     page: 1,
     limit: 100,
-    total: 0
+    total: 0,
   });
 
   const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
@@ -138,11 +146,26 @@ const StockPromotionManagementScreen = ({ navigation }) => {
     });
   };
 
+  const statusOptions = [
+    { value: 'ACTIVE', label: 'Active', color: COLORS.SUCCESS },
+    { value: 'INACTIVE', label: 'Inactive', color: COLORS.ERROR },
+  ];
+
   const getStatusColor = (status) => {
+    const statusOption = statusOptions.find(option => option.value === status);
+    return statusOption ? statusOption.color : COLORS.TEXT.SECONDARY;
+  };
+
+  const getStatusText = (status) => {
+    const statusOption = statusOptions.find(option => option.value === status);
+    return statusOption ? statusOption.label : 'Unknown';
+  };
+
+  const getStatusIcon = (status) => {
     switch (status) {
-      case 'ACTIVE': return COLORS.SUCCESS;
-      case 'INACTIVE': return COLORS.TEXT.SECONDARY;
-      default: return COLORS.TEXT.SECONDARY;
+      case 'ACTIVE': return <CheckCircle size={14} color={COLORS.TEXT.WHITE} />;
+      case 'INACTIVE': return <XCircle size={14} color={COLORS.TEXT.WHITE} />;
+      default: return <HelpCircle size={14} color={COLORS.TEXT.WHITE} />;
     }
   };
 
@@ -162,43 +185,51 @@ const StockPromotionManagementScreen = ({ navigation }) => {
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardInfo}>
-          <Text style={styles.cardId}>{item.name || `Promotion #${item.id}`}</Text>
+          <Text style={styles.cardTitle}>{item.name || `Promotion #${item.id}`}</Text>
+          <Text style={styles.cardSubtitle}>
+            {item.code ? `Code: ${item.code}` : `ID: ${item.id}`}
+          </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status || 'N/A'}</Text>
+          {getStatusIcon(item.status)}
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
         </View>
       </View>
 
       <View style={styles.cardDetails}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Description:</Text>
+          <Text style={styles.detailLabel}>Description</Text>
           <Text style={styles.detailValue}>
             {item.description || 'N/A'}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Discount Type:</Text>
+          <Text style={styles.detailLabel}>Discount Type</Text>
           <Text style={styles.detailValue}>
             {item.valueType || 'N/A'}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Value:</Text>
+          <Text style={styles.detailLabel}>Value</Text>
           <Text style={[styles.detailValue, styles.priceValue]}>
             {formatValue(item.value, item.valueType)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Start Date:</Text>
+          <Text style={styles.detailLabel}>Start Date</Text>
           <Text style={styles.detailValue}>{formatDate(item.startAt)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>End Date:</Text>
+          <Text style={styles.detailLabel}>End Date</Text>
           <Text style={styles.detailValue}>{formatDate(item.endAt)}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
+
+  const totalPromotions = stockPromotions.length;
+  const activePromotions = stockPromotions.filter(item => item.status === 'ACTIVE').length;
+  const inactivePromotions = stockPromotions.filter(item => item.status === 'INACTIVE').length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -208,7 +239,7 @@ const StockPromotionManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Stock Promotion Management</Text>
         <TouchableOpacity
@@ -234,14 +265,20 @@ const StockPromotionManagementScreen = ({ navigation }) => {
       {/* Stats Cards */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stockPromotions.length}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+          <Text style={styles.statNumber}>{totalPromotions}</Text>
+          <Text style={styles.statLabel}>Total Promotions</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>
-            {stockPromotions.filter(item => item.status === 'ACTIVE').length}
+            {activePromotions}
           </Text>
           <Text style={styles.statLabel}>Active</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>
+            {inactivePromotions}
+          </Text>
+          <Text style={styles.statLabel}>Inactive</Text>
         </View>
       </View>
 
@@ -260,7 +297,7 @@ const StockPromotionManagementScreen = ({ navigation }) => {
       >
         {loading && filteredStockPromotions.length === 0 ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={COLORS.PRIMARY} style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
+            <ActivityIndicator size="large" color="#009DFF" style={{ marginBottom: SIZES.PADDING.MEDIUM }} />
             <Text style={styles.emptyTitle}>Loading...</Text>
           </View>
         ) : filteredStockPromotions.length > 0 ? (
@@ -298,7 +335,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
+    paddingTop: 30,
   },
   header: {
     flexDirection: 'row',
@@ -333,7 +370,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -350,6 +387,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -360,6 +398,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.MEDIUM,
+    gap: 4,
   },
   statCard: {
     flex: 1,
@@ -404,9 +443,12 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.SMALL,
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: SIZES.PADDING.SMALL,
     paddingVertical: 4,
     borderRadius: SIZES.RADIUS.SMALL,
+    gap: 4,
   },
   statusText: {
     fontSize: SIZES.FONT.XSMALL,
@@ -416,18 +458,19 @@ const styles = StyleSheet.create({
   cardInfo: {
     flex: 1,
   },
-  cardId: {
+  cardTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     marginBottom: 4,
   },
-  cardDate: {
+  cardSubtitle: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
   cardDetails: {
     marginBottom: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
   },
   detailRow: {
     flexDirection: 'row',
@@ -443,6 +486,9 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: SIZES.PADDING.SMALL,
   },
   priceValue: {
     color: COLORS.SUCCESS,
