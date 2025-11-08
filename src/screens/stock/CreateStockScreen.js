@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   Image,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -19,6 +20,8 @@ import motorbikeService from '../../services/motorbikeService';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import LoadingScreen from '../../components/common/LoadingScreen';
 import { ArrowLeft, Check } from 'lucide-react-native';
+
+const PRIMARY_ACCENT = '#009DFF';
 
 const CreateStockScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -231,137 +234,149 @@ const CreateStockScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Stock</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSave}
-        >
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
+        <View style={styles.headerPlaceholder} />
       </View>
 
-      {/* Content */}
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Motorbike Selection */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Motorbike *</Text>
-          {errors.motorbikeId && (
-            <Text style={styles.errorText}>{errors.motorbikeId}</Text>
-          )}
-          <View style={styles.selectContainer}>
-            {motorbikes.map((motorbike) => (
-              <TouchableOpacity
-                key={motorbike.id}
-                style={[
-                  styles.selectOption,
-                  formData.motorbikeId === motorbike.id.toString() && styles.selectedOption
-                ]}
-                onPress={() => handleInputChange('motorbikeId', motorbike.id.toString())}
-              >
-                <Text style={[
-                  styles.selectOptionText,
-                  formData.motorbikeId === motorbike.id.toString() && styles.selectedOptionText
-                ]}>
-                  {motorbike.name}
-                </Text>
-                {formData.motorbikeId === motorbike.id.toString() && (
-                  <Text style={styles.checkIcon}><Check size={18} color="#FFFFFF" /></Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Stock Information</Text>
 
-        {/* Color Selection */}
-        {formData.motorbikeId && (
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Color *</Text>
-            {errors.colorId && (
-              <Text style={styles.errorText}>{errors.colorId}</Text>
-            )}
-            {motorbikeColors.length > 0 ? (
-              <View style={styles.colorContainer}>
-                {motorbikeColors.map((color) => (
-                  <TouchableOpacity
-                    key={color.id}
-                    style={[
-                      styles.colorOption,
-                      formData.colorId === color.id.toString() && styles.selectedColorOption
-                    ]}
-                    onPress={() => handleInputChange('colorId', color.id.toString())}
-                  >
-                    {color.imageUrl && (
-                      <Image
-                        source={{ uri: color.imageUrl }}
-                        style={styles.colorImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <Text style={[
-                      styles.colorText,
-                      formData.colorId === color.id.toString() && styles.selectedColorText
-                    ]}>
-                      {color.colorType}
-                    </Text>
-                    {formData.colorId === color.id.toString() && (
-                      <View style={styles.colorCheck}>
-                        <Text style={styles.colorCheckText}><Check size={18} color="#FFFFFF" /></Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Motorbike <Text style={styles.required}>*</Text>
+              </Text>
+              {errors.motorbikeId && <Text style={styles.errorText}>{errors.motorbikeId}</Text>}
+              <View style={styles.selectContainer}>
+                {motorbikes.map((motorbike) => {
+                  const isSelected = formData.motorbikeId === motorbike.id.toString();
+                  return (
+                    <TouchableOpacity
+                      key={motorbike.id}
+                      style={[styles.selectOption, isSelected && styles.selectedOption]}
+                      onPress={() => handleInputChange('motorbikeId', motorbike.id.toString())}
+                    >
+                      <Text
+                        style={[
+                          styles.selectOptionText,
+                          isSelected && styles.selectedOptionText,
+                        ]}
+                      >
+                        {motorbike.name}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.optionCheck}>
+                          <Check size={16} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            ) : (
-              <Text style={styles.loadingText}>Loading colors...</Text>
+            </View>
+
+            {formData.motorbikeId && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Color <Text style={styles.required}>*</Text>
+                </Text>
+                {errors.colorId && <Text style={styles.errorText}>{errors.colorId}</Text>}
+                {motorbikeColors.length > 0 ? (
+                  <View style={styles.colorContainer}>
+                    {motorbikeColors.map((color) => {
+                      const isSelected = formData.colorId === color.id.toString();
+                      return (
+                        <TouchableOpacity
+                          key={color.id}
+                          style={[
+                            styles.colorOption,
+                            isSelected && styles.selectedColorOption,
+                          ]}
+                          onPress={() => handleInputChange('colorId', color.id.toString())}
+                        >
+                          {color.imageUrl ? (
+                            <Image
+                              source={{ uri: color.imageUrl }}
+                              style={styles.colorImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.colorFallback}>
+                              <Text style={styles.colorFallbackText}>{color.colorType}</Text>
+                            </View>
+                          )}
+                          <Text
+                            style={[
+                              styles.colorText,
+                              isSelected && styles.selectedColorText,
+                            ]}
+                          >
+                            {color.colorType}
+                          </Text>
+                          {isSelected && (
+                            <View style={styles.colorCheck}>
+                              <Check size={16} color="#FFFFFF" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={styles.loadingText}>Loading colors...</Text>
+                )}
+              </View>
             )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Quantity <Text style={styles.required}>*</Text>
+              </Text>
+              {errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
+              <TextInput
+                style={[styles.input, errors.quantity && styles.inputError]}
+                placeholder="Enter quantity"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={formData.quantity}
+                onChangeText={(value) => handleInputChange('quantity', value)}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Selling Price (VND) <Text style={styles.required}>*</Text>
+              </Text>
+              {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+              <TextInput
+                style={[styles.input, errors.price && styles.inputError]}
+                placeholder="Enter selling price"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={formData.price}
+                onChangeText={(value) => handleInputChange('price', value)}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <TouchableOpacity style={styles.submitButton} onPress={handleSave}>
+              <Text style={styles.submitButtonText}>Create Stock</Text>
+            </TouchableOpacity>
           </View>
-        )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-        {/* Quantity */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Quantity *</Text>
-          {errors.quantity && (
-            <Text style={styles.errorText}>{errors.quantity}</Text>
-          )}
-          <TextInput
-            style={[styles.textInput, errors.quantity && styles.inputError]}
-            placeholder="Enter quantity"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={formData.quantity}
-            onChangeText={(value) => handleInputChange('quantity', value)}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Price */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Selling Price (VND) *</Text>
-          {errors.price && (
-            <Text style={styles.errorText}>{errors.price}</Text>
-          )}
-          <TextInput
-            style={[styles.textInput, errors.price && styles.inputError]}
-            placeholder="Enter selling price"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={formData.price}
-            onChangeText={(value) => handleInputChange('price', value)}
-            keyboardType="numeric"
-          />
-        </View>
-      </ScrollView>
-      
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -382,62 +397,63 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 10,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE,
     paddingBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
+    fontSize: SIZES.FONT.XXLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  headerPlaceholder: {
+    width: 40,
   },
-  saveButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
   },
-  contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
+  scrollContent: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.LARGE,
   },
-  inputLabel: {
+  label: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
+  },
+  required: {
+    color: COLORS.ERROR,
   },
   errorText: {
     fontSize: SIZES.FONT.SMALL,
@@ -445,38 +461,41 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.SMALL,
   },
   selectContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: SIZES.PADDING.SMALL,
   },
   selectOption: {
-    backgroundColor: COLORS.SURFACE,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F9FA',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     borderWidth: 1,
-    borderColor: 'transparent',
-    minWidth: '45%',
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderColor: COLORS.BORDER.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
   },
   selectedOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: PRIMARY_ACCENT,
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
   selectOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    flex: 1,
+    marginRight: SIZES.PADDING.SMALL,
   },
   selectedOptionText: {
-    color: COLORS.PRIMARY,
+    color: PRIMARY_ACCENT,
     fontWeight: '600',
   },
-  checkIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    marginLeft: SIZES.PADDING.SMALL,
+  optionCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: PRIMARY_ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   colorContainer: {
     flexDirection: 'row',
@@ -484,64 +503,84 @@ const styles = StyleSheet.create({
     gap: SIZES.PADDING.MEDIUM,
   },
   colorOption: {
-    width: 120,
+    width: 130,
     borderRadius: SIZES.RADIUS.MEDIUM,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
     position: 'relative',
+    backgroundColor: '#F8F9FA',
   },
   selectedColorOption: {
-    borderColor: COLORS.PRIMARY,
+    borderColor: PRIMARY_ACCENT,
   },
   colorImage: {
     width: '100%',
-    height: 80,
-    backgroundColor: '#F5F5F5',
+    height: 90,
+    backgroundColor: '#E9ECEF',
+  },
+  colorFallback: {
+    height: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E9ECEF',
+    paddingHorizontal: SIZES.PADDING.SMALL,
+  },
+  colorFallbackText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
   },
   colorText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     textAlign: 'center',
-    padding: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.SURFACE,
+    paddingVertical: SIZES.PADDING.SMALL,
+    fontWeight: '600',
   },
   selectedColorText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    color: PRIMARY_ACCENT,
   },
   colorCheck: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.PRIMARY,
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: PRIMARY_ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  colorCheckText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
-  textInput: {
-    backgroundColor: COLORS.SURFACE,
+  input: {
+    backgroundColor: '#F8F9FA',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   inputError: {
-    borderWidth: 1,
     borderColor: COLORS.ERROR,
   },
   loadingText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
     fontStyle: 'italic',
+  },
+  submitButton: {
+    backgroundColor: PRIMARY_ACCENT,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 
