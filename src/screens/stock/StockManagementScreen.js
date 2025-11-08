@@ -5,11 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
   TextInput,
   Image,
   Modal,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -17,21 +19,22 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useAuth } from '../../contexts/AuthContext';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
-import LoadingScreen from '../../components/common/LoadingScreen';
-import { ArrowLeft, Bike, Check, ChevronDown, CircleX, Palette, Package, Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, Bike, CircleX, Palette, Package, Plus, Search, Filter, Trash2, Pencil } from 'lucide-react-native';
+
+const PRIMARY_ACCENT = '#009DFF';
 
 const StockManagementScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [stocks, setStocks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [motorbikes, setMotorbikes] = useState([]);
   const [colors, setColors] = useState([]);
   const [allStocksForColors, setAllStocksForColors] = useState([]);
   const [selectedMotorbikeId, setSelectedMotorbikeId] = useState(null);
   const [selectedColorId, setSelectedColorId] = useState(null);
-  const [showMotorbikeModal, setShowMotorbikeModal] = useState(false);
-  const [showColorModal, setShowColorModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
   useEffect(() => {
@@ -114,9 +117,11 @@ const StockManagementScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation]);
 
-  const loadStocks = async () => {
+  const loadStocks = async (showLoader = true) => {
     try {
+      if (showLoader) {
       setLoading(true);
+      }
       if (!user?.agencyId) {
         showError('Error', 'Agency information not found');
         return;
@@ -149,7 +154,9 @@ const StockManagementScreen = ({ navigation }) => {
       console.error('Error loading stocks:', error);
       showError('Error', 'Failed to load stock list');
     } finally {
+      if (showLoader) {
       setLoading(false);
+      }
     }
   };
 
@@ -190,17 +197,29 @@ const StockManagementScreen = ({ navigation }) => {
 
   const handleFilterMotorbike = (motorbikeId) => {
     setSelectedMotorbikeId(motorbikeId);
-    setShowMotorbikeModal(false);
   };
 
   const handleFilterColor = (colorId) => {
     setSelectedColorId(colorId);
-    setShowColorModal(false);
   };
 
   const clearFilters = () => {
     setSelectedMotorbikeId(null);
     setSelectedColorId(null);
+    setShowFilterModal(false);
+  };
+
+  const applyFilters = () => {
+    setShowFilterModal(false);
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await loadStocks(false);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const getSelectedMotorbikeName = () => {
@@ -213,6 +232,12 @@ const StockManagementScreen = ({ navigation }) => {
     if (!selectedColorId) return 'All Colors';
     const color = colors.find(c => c.id === selectedColorId);
     return color?.colorType || `Color ${selectedColorId}`;
+  };
+
+  const getColorName = (colorId) => {
+    if (!colorId) return 'N/A';
+    const color = colors.find(c => c.id === colorId);
+    return color?.colorType || `Color ${colorId}`;
   };
 
   const handleAddStock = () => {
@@ -249,69 +274,202 @@ const StockManagementScreen = ({ navigation }) => {
     );
   };
 
-  const renderStockCard = (stock) => {
+  const renderStockCard = ({ item: stock }) => {
     const motorbike = getMotorbikeInfo(stock.motorbikeId);
-    const stockImage = motorbike?.images?.[0]?.imageUrl || null;
+    const stockImage =
+      motorbike?.images?.[0]?.imageUrl ||
+      'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png';
+    const isInStock = stock.quantity > 0;
+    const updatedDate = new Date(stock.createAt || stock.createdAt || Date.now()).toLocaleDateString('vi-VN');
+    const colorName = getColorName(stock.colorId);
 
     return (
-      <TouchableOpacity
-        key={stock.id}
-        style={styles.stockCard}
-        onPress={() => handleViewDetail(stock)}
-        activeOpacity={0.8}
-      >
-        {stockImage && (
+      <View style={styles.stockCardShadow}>
+        <TouchableOpacity
+          style={styles.stockCard}
+          activeOpacity={0.85}
+          onPress={() => handleViewDetail(stock)}
+        >
+        <View style={styles.stockImageContainer}>
           <Image
             source={{ uri: stockImage }}
             style={styles.stockImage}
             resizeMode="cover"
           />
-        )}
-        <View style={styles.stockContent}>
-          <View style={styles.stockHeader}>
-            <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown Motorbike'}</Text>
-            <View style={[styles.quantityBadge, stock.quantity > 0 ? styles.inStockBadge : styles.outOfStockBadge]}>
-              <Text style={styles.quantityText}>{stock.quantity}</Text>
-            </View>
+          <View
+            style={[
+              styles.statusBadge,
+              isInStock ? styles.statusBadgeSuccess : styles.statusBadgeError,
+            ]}
+          >
+            <Text style={styles.statusText}>{isInStock ? 'In Stock' : 'Out of Stock'}</Text>
           </View>
-          
+        </View>
+
+        <View style={styles.stockInfo}>
+          <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown Motorbike'}</Text>
           <Text style={styles.modelText}>{motorbike?.model || 'N/A'}</Text>
-          
-          <View style={styles.detailsRow}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Selling Price:</Text>
-              <Text style={styles.detailValue}>{formatPrice(stock.price)}</Text>
+
+          <View style={styles.stockSpecs}>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Color</Text>
+              <Text style={styles.specValue} numberOfLines={1}>{colorName}</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Updated</Text>
+              <Text style={styles.specValue}>{updatedDate}</Text>
             </View>
           </View>
 
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleEditStock(stock);
-              }}
-            >
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleDeleteStock(stock);
-              }}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.stockFooter}>
+              <Text style={styles.stockPrice}>{formatPrice(stock.price)}</Text>
+              <Text style={styles.stockQuantity}>Quantity: {stock.quantity}</Text>
+            </View>
         </View>
-      </TouchableOpacity>
+
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              handleEditStock(stock);
+            }}
+          >
+            <Pencil size={18} color={PRIMARY_ACCENT} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteActionButton]}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              handleDeleteStock(stock);
+            }}
+          >
+            <Trash2 size={18} color={PRIMARY_ACCENT} />
+          </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  if (loading) {
-    return <LoadingScreen />;
-  }
+  const renderFilterModal = () => (
+    <Modal
+      visible={showFilterModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowFilterModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filter Stocks</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowFilterModal(false)}
+            >
+              <CircleX size={18} color={COLORS.TEXT.SECONDARY} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Motorbike</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    !selectedMotorbikeId && styles.selectedFilterOption,
+                  ]}
+                  onPress={() => handleFilterMotorbike(null)}
+                >
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      !selectedMotorbikeId && styles.selectedFilterOptionText,
+                    ]}
+                  >
+                    All Motorbikes
+                  </Text>
+                </TouchableOpacity>
+                {motorbikes.map((motorbike) => (
+                  <TouchableOpacity
+                    key={motorbike.id}
+                    style={[
+                      styles.filterOption,
+                      selectedMotorbikeId === motorbike.id && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterMotorbike(motorbike.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        selectedMotorbikeId === motorbike.id && styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {motorbike.name || `ID: ${motorbike.id}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Color</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    !selectedColorId && styles.selectedFilterOption,
+                  ]}
+                  onPress={() => handleFilterColor(null)}
+                >
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      !selectedColorId && styles.selectedFilterOptionText,
+                    ]}
+                  >
+                    All Colors
+                  </Text>
+                </TouchableOpacity>
+                {colors.map((color) => (
+                  <TouchableOpacity
+                    key={color.id}
+                    style={[
+                      styles.filterOption,
+                      selectedColorId === color.id && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterColor(color.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        selectedColorId === color.id && styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {color.colorType || `Color ${color.id}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {colors.length === 0 && (
+                  <Text style={styles.modalEmptyText}>No colors available</Text>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // Calculate statistics
   const totalStocks = stocks.length;
@@ -320,27 +478,28 @@ const StockManagementScreen = ({ navigation }) => {
   const outOfStockCount = stocks.filter(stock => stock.quantity === 0).length;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.headerTop}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Stock Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddStock}
-        >
-          <Text style={styles.addIcon}><Plus color="#FFFFFF" size={18} /></Text>
+          <View style={styles.headerTitle}>
+            <Text style={styles.headerTitleText}>Stock Management</Text>
+            <Text style={styles.headerSubtitle}>Manage your agency inventory</Text>
+          </View>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddStock}>
+            <Plus size={18} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Search Bar */}
+      <View style={styles.searchSection}>
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}><Search /></Text>
+          <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search motorbikes..."
@@ -348,242 +507,111 @@ const StockManagementScreen = ({ navigation }) => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-      </View>
-
-      {/* Filter Section */}
-      <View style={styles.filterContainer}>
-        <View style={styles.filterRow}>
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              selectedMotorbikeId && styles.filterButtonActive
-            ]}
-            onPress={() => setShowMotorbikeModal(true)}
+            style={styles.filterButton}
+            onPress={() => setShowFilterModal(true)}
           >
-            <View style={styles.filterButtonContent}>
-              <Bike 
-                size={16} 
-                color={selectedMotorbikeId ? COLORS.PRIMARY : COLORS.TEXT.PRIMARY} 
-              />
-              <Text style={[
-                styles.filterButtonText,
-                selectedMotorbikeId && styles.filterButtonTextActive
-              ]}>
-                {getSelectedMotorbikeName()}
-              </Text>
+            <Filter size={20} color={COLORS.TEXT.SECONDARY} />
+          </TouchableOpacity>
             </View>
-            <ChevronDown 
-              size={16} 
-              color={COLORS.TEXT.SECONDARY} 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              selectedColorId && styles.filterButtonActive
-            ]}
-            onPress={() => setShowColorModal(true)}
-          >
-            <View style={styles.filterButtonContent}>
-              <Palette 
-                size={16} 
-                color={selectedColorId ? COLORS.PRIMARY : COLORS.TEXT.PRIMARY} 
-              />
-              <Text style={[
-                styles.filterButtonText,
-                selectedColorId && styles.filterButtonTextActive
-              ]}>
-                {getSelectedColorName()}
-              </Text>
-            </View>
-            <ChevronDown 
-              size={16} 
-              color={COLORS.TEXT.SECONDARY} 
-            />
-          </TouchableOpacity>
         </View>
 
-        {(selectedMotorbikeId || selectedColorId) && (
-          <TouchableOpacity
-            style={styles.clearFilterButton}
-            onPress={clearFilters}
-          >
-            <Text style={styles.clearFilterText}>Clear Filters</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.content}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={PRIMARY_ACCENT} />
       </View>
-
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{totalStocks}</Text>
-          <Text style={styles.statLabel}>Total Stock</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{totalQuantity}</Text>
-          <Text style={styles.statLabel}>Total Quantity</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{inStockCount}</Text>
-          <Text style={styles.statLabel}>In Stock</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{outOfStockCount}</Text>
-          <Text style={styles.statLabel}>Out of Stock</Text>
-        </View>
-      </View>
-
-      {/* Stock List */}
-      <ScrollView
-        style={styles.stockList}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.stockListContent}
-      >
-        {filteredStocks.length > 0 ? (
-          filteredStocks.map(renderStockCard)
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}><Package size={80} color="#FFFFFF" /></Text>
-            <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No results found' : 'No stock items'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery
-                ? 'Try searching with different keywords'
-                : 'Add a new stock item to get started'
-              }
-            </Text>
-            {!searchQuery && (
-              <TouchableOpacity
-                style={styles.addFirstButton}
-                onPress={handleAddStock}
-              >
-                <Text style={styles.addFirstButtonText}>Add Stock</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <FlatList
+            data={filteredStocks}
+            renderItem={renderStockCard}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={PRIMARY_ACCENT}
+                colors={[PRIMARY_ACCENT]}
+              />
+            }
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                <View style={styles.listHeaderTop}>
+                  <Text style={styles.listTitle}>Stocks ({filteredStocks.length})</Text>
+                  <TouchableOpacity
+                    style={styles.inlineFilterButton}
+                    onPress={() => setShowFilterModal(true)}
+                  >
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.statsContainer}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{totalStocks}</Text>
+                    <Text style={styles.statLabel}>Total Stock</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statNumber, styles.statNumberSuccess]}>{totalQuantity}</Text>
+                    <Text style={styles.statLabel}>Total Quantity</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statNumber, styles.statNumberSuccess]}>{inStockCount}</Text>
+                    <Text style={styles.statLabel}>In Stock</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statNumber, styles.statNumberError]}>{outOfStockCount}</Text>
+                    <Text style={styles.statLabel}>Out of Stock</Text>
+                  </View>
+                </View>
+
+                {(selectedMotorbikeId || selectedColorId) && (
+                  <View style={styles.activeFilters}>
+                    {selectedMotorbikeId && (
+                      <View style={styles.filterChip}>
+                        <Bike size={14} color={PRIMARY_ACCENT} />
+                        <Text style={styles.filterChipText}>{getSelectedMotorbikeName()}</Text>
+                      </View>
+                    )}
+                    {selectedColorId && (
+                      <View style={styles.filterChip}>
+                        <Palette size={14} color={PRIMARY_ACCENT} />
+                        <Text style={styles.filterChipText}>{getSelectedColorName()}</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.clearChip} onPress={clearFilters}>
+                      <Text style={styles.clearChipText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Package size={64} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'No results found' : 'No stock items'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {searchQuery
+                    ? 'Try adjusting your search'
+                    : 'Add a new stock item to get started'}
+                </Text>
+                {!searchQuery && (
+                  <TouchableOpacity
+                    style={styles.addFirstButton}
+                    onPress={handleAddStock}
+                  >
+                    <Text style={styles.addFirstButtonText}>Add Stock</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            }
+          />
         )}
-      </ScrollView>
-
-      {/* Motorbike Filter Modal */}
-      <Modal
-        visible={showMotorbikeModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowMotorbikeModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Motorbike</Text>
-              <TouchableOpacity onPress={() => setShowMotorbikeModal(false)}>
-                <Text style={styles.modalCloseIcon}><CircleX size={18} /></Text>
-              </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalScrollView}>
-              <TouchableOpacity
-                style={[
-                  styles.modalOption,
-                  !selectedMotorbikeId && styles.modalOptionSelected
-                ]}
-                onPress={() => handleFilterMotorbike(null)}
-              >
-                <Text style={[
-                  styles.modalOptionText,
-                  !selectedMotorbikeId && styles.modalOptionTextSelected
-                ]}>
-                  All Motorbikes
-                </Text>
-                {!selectedMotorbikeId && (
-                  <Text style={styles.modalCheckIcon}><Check size={18} /></Text>
-                )}
-              </TouchableOpacity>
-              {motorbikes.map((motorbike) => (
-                <TouchableOpacity
-                  key={motorbike.id}
-                  style={[
-                    styles.modalOption,
-                    selectedMotorbikeId === motorbike.id && styles.modalOptionSelected
-                  ]}
-                  onPress={() => handleFilterMotorbike(motorbike.id)}
-                >
-                  <Text style={[
-                    styles.modalOptionText,
-                    selectedMotorbikeId === motorbike.id && styles.modalOptionTextSelected
-                  ]}>
-                    {motorbike.name || `ID: ${motorbike.id}`}
-                  </Text>
-                  {selectedMotorbikeId === motorbike.id && (
-                    <Text style={styles.modalCheckIcon}><Check size={18} /></Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
-      {/* Color Filter Modal */}
-      <Modal
-        visible={showColorModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowColorModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Color</Text>
-              <TouchableOpacity onPress={() => setShowColorModal(false)}>
-                <Text style={styles.modalCloseIcon}><CircleX size={18} /></Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScrollView}>
-              <TouchableOpacity
-                style={[
-                  styles.modalOption,
-                  !selectedColorId && styles.modalOptionSelected
-                ]}
-                onPress={() => handleFilterColor(null)}
-              >
-                <Text style={[
-                  styles.modalOptionText,
-                  !selectedColorId && styles.modalOptionTextSelected
-                ]}>
-                  All Colors
-                </Text>
-                {!selectedColorId && (
-                  <Text style={styles.modalCheckIcon}><Check size={18} /></Text>
-                )}
-              </TouchableOpacity>
-              {colors.map((color) => (
-                <TouchableOpacity
-                  key={color.id}
-                  style={[
-                    styles.modalOption,
-                    selectedColorId === color.id && styles.modalOptionSelected
-                  ]}
-                  onPress={() => handleFilterColor(color.id)}
-                >
-                  <Text style={[
-                    styles.modalOptionText,
-                    selectedColorId === color.id && styles.modalOptionTextSelected
-                  ]}>
-                    {color.colorType || `Màu ${color.id}`}
-                  </Text>
-                  {selectedColorId === color.id && (
-                    <Text style={styles.modalCheckIcon}><Check size={18} /></Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-              {colors.length === 0 && (
-                <Text style={styles.modalEmptyText}>No colors available</Text>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {renderFilterModal()}
       
       <CustomAlert
         visible={alertConfig.visible}
@@ -597,7 +625,7 @@ const StockManagementScreen = ({ navigation }) => {
         onCancel={alertConfig.onCancel}
         onClose={hideAlert}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -605,356 +633,305 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
-  
-  // Header
   header: {
+    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.LARGE,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 10,
-    paddingBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitleText: {
+    fontSize: SIZES.FONT.HEADER,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
-    flex: 1,
-    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 2,
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
-    alignItems: 'center',
+    backgroundColor: PRIMARY_ACCENT,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+  searchSection: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.LARGE,
   },
-
-  // Search
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
+    borderRadius: SIZES.RADIUS.LARGE,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    margin: SIZES.PADDING.MEDIUM,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
-
-  // Filter Section
-  filterContainer: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
+  filterButton: {
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
   },
-  filterRow: {
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: Platform.OS === 'ios' ? SIZES.PADDING.XXXLARGE : SIZES.PADDING.XXLARGE,
+  },
+  listHeader: {
+    paddingTop: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+  },
+  listHeaderTop: {
     flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: SIZES.PADDING.SMALL,
   },
-  filterButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  filterButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: SIZES.PADDING.SMALL,
-  },
-  filterButtonActive: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  filterButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.PRIMARY,
-    flex: 1,
-    marginLeft: SIZES.PADDING.XSMALL,
-  },
-  filterButtonTextActive: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  filterArrow: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginLeft: SIZES.PADDING.SMALL,
-  },
-  clearFilterButton: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderRadius: SIZES.RADIUS.SMALL,
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-  },
-  clearFilterText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.SURFACE,
-    borderTopLeftRadius: SIZES.RADIUS.LARGE,
-    borderTopRightRadius: SIZES.RADIUS.LARGE,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  modalTitle: {
+  listTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
   },
-  modalCloseIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: 'bold',
+  inlineFilterButton: {
+    // flexDirection: 'row',
+    // alignItems: 'center',
+    // backgroundColor: 'rgba(0, 157, 255, 0.12)',
+    // paddingHorizontal: SIZES.PADDING.MEDIUM,
+    // paddingVertical: SIZES.PADDING.XSMALL,
+    // borderRadius: SIZES.RADIUS.LARGE,
+    // gap: SIZES.PADDING.XSMALL,
   },
-  modalScrollView: {
-    maxHeight: 400,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  modalOptionSelected: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  modalOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    flex: 1,
-  },
-  modalOptionTextSelected: {
-    color: COLORS.PRIMARY,
+  inlineFilterText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: PRIMARY_ACCENT,
     fontWeight: '600',
   },
-  modalCheckIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: 'bold',
-    marginLeft: SIZES.PADDING.SMALL,
-  },
-  modalEmptyText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    textAlign: 'center',
-    paddingVertical: SIZES.PADDING.LARGE,
-    fontStyle: 'italic',
-  },
-
-  // Stats
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.MEDIUM,
   },
   statCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#F8F9FA',
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.SMALL,
-    alignItems: 'center',
-    marginHorizontal: 2,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   statNumber: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: PRIMARY_ACCENT,
     marginBottom: 4,
+  },
+  statNumberSuccess: {
+    color: PRIMARY_ACCENT,
+  },
+  statNumberError: {
+    color: COLORS.ERROR,
   },
   statLabel: {
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
-    textAlign: 'center',
   },
-
-  // Stock List
-  stockList: {
-    flex: 1,
+  activeFilters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.MEDIUM,
   },
-  stockListContent: {
-    padding: SIZES.PADDING.MEDIUM,
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    marginRight: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.XSMALL,
+  },
+  filterChipText: {
+    marginLeft: SIZES.PADDING.XSMALL,
+    fontSize: SIZES.FONT.SMALL,
+    color: PRIMARY_ACCENT,
+    fontWeight: '600',
+  },
+  clearChip: {
+    backgroundColor: '#F1F3F5',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    marginBottom: SIZES.PADDING.XSMALL,
+  },
+  clearChipText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  stockCardShadow: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.LARGE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    backgroundColor: 'transparent',
   },
   stockCard: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.LARGE,
-    marginBottom: SIZES.PADDING.MEDIUM,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  stockImageContainer: {
+    position: 'relative',
+    height: 200,
   },
   stockImage: {
     width: '100%',
-    height: 180,
-    backgroundColor: '#F5F5F5',
+    height: '100%',
   },
-  stockContent: {
+  statusBadge: {
+    position: 'absolute',
+    top: SIZES.PADDING.MEDIUM,
+    right: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+  },
+  statusBadgeSuccess: {
+    backgroundColor: COLORS.SUCCESS,
+  },
+  statusBadgeError: {
+    backgroundColor: COLORS.ERROR,
+  },
+  statusText: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: 'bold',
+  },
+  stockInfo: {
     padding: SIZES.PADDING.MEDIUM,
-  },
-  stockHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SIZES.PADDING.SMALL,
   },
   motorbikeName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-    flex: 1,
-  },
-  quantityBadge: {
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: 4,
-    borderRadius: SIZES.RADIUS.SMALL,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  inStockBadge: {
-    backgroundColor: COLORS.SUCCESS,
-  },
-  outOfStockBadge: {
-    backgroundColor: COLORS.ERROR,
-  },
-  quantityText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
   },
   modelText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    marginTop: 2,
     marginBottom: SIZES.PADDING.SMALL,
   },
-  detailsRow: {
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  detailItem: {
+  stockSpecs: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
-  detailLabel: {
-    fontSize: SIZES.FONT.SMALL,
+  specItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  specLabel: {
+    fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
   },
-  detailValue: {
-    fontSize: SIZES.FONT.MEDIUM,
+  specValue: {
+    fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
+    textAlign: 'center',
+  },
+  stockFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  stockPrice: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.SECONDARY,
+  },
+  stockQuantity: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: SIZES.PADDING.SMALL,
-    marginTop: SIZES.PADDING.SMALL,
-  },
-  editButton: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    paddingBottom: SIZES.PADDING.MEDIUM,
   },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: COLORS.ERROR,
+  actionButton: {
+    width: 36,
+    height: 36,
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
-
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
-    paddingVertical: SIZES.PADDING.XXXLARGE,
+    alignItems: 'center',
+    marginLeft: SIZES.PADDING.SMALL,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
+  deleteActionButton: {
+    backgroundColor: '#FFE5E5',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
+    marginTop: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.SMALL,
   },
   emptySubtitle: {
@@ -964,8 +941,8 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   addFirstButton: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.MEDIUM,
+    backgroundColor: PRIMARY_ACCENT,
+    borderRadius: SIZES.RADIUS.LARGE,
     paddingHorizontal: SIZES.PADDING.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
   },
@@ -973,6 +950,118 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+  },
+  filterSection: {
+    marginBottom: SIZES.PADDING.XLARGE,
+  },
+  filterSectionTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.SMALL,
+  },
+  filterOption: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  selectedFilterOption: {
+    backgroundColor: "#009DFF",
+    borderColor: "#009DFF",
+  },
+  filterOptionText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+  },
+  selectedFilterOptionText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  clearButton: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: "#009DFF",
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
+  },
+  modalEmptyText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+    paddingVertical: SIZES.PADDING.LARGE,
+    fontStyle: 'italic',
   },
 });
 

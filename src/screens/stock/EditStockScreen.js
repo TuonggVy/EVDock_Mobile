@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   Platform,
   TextInput,
+  KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -15,6 +17,8 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import agencyStockService from '../../services/agencyStockService';
 import LoadingScreen from '../../components/common/LoadingScreen';
 import { ArrowLeft } from 'lucide-react-native';
+
+const PRIMARY_ACCENT = '#009DFF';
 
 const EditStockScreen = ({ navigation, route }) => {
   const { stockId, stock } = route.params || {};
@@ -137,82 +141,91 @@ const EditStockScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Stock</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerPlaceholder} />
       </View>
 
-      {/* Content */}
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Stock Info (Read-only) */}
-        <View style={styles.infoGroup}>
-          <Text style={styles.infoLabel}>Stock Information</Text>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoKey}>Motorbike:</Text>
-              <Text style={styles.infoValue}>{stockDetail.motorbike?.name || 'N/A'}</Text>
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Stock Information</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Motorbike</Text>
+                <Text style={styles.infoValue}>{stockDetail.motorbike?.name || 'N/A'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Model</Text>
+                <Text style={styles.infoValue}>{stockDetail.motorbike?.model || 'N/A'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Color</Text>
+                <Text style={styles.infoValue}>{stockDetail.color?.colorType || 'N/A'}</Text>
+              </View>
+              <View style={[styles.infoRow, styles.infoRowLast]}>
+                <Text style={styles.infoLabel}>Current Price</Text>
+                <Text style={[styles.infoValue, styles.infoHighlight]}>
+                  {formatPrice(stockDetail.price)}
+                </Text>
+              </View>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoKey}>Model:</Text>
-              <Text style={styles.infoValue}>{stockDetail.motorbike?.model || 'N/A'}</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Quantity <Text style={styles.required}>*</Text>
+              </Text>
+              {errors.quantity && <Text style={styles.errorText}>{errors.quantity}</Text>}
+              <TextInput
+                style={[styles.input, errors.quantity && styles.inputError]}
+                placeholder="Enter quantity"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={formData.quantity}
+                onChangeText={(value) => handleInputChange('quantity', value)}
+                keyboardType="numeric"
+              />
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoKey}>Color:</Text>
-              <Text style={styles.infoValue}>{stockDetail.color?.colorType || 'N/A'}</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Selling Price (VND) <Text style={styles.required}>*</Text>
+              </Text>
+              {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+              <TextInput
+                style={[styles.input, errors.price && styles.inputError]}
+                placeholder="Enter selling price"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={formData.price}
+                onChangeText={(value) => handleInputChange('price', value)}
+                keyboardType="numeric"
+              />
             </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, saving && styles.submitButtonDisabled]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Update Stock</Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-        {/* Quantity */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Quantity *</Text>
-          {errors.quantity && (
-            <Text style={styles.errorText}>{errors.quantity}</Text>
-          )}
-          <TextInput
-            style={[styles.textInput, errors.quantity && styles.inputError]}
-            placeholder="Enter quantity"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={formData.quantity}
-            onChangeText={(value) => handleInputChange('quantity', value)}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Price */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Selling Price (VND) *</Text>
-          {errors.price && (
-            <Text style={styles.errorText}>{errors.price}</Text>
-          )}
-          <TextInput
-            style={[styles.textInput, errors.price && styles.inputError]}
-            placeholder="Enter selling price"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={formData.price}
-            onChangeText={(value) => handleInputChange('price', value)}
-            keyboardType="numeric"
-          />
-        </View>
-      </ScrollView>
-      
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -233,82 +246,83 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 10,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE,
     paddingBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
+    fontSize: SIZES.FONT.XXLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  headerPlaceholder: {
+    width: 40,
   },
-  saveButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
   },
-  contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
+  scrollContent: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
-  infoGroup: {
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.LARGE,
   },
-  infoLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
   infoCard: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: '#F8F9FA',
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: SIZES.PADDING.LARGE,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEFF1',
   },
-  infoKey: {
-    fontSize: SIZES.FONT.MEDIUM,
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+  infoLabel: {
+    fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+  },
+  infoHighlight: {
+    color: PRIMARY_ACCENT,
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.LARGE,
@@ -316,25 +330,44 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
+  },
+  required: {
+    color: COLORS.ERROR,
   },
   errorText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.ERROR,
     marginBottom: SIZES.PADDING.SMALL,
   },
-  textInput: {
-    backgroundColor: COLORS.SURFACE,
+  input: {
+    backgroundColor: '#F8F9FA',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   inputError: {
-    borderWidth: 1,
     borderColor: COLORS.ERROR,
+  },
+  submitButton: {
+    backgroundColor: PRIMARY_ACCENT,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 
