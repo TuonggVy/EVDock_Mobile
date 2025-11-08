@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -157,7 +158,7 @@ const CreateBatchScreen = ({ navigation }) => {
 
     if (!formData.invoiceNumber || formData.invoiceNumber.trim() === '') {
       newErrors.invoiceNumber = 'Invoice number is required';
-    } else if (isNaN(parseInt(formData.invoiceNumber))) {
+    } else if (isNaN(parseInt(formData.invoiceNumber, 10))) {
       newErrors.invoiceNumber = 'Invoice number must be a number';
     }
 
@@ -180,19 +181,20 @@ const CreateBatchScreen = ({ navigation }) => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   const handleSubmit = async () => {
     setErrors({});
-    
-    if (!validateForm()) {
-      const firstError = Object.values(errors)[0];
+
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      const firstError = Object.values(validationErrors)[0];
       if (firstError) {
         setAlertConfig({
           title: 'Validation Error',
           message: firstError,
-          type: 'error'
+          type: 'error',
         });
         setShowAlert(true);
       }
@@ -245,6 +247,16 @@ const CreateBatchScreen = ({ navigation }) => {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#009DFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <CustomAlert
@@ -255,130 +267,153 @@ const CreateBatchScreen = ({ navigation }) => {
         onClose={() => setShowAlert(false)}
       />
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color={COLORS.PRIMARY} />
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Batch</Text>
-        <TouchableOpacity
-          style={[styles.saveButton, creating && styles.saveButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={creating}
-        >
-          {creating ? (
-            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Invoice Number *</Text>
-          <TextInput
-            style={[styles.textInput, errors.invoiceNumber && styles.inputError]}
-            value={formData.invoiceNumber}
-            onChangeText={(value) => handleInputChange('invoiceNumber', value)}
-            placeholder="Enter invoice number"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.invoiceNumber && <Text style={styles.errorText}>{errors.invoiceNumber}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Amount *</Text>
-          <TextInput
-            style={[styles.textInput, errors.amount && styles.inputError]}
-            value={formData.amount}
-            onChangeText={(value) => handleInputChange('amount', value)}
-            placeholder="Enter amount"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Due Date *</Text>
-          <TouchableOpacity
-            style={[styles.dropdownButton, errors.dueDate && styles.inputError]}
-            onPress={() => setShowDatePicker(true)}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.contentWrapper}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[
-              styles.dropdownButtonText,
-              !formData.dueDate && styles.dropdownButtonTextPlaceholder
-            ]}>
-              {formatDate(formData.dueDate)}
-            </Text>
-            <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-          {errors.dueDate && <Text style={styles.errorText}>{errors.dueDate}</Text>}
-          {showDatePicker && (
-            <DateTimePicker
-              value={formData.dueDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
-              minimumDate={new Date()}
-            />
-          )}
-        </View>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Batch Information</Text>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Agency *</Text>
-          <TouchableOpacity
-            style={[styles.dropdownButton, errors.agencyId && styles.inputError]}
-            onPress={() => setShowAgencyModal(true)}
-          >
-            <Text style={[
-              styles.dropdownButtonText,
-              !formData.agencyId && styles.dropdownButtonTextPlaceholder
-            ]}>
-              {getAgencyName(formData.agencyId)}
-            </Text>
-            <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-          {errors.agencyId && <Text style={styles.errorText}>{errors.agencyId}</Text>}
-        </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Invoice Number *</Text>
+                <TextInput
+                  style={[styles.textInput, errors.invoiceNumber && styles.inputError]}
+                  value={formData.invoiceNumber}
+                  onChangeText={(value) => handleInputChange('invoiceNumber', value)}
+                  placeholder="Enter invoice number"
+                  placeholderTextColor={COLORS.TEXT.SECONDARY}
+                  keyboardType="numeric"
+                />
+                {errors.invoiceNumber && <Text style={styles.errorText}>{errors.invoiceNumber}</Text>}
+              </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Agency Order *</Text>
-          <TouchableOpacity
-            style={[styles.dropdownButton, errors.agencyOrderId && styles.inputError]}
-            onPress={() => {
-              if (!formData.agencyId) {
-                setAlertConfig({
-                  title: 'Error',
-                  message: 'Please select an agency first',
-                  type: 'error'
-                });
-                setShowAlert(true);
-                return;
-              }
-              setShowOrderModal(true);
-            }}
-            disabled={!formData.agencyId || loadingOrders}
-          >
-            {loadingOrders ? (
-              <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-            ) : (
-              <>
-                <Text style={[
-                  styles.dropdownButtonText,
-                  !formData.agencyOrderId && styles.dropdownButtonTextPlaceholder
-                ]}>
-                  {getOrderDisplay(formData.agencyOrderId)}
-                </Text>
-                <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
-              </>
-            )}
-          </TouchableOpacity>
-          {errors.agencyOrderId && <Text style={styles.errorText}>{errors.agencyOrderId}</Text>}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Amount *</Text>
+                <TextInput
+                  style={[styles.textInput, errors.amount && styles.inputError]}
+                  value={formData.amount}
+                  onChangeText={(value) => handleInputChange('amount', value)}
+                  placeholder="Enter amount"
+                  placeholderTextColor={COLORS.TEXT.SECONDARY}
+                  keyboardType="numeric"
+                />
+                {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Due Date *</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, errors.dueDate && styles.inputError]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownButtonText,
+                      !formData.dueDate && styles.dropdownButtonTextPlaceholder,
+                    ]}
+                  >
+                    {formatDate(formData.dueDate)}
+                  </Text>
+                  <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+                </TouchableOpacity>
+                {errors.dueDate && <Text style={styles.errorText}>{errors.dueDate}</Text>}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dueDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Agency *</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, errors.agencyId && styles.inputError]}
+                  onPress={() => setShowAgencyModal(true)}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownButtonText,
+                      !formData.agencyId && styles.dropdownButtonTextPlaceholder,
+                    ]}
+                  >
+                    {getAgencyName(formData.agencyId)}
+                  </Text>
+                  <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
+                </TouchableOpacity>
+                {errors.agencyId && <Text style={styles.errorText}>{errors.agencyId}</Text>}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Agency Order *</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, errors.agencyOrderId && styles.inputError]}
+                  onPress={() => {
+                    if (!formData.agencyId) {
+                      setAlertConfig({
+                        title: 'Error',
+                        message: 'Please select an agency first',
+                        type: 'error',
+                      });
+                      setShowAlert(true);
+                      return;
+                    }
+                    setShowOrderModal(true);
+                  }}
+                  disabled={!formData.agencyId || loadingOrders}
+                >
+                  {loadingOrders ? (
+                    <ActivityIndicator size="small" color="#009DFF" />
+                  ) : (
+                    <>
+                      <Text
+                        style={[
+                          styles.dropdownButtonText,
+                          !formData.agencyOrderId && styles.dropdownButtonTextPlaceholder,
+                        ]}
+                      >
+                        {getOrderDisplay(formData.agencyOrderId)}
+                      </Text>
+                      <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
+                    </>
+                  )}
+                </TouchableOpacity>
+                {errors.agencyOrderId && <Text style={styles.errorText}>{errors.agencyOrderId}</Text>}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitButton, creating && styles.submitButtonDisabled]}
+                onPress={handleSubmit}
+                disabled={creating}
+                activeOpacity={0.85}
+              >
+                {creating ? (
+                  <ActivityIndicator size="small" color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Create Batch</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Agency Modal */}
       <Modal
@@ -467,55 +502,123 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: SIZES.FONT.XXLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  headerActions: {
+    width: 40,
+    alignItems: 'flex-end',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  inputGroup: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  inputLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  textInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  inputError: {
+    borderColor: COLORS.ERROR,
+  },
+  errorText: {
+    color: COLORS.ERROR,
+    fontSize: SIZES.FONT.SMALL,
+    marginTop: SIZES.PADDING.XSMALL,
+  },
+  dropdownButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  dropdownButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  dropdownButtonTextPlaceholder: {
+    color: COLORS.TEXT.SECONDARY,
+  },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XXLARGE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
-  },
-  saveButtonDisabled: { opacity: 0.5 },
-  saveButtonText: { color: COLORS.TEXT.WHITE, fontWeight: '600' },
-  content: { padding: SIZES.PADDING.LARGE },
-  inputGroup: { marginBottom: SIZES.PADDING.LARGE },
-  inputLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  textInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  inputError: { borderWidth: 1, borderColor: COLORS.ERROR },
-  errorText: { color: COLORS.ERROR, fontSize: SIZES.FONT.SMALL, marginTop: 4 },
-  dropdownButton: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
-  dropdownButtonText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
-  dropdownButtonTextPlaceholder: { color: COLORS.TEXT.SECONDARY },
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -535,9 +638,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#EFEFEF',
   },
-  modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
-  modalItem: { padding: SIZES.PADDING.MEDIUM, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
-  modalItemText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  modalItem: {
+    padding: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  modalItemText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
 });
 
 export default CreateBatchScreen;

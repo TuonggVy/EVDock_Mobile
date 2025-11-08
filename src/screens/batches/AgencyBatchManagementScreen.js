@@ -264,11 +264,10 @@ const AgencyBatchManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.backButtonText}>Back</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Ap Batches Management</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerActions} />
       </View>
 
       {/* Search */}
@@ -356,10 +355,12 @@ const styles = StyleSheet.create({
     paddingTop: SIZES.PADDING.XXXLARGE,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
+    justifyContent: 'center',
   },
   backButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -373,8 +374,8 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: 60, // Same width as back button to center title
+  headerActions: {
+    width: 40,
   },
   filterContainer: {
     paddingTop: SIZES.PADDING.SMALL,
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
     marginRight: SIZES.PADDING.SMALL,
   },
   filterButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   filterButtonText: {
     fontSize: SIZES.FONT.SMALL,

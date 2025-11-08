@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -170,6 +171,7 @@ const BatchDetailScreen = ({ navigation, route }) => {
       });
 
       if (response.success && response.paymentUrl) {
+        console.log('🔎 [BatchDetailScreen] VNPay payment URL:', response.paymentUrl);
         const canOpen = await Linking.canOpenURL(response.paymentUrl);
         if (canOpen) {
           await Linking.openURL(response.paymentUrl);
@@ -205,7 +207,7 @@ const BatchDetailScreen = ({ navigation, route }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+        <ActivityIndicator size="large" color="#009DFF" />
       </View>
     );
   }
@@ -279,7 +281,7 @@ const BatchDetailScreen = ({ navigation, route }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
@@ -356,187 +358,186 @@ const BatchDetailScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.backButtonText}>Back</Text>
+          <ArrowLeft size={20} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Batch Detail</Text>
-        {!isDealerManager ? (
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={handleEdit}
-          >
-            <Edit size={20} color={COLORS.PRIMARY} />
-            <Text style={styles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
-        ) : remainingAmount > 0 ? (
-          <TouchableOpacity
-            style={[styles.payButton, isPaying && styles.payButtonDisabled]}
-            onPress={handleOpenPaymentModal}
-            disabled={isPaying}
-          >
-            <DollarSign size={20} color={COLORS.SUCCESS} />
-            <Text style={styles.payButtonText}>{isPaying ? 'Processing...' : 'Pay Batch'}</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerRight} />
-        )}
+        <View style={styles.headerRight} />
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Batch Info Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Batch Information</Text>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {batch.status || 'N/A'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.infoSection}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Batch ID</Text>
-                <Text style={styles.infoValue}>#{batch.id}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Invoice Number</Text>
-                <Text style={styles.infoValue}>{batch.invoiceNumber || 'N/A'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><Building size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Agency</Text>
-                <Text style={styles.infoValue}>{getAgencyName(batch.agencyId)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><DollarSign size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Total Amount</Text>
-                <Text style={styles.amountValue}>{formatPrice(batch.amount)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><DollarSign size={16} color={COLORS.SUCCESS} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Total Paid</Text>
-                <Text style={[styles.amountValue, { color: COLORS.SUCCESS }]}>{formatPrice(totalPaid)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><DollarSign size={16} color={COLORS.WARNING} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Remaining Amount</Text>
-                <Text style={[styles.amountValue, { color: COLORS.WARNING }]}>{formatPrice(remainingAmount)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><Calendar size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Due Date</Text>
-                <Text style={styles.infoValue}>{formatDate(batch.dueDate)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}><Calendar size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Created At</Text>
-                <Text style={styles.infoValue}>{formatDate(batch.createAt)}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Payment History */}
-        {batch.apPayment && batch.apPayment.length > 0 && (
+      <View style={styles.contentWrapper}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Batch Info Card */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment History</Text>
-            {batch.apPayment.map((payment, index) => (
-              <View key={index} style={styles.paymentItem}>
-                <View style={styles.paymentInfo}>
-                  <Text style={styles.paymentDate}>{formatDate(payment.paidDate)}</Text>
-                  <Text style={styles.paymentAmount}>{formatPrice(payment.amount)}</Text>
-                </View>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Batch Information</Text>
+              <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                <Text style={[styles.statusText, { color: statusColor }]}>
+                  {batch.status || 'N/A'}
+                </Text>
               </View>
-            ))}
-          </View>
-        )}
+            </View>
 
-        {/* Agency Order Info */}
-        {batch.agencyOrder && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Related Order</Text>
             <View style={styles.infoSection}>
               <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}><Package size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Order ID</Text>
-                  <Text style={styles.infoValue}>#{batch.agencyOrder.id}</Text>
+                  <Text style={styles.infoLabel}>Batch ID</Text>
+                  <Text style={styles.infoValue}>#{batch.id}</Text>
                 </View>
               </View>
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}><Package size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Items Quantity</Text>
-                  <Text style={styles.infoValue}>{batch.agencyOrder.itemQuantity || batch.agencyOrder.itemsQuantity || 0}</Text>
+                  <Text style={styles.infoLabel}>Invoice Number</Text>
+                  <Text style={styles.infoValue}>{batch.invoiceNumber || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoIcon}><Building size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Agency</Text>
+                  <Text style={styles.infoValue}>{getAgencyName(batch.agencyId)}</Text>
                 </View>
               </View>
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}><DollarSign size={16} color={COLORS.TEXT.SECONDARY} /></Text>
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Sub Total</Text>
-                  <Text style={styles.amountValue}>{formatPrice(batch.agencyOrder.subtotal || batch.agencyOrder.subTotal)}</Text>
+                  <Text style={styles.infoLabel}>Total Amount</Text>
+                  <Text style={styles.amountValue}>{formatPrice(batch.amount)}</Text>
                 </View>
               </View>
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}><Calendar size={16} color={COLORS.TEXT.SECONDARY} /></Text>
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Order Date</Text>
-                  <Text style={styles.infoValue}>{formatDate(batch.agencyOrder.orderAt)}</Text>
+                  <Text style={styles.infoLabel}>Due Date</Text>
+                  <Text style={styles.infoValue}>{formatDate(batch.dueDate)}</Text>
                 </View>
               </View>
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                <Text style={styles.infoIcon}><Calendar size={16} color={COLORS.TEXT.SECONDARY} /></Text>
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Order Type</Text>
-                  <Text style={styles.infoValue}>{batch.agencyOrder.orderType || 'N/A'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Order Status</Text>
-                  <Text style={styles.infoValue}>{batch.agencyOrder.status || 'N/A'}</Text>
+                  <Text style={styles.infoLabel}>Created At</Text>
+                  <Text style={styles.infoValue}>{formatDate(batch.createAt)}</Text>
                 </View>
               </View>
             </View>
           </View>
-        )}
-      </ScrollView>
 
-    </View>
+          {/* Payment History */}
+          {batch.apPayment && batch.apPayment.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Payment History</Text>
+              {batch.apPayment.map((payment, index) => (
+                <View key={index} style={styles.paymentItem}>
+                  <View style={styles.paymentInfo}>
+                    <Text style={styles.paymentDate}>{formatDate(payment.paidDate)}</Text>
+                    <Text style={styles.paymentAmount}>{formatPrice(payment.amount)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Agency Order Info */}
+          {batch.agencyOrder && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Related Order</Text>
+              <View style={styles.infoSection}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><Package size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Order ID</Text>
+                    <Text style={styles.infoValue}>#{batch.agencyOrder.id}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><Package size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Items Quantity</Text>
+                    <Text style={styles.infoValue}>{batch.agencyOrder.itemQuantity || batch.agencyOrder.itemsQuantity || 0}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><DollarSign size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Sub Total</Text>
+                    <Text style={styles.amountValue}>{formatPrice(batch.agencyOrder.subtotal || batch.agencyOrder.subTotal)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><Calendar size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Order Date</Text>
+                    <Text style={styles.infoValue}>{formatDate(batch.agencyOrder.orderAt)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Order Type</Text>
+                    <Text style={styles.infoValue}>{batch.agencyOrder.orderType || 'N/A'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}><FileText size={16} color={COLORS.TEXT.SECONDARY} /></Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Order Status</Text>
+                    <Text style={styles.infoValue}>{batch.agencyOrder.status || 'N/A'}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Actions */}
+          <View style={styles.actionsSection}>
+            {!isDealerManager && (
+              <TouchableOpacity
+                style={[styles.primaryActionButton, styles.editPrimaryButton]}
+                onPress={handleEdit}
+                activeOpacity={0.85}
+              >
+                <Edit size={20} color={COLORS.TEXT.WHITE} />
+                <Text style={styles.primaryActionText}>Edit Batch</Text>
+              </TouchableOpacity>
+            )}
+
+            {isDealerManager && remainingAmount > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.primaryActionButton,
+                  styles.payPrimaryButton,
+                  (isPaying) && styles.actionButtonDisabled,
+                ]}
+                onPress={handleOpenPaymentModal}
+                disabled={isPaying}
+                activeOpacity={0.85}
+              >
+                <DollarSign size={20} color={COLORS.TEXT.WHITE} />
+                <Text style={styles.primaryActionText}>
+                  {isPaying ? 'Processing...' : 'Pay Batch'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+
+    </SafeAreaView>
   );
 };
 
@@ -549,52 +550,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 4,
+    paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  backButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.HEADER,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  payButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  editButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  payButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.SUCCESS,
-    fontWeight: '600',
-  },
-  payButtonDisabled: {
-    opacity: 0.6,
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
   paymentModalOverlay: {
     flex: 1,
@@ -667,13 +641,54 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   headerRight: {
-    width: 60,
+    width: 40,
+    height: 40,
+  },
+  actionsSection: {
+    marginTop: SIZES.PADDING.LARGE,
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  editPrimaryButton: {
+    backgroundColor: "#009DFF",
+  },
+  payPrimaryButton: {
+    backgroundColor: COLORS.SUCCESS,
+  },
+  actionButtonDisabled: {
+    opacity: 0.7,
+  },
+  primaryActionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    overflow: 'hidden',
+    paddingTop: SIZES.PADDING.LARGE,
   },
   content: {
     flex: 1,

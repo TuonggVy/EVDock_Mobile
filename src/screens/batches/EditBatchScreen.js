@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -153,14 +154,15 @@ const EditBatchScreen = ({ navigation, route }) => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   const handleSubmit = async () => {
     setErrors({});
-    
-    if (!validateForm()) {
-      const firstError = Object.values(errors)[0];
+
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      const firstError = Object.values(validationErrors)[0];
       if (firstError) {
         setAlertConfig({
           title: 'Validation Error',
@@ -220,7 +222,7 @@ const EditBatchScreen = ({ navigation, route }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+        <ActivityIndicator size="large" color="#009DFF" />
       </View>
     );
   }
@@ -235,96 +237,113 @@ const EditBatchScreen = ({ navigation, route }) => {
         onClose={() => setShowAlert(false)}
       />
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color={COLORS.PRIMARY} />
+          <ArrowLeft size={22} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Batch</Text>
-        <TouchableOpacity
-          style={[styles.saveButton, updating && styles.saveButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={updating}
-        >
-          {updating ? (
-            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Invoice Number</Text>
-          <View style={[styles.textInput, styles.readOnlyInput, styles.readOnlyContainer]}>
-            <Text style={styles.readOnlyText}>{formData.invoiceNumber || 'N/A'}</Text>
-            <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Amount *</Text>
-          <TextInput
-            style={[styles.textInput, errors.amount && styles.inputError]}
-            value={formData.amount}
-            onChangeText={(value) => handleInputChange('amount', value)}
-            placeholder="Enter amount"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Status *</Text>
-          <TouchableOpacity
-            style={[styles.dropdownButton, errors.status && styles.inputError]}
-            onPress={() => setShowStatusModal(true)}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.contentWrapper}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.statusDisplay}>
-              {formData.status && (
-                <View style={[styles.statusBadgePreview, { backgroundColor: getStatusColor(formData.status) + '20' }]}>
-                  <Text style={[styles.statusTextPreview, { color: getStatusColor(formData.status) }]}>
-                    {formData.status}
-                  </Text>
+            <View style={styles.formSection}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Invoice Number</Text>
+                <View style={[styles.textInput, styles.readOnlyInput, styles.readOnlyContainer]}>
+                  <Text style={styles.readOnlyText}>{formData.invoiceNumber || 'N/A'}</Text>
+                  <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
                 </View>
-              )}
-              {!formData.status && (
-                <Text style={styles.dropdownButtonTextPlaceholder}>Select Status</Text>
-              )}
-            </View>
-            <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-          {errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
-        </View>
+              </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Due Date *</Text>
-          <TouchableOpacity
-            style={[styles.dropdownButton, errors.dueDate && styles.inputError]}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={[
-              styles.dropdownButtonText,
-              !formData.dueDate && styles.dropdownButtonTextPlaceholder
-            ]}>
-              {formatDate(formData.dueDate)}
-            </Text>
-            <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-          {errors.dueDate && <Text style={styles.errorText}>{errors.dueDate}</Text>}
-          {showDatePicker && (
-            <DateTimePicker
-              value={formData.dueDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
-              minimumDate={new Date()}
-            />
-          )}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Amount *</Text>
+                <TextInput
+                  style={[styles.textInput, errors.amount && styles.inputError]}
+                  value={formData.amount}
+                  onChangeText={(value) => handleInputChange('amount', value)}
+                  placeholder="Enter amount"
+                  placeholderTextColor={COLORS.TEXT.SECONDARY}
+                  keyboardType="numeric"
+                />
+                {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Status *</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, errors.status && styles.inputError]}
+                  onPress={() => setShowStatusModal(true)}
+                >
+                  <View style={styles.statusDisplay}>
+                    {formData.status && (
+                      <View style={[styles.statusBadgePreview, { backgroundColor: getStatusColor(formData.status) + '20' }]}>
+                        <Text style={[styles.statusTextPreview, { color: getStatusColor(formData.status) }]}>
+                          {formData.status}
+                        </Text>
+                      </View>
+                    )}
+                    {!formData.status && (
+                      <Text style={styles.dropdownButtonTextPlaceholder}>Select Status</Text>
+                    )}
+                  </View>
+                  <ChevronDown size={20} color={COLORS.TEXT.SECONDARY} />
+                </TouchableOpacity>
+                {errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Due Date *</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, errors.dueDate && styles.inputError]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownButtonText,
+                      !formData.dueDate && styles.dropdownButtonTextPlaceholder,
+                    ]}
+                  >
+                    {formatDate(formData.dueDate)}
+                  </Text>
+                  <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+                </TouchableOpacity>
+                {errors.dueDate && <Text style={styles.errorText}>{errors.dueDate}</Text>}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dueDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitButton, updating && styles.submitButtonDisabled]}
+                onPress={handleSubmit}
+                disabled={updating}
+                activeOpacity={0.85}
+              >
+                {updating ? (
+                  <ActivityIndicator size="small" color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Status Modal */}
       <Modal
@@ -378,53 +397,76 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    flex: 1,
+    textAlign: 'center',
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
+  headerActions: {
+    width: 40,
+    alignItems: 'flex-end',
   },
-  saveButtonDisabled: { opacity: 0.5 },
-  saveButtonText: { color: COLORS.TEXT.WHITE, fontWeight: '600' },
-  loadingContainer: {
+  keyboardView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
-  content: { padding: SIZES.PADDING.LARGE },
-  inputGroup: { marginBottom: SIZES.PADDING.LARGE },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  inputGroup: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
   },
   textInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
-  inputError: { borderWidth: 1, borderColor: COLORS.ERROR },
-  errorText: { color: COLORS.ERROR, fontSize: SIZES.FONT.SMALL, marginTop: 4 },
+  inputError: {
+    borderColor: COLORS.ERROR,
+  },
+  errorText: {
+    color: COLORS.ERROR,
+    fontSize: SIZES.FONT.SMALL,
+    marginTop: SIZES.PADDING.XSMALL,
+  },
   readOnlyInput: {
-    backgroundColor: "#BABABA",
+    backgroundColor: '#E0E0E0',
+    borderColor: 'transparent',
   },
   readOnlyContainer: {
     flexDirection: 'row',
@@ -437,15 +479,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownButton: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
-  dropdownButtonText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
-  dropdownButtonTextPlaceholder: { color: COLORS.TEXT.SECONDARY },
+  dropdownButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  dropdownButtonTextPlaceholder: {
+    color: COLORS.TEXT.SECONDARY,
+  },
   statusDisplay: {
     flex: 1,
   },
@@ -458,6 +508,32 @@ const styles = StyleSheet.create({
   statusTextPreview: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XXLARGE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   modalContainer: {
     flex: 1,
@@ -478,7 +554,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#EFEFEF',
   },
-  modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+  },
   modalItem: {
     padding: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
