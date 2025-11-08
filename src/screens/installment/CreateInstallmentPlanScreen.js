@@ -401,7 +401,7 @@ const CreateInstallmentPlanScreen = () => {
         {/* Save Button */}
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.actionWrapper} disabled={saving} onPress={onSave}>
-            <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.saveButton}>
+            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.saveButton}>
               <Text style={styles.saveText}>{saving ? 'Creating...' : 'Create Plan'}</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -494,12 +494,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    marginLeft: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
   },
   headerTitleText: {
     color: COLORS.TEXT.WHITE,
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   content: {
     backgroundColor: COLORS.SURFACE,
