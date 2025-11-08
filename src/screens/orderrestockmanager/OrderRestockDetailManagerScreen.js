@@ -7,14 +7,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
-  Modal,
   Linking,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { ArrowLeft, DollarSign, Calendar, Check } from 'lucide-react-native';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import agencyService from '../../services/agencyService';
 
@@ -27,8 +25,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [showBillModal, setShowBillModal] = useState(false);
-  const [selectedPaymentType, setSelectedPaymentType] = useState('FULL');
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -172,207 +168,24 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
 
   const renderStatusModal = () => null;
 
-  const handleCreateBill = async (paymentType) => {
-    if (!order || !order.id) {
-      showError('Lỗi', 'Không tìm thấy thông tin đơn hàng');
+  const handlePayment = async () => {
+    if (!orderItem || !orderItem.id) {
+      showError('Error', 'Order item not found.');
       return;
     }
+
     try {
-      const response = await orderRestockManagerService.createOrderRestockBill(order.id, paymentType);
-      if (response.success) {
-        showSuccess('Success', response.message || 'Bill created successfully!');
-        setShowBillModal(false);
-        // Reload order detail to get updated bill information
-        await loadOrderDetail();
+      const resp = await orderRestockManagerService.payOrderRestock(orderItem.id);
+      if (resp.success) {
+        setOrder(resp.data);
+        showSuccess('Success', 'Order has been paid!');
         if (onStatusUpdate) onStatusUpdate();
       } else {
-        showError('Error', response.error || 'Unable to create bill');
+        showError('Error', resp.error || 'Unable to pay order');
       }
-    } catch (error) {
-      console.error('Error creating bill:', error);
-      showError('Error', 'Unable to create bill');
+    } catch (e) {
+      showError('Error', 'Unable to pay order');
     }
-  };
-
-  const handlePayment = async () => {
-    if (!order) {
-      showError('Error', 'Order information not found');
-      return;
-    }
-    if (!order.agencyBill || !order.agencyBill.id) {
-      showError('Error', 'Bill information not found');
-      return;
-    }
-
-    if (order.agencyBill.isCompleted) {
-      showError('Notification', 'Bill has already been paid');
-      return;
-    }
-
-    try {
-      showConfirm(
-        'Confirm Payment',
-        `Are you sure you want to pay bill #${order.agencyBill.id}?\nAmount: ${formatPrice(order.agencyBill.amount)}`,
-        async () => {
-          try {
-            const response = await orderRestockManagerService.getVNPayPaymentUrl(order.agencyBill.id);
-            if (response.success && response.paymentUrl) {
-              // Check if URL can be opened
-              const canOpen = await Linking.canOpenURL(response.paymentUrl);
-               if (canOpen) {
-                 await Linking.openURL(response.paymentUrl);
-                 // Reload order detail after payment attempt to check if payment completed
-                 // Check multiple times as payment might take a few seconds
-                 setTimeout(() => {
-                   loadOrderDetail();
-                 }, 2000);
-                 setTimeout(() => {
-                   loadOrderDetail();
-                 }, 5000);
-                 setTimeout(() => {
-                   loadOrderDetail();
-                 }, 10000);
-               } else {
-                showError('Error', 'Unable to open payment URL');
-              }
-            } else {
-              showError('Error', response.error || 'Unable to get payment URL');
-            }
-          } catch (error) {
-            console.error('Error getting payment URL:', error);
-            showError('Error', 'Unable to process payment');
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Error in payment flow:', error);
-      showError('Error', 'Unable to process payment');
-    }
-  };
-
-  const renderBillModal = () => {
-    if (!showBillModal) return null;
-
-    return (
-      <Modal
-        visible={showBillModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowBillModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Payment Method</Text>
-            <Text style={styles.modalSubtitle}>Order #{order?.id || orderItem?.orderId || 'N/A'} has been delivered</Text>
-
-            <View style={styles.paymentTypeContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.paymentTypeCard,
-                  selectedPaymentType === 'FULL' && styles.paymentTypeCardSelected
-                ]}
-                onPress={() => setSelectedPaymentType('FULL')}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={selectedPaymentType === 'FULL' 
-                    ? ['#4A90E2', '#357ABD'] 
-                    : ['#FFFFFF', '#F8F9FA']
-                  }
-                  style={styles.paymentTypeCardGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.paymentTypeHeader}>
-                    <View style={styles.paymentTypeIconContainer}>
-                      <DollarSign size={28} color={selectedPaymentType === 'FULL' ? COLORS.TEXT.WHITE : COLORS.PRIMARY} />
-                    </View>
-                    <View style={styles.paymentTypeTitleContainer}>
-                      <Text style={[
-                        styles.paymentTypeTitle,
-                        selectedPaymentType === 'FULL' && styles.paymentTypeTitleSelected
-                      ]}>
-                        Full Payment
-                      </Text>
-                      <Text style={[
-                        styles.paymentTypeSubtitle,
-                        selectedPaymentType === 'FULL' && styles.paymentTypeSubtitleSelected
-                      ]}>
-                        One-time payment (FULL)
-                      </Text>
-                    </View>
-                    {selectedPaymentType === 'FULL' && (
-                      <View style={styles.selectedBadge}>
-                        <Check size={16} color={COLORS.TEXT.WHITE} />
-                      </View>
-                    )}
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.paymentTypeCard,
-                  selectedPaymentType === 'DEFERRED' && styles.paymentTypeCardSelected
-                ]}
-                onPress={() => setSelectedPaymentType('DEFERRED')}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={selectedPaymentType === 'DEFERRED' 
-                    ? ['#9B59B6', '#8E44AD'] 
-                    : ['#FFFFFF', '#F8F9FA']
-                  }
-                  style={styles.paymentTypeCardGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.paymentTypeHeader}>
-                    <View style={styles.paymentTypeIconContainer}>
-                      <Calendar size={28} color={selectedPaymentType === 'DEFERRED' ? COLORS.TEXT.WHITE : COLORS.PRIMARY} />
-                    </View>
-                    <View style={styles.paymentTypeTitleContainer}>
-                      <Text style={[
-                        styles.paymentTypeTitle,
-                        selectedPaymentType === 'DEFERRED' && styles.paymentTypeTitleSelected
-                      ]}>
-                        Deferred Payment
-                      </Text>
-                      <Text style={[
-                        styles.paymentTypeSubtitle,
-                        selectedPaymentType === 'DEFERRED' && styles.paymentTypeSubtitleSelected
-                      ]}>
-                        Pay later (DEFERRED)
-                      </Text>
-                    </View>
-                    {selectedPaymentType === 'DEFERRED' && (
-                      <View style={styles.selectedBadge}>
-                        <Check size={16} color={COLORS.TEXT.WHITE} />
-                      </View>
-                    )}
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setShowBillModal(false)}
-              >
-                <Text style={styles.modalButtonCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
-                onPress={() => handleCreateBill(selectedPaymentType)}
-              >
-                <Text style={styles.modalButtonConfirmText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
   };
 
   if (loading) {
@@ -518,16 +331,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                 <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
               </TouchableOpacity>
             </>
-          ) : order.status === 'DELIVERED' && !order.agencyBill ? (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                setSelectedPaymentType('FULL');
-                setShowBillModal(true);
-              }}
-            >
-              <Text style={styles.actionButtonText}>Create Bill</Text>
-            </TouchableOpacity>
           ) : order.agencyBill && !order.agencyBill.isCompleted ? (
             <TouchableOpacity
               style={styles.actionButton}
@@ -538,8 +341,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           ) : null}
         </View>
       )}
-
-      {renderBillModal()}
 
       {renderStatusModal()}
 
@@ -599,7 +400,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 160,
+    // paddingBottom: 160,
   },
   loadingContainer: {
     flex: 1,
@@ -656,7 +457,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   infoRow: {
@@ -697,7 +498,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   actionButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -710,133 +511,10 @@ const styles = StyleSheet.create({
   deleteActionButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.ERROR,
+    borderColor: "#009DFF",
   },
   deleteActionButtonText: {
-    color: COLORS.ERROR,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SIZES.PADDING.MEDIUM,
-  },
-  modalContent: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.LARGE,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.SMALL,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.LARGE,
-    textAlign: 'center',
-  },
-  paymentTypeContainer: {
-    marginBottom: SIZES.PADDING.LARGE,
-    gap: SIZES.PADDING.MEDIUM,
-  },
-  paymentTypeCard: {
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  paymentTypeCardSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.PRIMARY,
-  },
-  paymentTypeCardGradient: {
-    padding: SIZES.PADDING.LARGE,
-    borderRadius: SIZES.RADIUS.LARGE,
-  },
-  paymentTypeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  paymentTypeIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SIZES.PADDING.MEDIUM,
-  },
-  paymentTypeTitleContainer: {
-    flex: 1,
-  },
-  paymentTypeTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: 4,
-  },
-  paymentTypeTitleSelected: {
-    color: COLORS.TEXT.WHITE,
-  },
-  paymentTypeSubtitle: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  paymentTypeSubtitleSelected: {
-    color: COLORS.TEXT.WHITE,
-    opacity: 0.9,
-  },
-  selectedBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.SUCCESS,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.MEDIUM,
-  },
-  modalButton: {
-    flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.TEXT.SECONDARY,
-  },
-  modalButtonCancelText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: '600',
-  },
-  modalButtonConfirm: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  modalButtonConfirmText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+    color: "#FFFFFF",
   },
 });
 
