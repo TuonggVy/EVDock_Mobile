@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -166,179 +167,186 @@ const CreateStockPromotionScreen = ({ navigation }) => {
           <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Stock Promotion</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleCreatePromotion}
-          disabled={creating}
-        >
-          {creating ? (
-            <ActivityIndicator color={COLORS.TEXT.WHITE} />
-          ) : (
-            <Text style={styles.saveButtonText}>Create</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Promotion Name *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={newPromotion.name}
-            onChangeText={(text) => setNewPromotion(prev => ({ ...prev, name: text }))}
-            placeholder="Enter promotion name"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-          />
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.formSection}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Promotion Name *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newPromotion.name}
+                onChangeText={(text) => setNewPromotion(prev => ({ ...prev, name: text }))}
+                placeholder="Enter promotion name"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+              />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Description *</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea]}
-            value={newPromotion.description}
-            onChangeText={(text) => setNewPromotion(prev => ({ ...prev, description: text }))}
-            placeholder="Enter description"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            multiline
-            numberOfLines={4}
-          />
-        </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Description *</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                value={newPromotion.description}
+                onChangeText={(text) => setNewPromotion(prev => ({ ...prev, description: text }))}
+                placeholder="Enter description"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Discount Type *</Text>
-          <View style={styles.selectorRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Discount Type *</Text>
+              <View style={styles.selectorRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorOption,
+                    newPromotion.valueType === 'PERCENT' && styles.selectedOption
+                  ]}
+                  onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'PERCENT' }))}
+                >
+                  <Text style={[
+                    styles.selectorOptionText,
+                    newPromotion.valueType === 'PERCENT' && styles.selectedOptionText
+                  ]}>
+                    PERCENT (%)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorOption,
+                    newPromotion.valueType === 'FIXED' && styles.selectedOption
+                  ]}
+                  onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'FIXED' }))}
+                >
+                  <Text style={[
+                    styles.selectorOptionText,
+                    newPromotion.valueType === 'FIXED' && styles.selectedOptionText
+                  ]}>
+                    FIXED (VND)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Value *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newPromotion.value}
+                onChangeText={(text) => setNewPromotion(prev => ({ ...prev, value: text }))}
+                placeholder={newPromotion.valueType === 'PERCENT' ? 'Enter percentage (e.g., 10)' : 'Enter amount (e.g., 50000)'}
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Start Date *</Text>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text style={[
+                  styles.dateInputText,
+                  !newPromotion.startAt && styles.dateInputTextPlaceholder
+                ]}>
+                  {newPromotion.startAt ? formatDateForDisplay(newPromotion.startAt) : 'Select start date'}
+                </Text>
+                <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+              </TouchableOpacity>
+            </View>
+
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={startDate}
+                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
+                is24Hour={true}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleStartDateChange}
+              />
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={[
+                  styles.dateInputText,
+                  !newPromotion.endAt && styles.dateInputTextPlaceholder
+                ]}>
+                  {newPromotion.endAt ? formatDateForDisplay(newPromotion.endAt) : 'Select end date'}
+                </Text>
+                <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+              </TouchableOpacity>
+            </View>
+
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={endDate}
+                mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
+                is24Hour={true}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleEndDateChange}
+                minimumDate={startDate}
+              />
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Status *</Text>
+              <View style={styles.selectorRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorOption,
+                    newPromotion.status === 'ACTIVE' && styles.selectedOption
+                  ]}
+                  onPress={() => setNewPromotion(prev => ({ ...prev, status: 'ACTIVE' }))}
+                >
+                  <Text style={[
+                    styles.selectorOptionText,
+                    newPromotion.status === 'ACTIVE' && styles.selectedOptionText
+                  ]}>
+                    ACTIVE
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorOption,
+                    newPromotion.status === 'INACTIVE' && styles.selectedOption
+                  ]}
+                  onPress={() => setNewPromotion(prev => ({ ...prev, status: 'INACTIVE' }))}
+                >
+                  <Text style={[
+                    styles.selectorOptionText,
+                    newPromotion.status === 'INACTIVE' && styles.selectedOptionText
+                  ]}>
+                    INACTIVE
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={[
-                styles.selectorOption,
-                newPromotion.valueType === 'PERCENT' && styles.selectedOption
-              ]}
-              onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'PERCENT' }))}
+              style={[styles.createButton, creating && styles.createButtonDisabled]}
+              onPress={handleCreatePromotion}
+              disabled={creating}
             >
-              <Text style={[
-                styles.selectorOptionText,
-                newPromotion.valueType === 'PERCENT' && styles.selectedOptionText
-              ]}>
-                PERCENT (%)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.selectorOption,
-                { marginLeft: SIZES.PADDING.SMALL },
-                newPromotion.valueType === 'FIXED' && styles.selectedOption
-              ]}
-              onPress={() => setNewPromotion(prev => ({ ...prev, valueType: 'FIXED' }))}
-            >
-              <Text style={[
-                styles.selectorOptionText,
-                newPromotion.valueType === 'FIXED' && styles.selectedOptionText
-              ]}>
-                FIXED (VND)
-              </Text>
+          {creating ? (
+            <ActivityIndicator color="#009DFF" />
+              ) : (
+                <Text style={styles.createButtonText}>Create</Text>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Value *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={newPromotion.value}
-            onChangeText={(text) => setNewPromotion(prev => ({ ...prev, value: text }))}
-            placeholder={newPromotion.valueType === 'PERCENT' ? "Enter percentage (e.g., 10)" : "Enter amount (e.g., 50000)"}
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Start Date *</Text>
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => setShowStartDatePicker(true)}
-          >
-            <Text style={[
-              styles.dateInputText,
-              !newPromotion.startAt && styles.dateInputTextPlaceholder
-            ]}>
-              {newPromotion.startAt ? formatDateForDisplay(newPromotion.startAt) : 'Select start date'}
-            </Text>
-            <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-        </View>
-
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-            is24Hour={true}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleStartDateChange}
-          />
-        )}
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>End Date *</Text>
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => setShowEndDatePicker(true)}
-          >
-            <Text style={[
-              styles.dateInputText,
-              !newPromotion.endAt && styles.dateInputTextPlaceholder
-            ]}>
-              {newPromotion.endAt ? formatDateForDisplay(newPromotion.endAt) : 'Select end date'}
-            </Text>
-            <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-          </TouchableOpacity>
-        </View>
-
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
-            is24Hour={true}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleEndDateChange}
-            minimumDate={startDate}
-          />
-        )}
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Status *</Text>
-          <View style={styles.selectorRow}>
-            <TouchableOpacity
-              style={[
-                styles.selectorOption,
-                newPromotion.status === 'ACTIVE' && styles.selectedOption
-              ]}
-              onPress={() => setNewPromotion(prev => ({ ...prev, status: 'ACTIVE' }))}
-            >
-              <Text style={[
-                styles.selectorOptionText,
-                newPromotion.status === 'ACTIVE' && styles.selectedOptionText
-              ]}>
-                ACTIVE
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.selectorOption,
-                { marginLeft: SIZES.PADDING.SMALL },
-                newPromotion.status === 'INACTIVE' && styles.selectedOption
-              ]}
-              onPress={() => setNewPromotion(prev => ({ ...prev, status: 'INACTIVE' }))}
-            >
-              <Text style={[
-                styles.selectorOptionText,
-                newPromotion.status === 'INACTIVE' && styles.selectedOptionText
-              ]}>
-                INACTIVE
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -360,8 +368,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderBottomWidth: 1,
@@ -382,55 +390,73 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    minWidth: 60,
+  headerActions: {
+    width: 40,
+    height: 40,
+  },
+  createButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
+    alignSelf: 'stretch',
   },
-  saveButtonText: {
+  createButtonDisabled: {
+    opacity: 0.6,
+  },
+  createButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
+  keyboardView: {
+    flex: 1,
+  },
   content: {
     flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
   },
   inputGroup: {
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
   },
   textInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.BORDER?.PRIMARY || 'rgba(0,0,0,0.05)',
   },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
   dateInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.BORDER?.PRIMARY || 'rgba(0,0,0,0.05)',
   },
   dateInputText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -442,19 +468,21 @@ const styles = StyleSheet.create({
   },
   selectorRow: {
     flexDirection: 'row',
+    gap: SIZES.PADDING.SMALL,
   },
   selectorOption: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.BORDER?.PRIMARY || 'rgba(0,0,0,0.05)',
   },
   selectedOption: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
+    borderColor: '#009DFF',
   },
   selectorOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
