@@ -17,12 +17,14 @@ import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, Car, CarFront, Gift, Bus, CircleDollarSign, CreditCard, NotepadText, WalletCards, Building2, Users, PackageOpen, SquareChartGantt } from 'lucide-react-native';
+import useUserProfile from '../../hooks/useUserProfile';
 
 const { width } = Dimensions.get('window');
 
 const DealerManagerHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  const { profile } = useUserProfile();
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,7 +186,7 @@ const DealerManagerHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Manager'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Manager'}</Text>
             <Text style={styles.roleText}>Dealer Manager</Text>
           </View>
         </View>

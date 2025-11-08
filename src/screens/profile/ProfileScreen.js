@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES } from '../../constants';
@@ -29,12 +30,56 @@ import {
   ChevronRight,
   LogOut
 } from 'lucide-react-native';
+import { getProfile } from '../../services/api/authApi';
 
 const { width } = Dimensions.get('window');
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  const [profileData, setProfileData] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const showInfoRef = useRef(showInfo);
+
+  useEffect(() => {
+    showInfoRef.current = showInfo;
+  }, [showInfo]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    let isActive = true;
+
+    const fetchProfile = async () => {
+      setIsProfileLoading(true);
+      try {
+        const response = await getProfile(user.id);
+        const profile = response?.data ?? response;
+        if (isActive) {
+          setProfileData(profile || null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error.response?.data || error.message);
+        if (isActive) {
+          const message =
+            error.response?.data?.message || "Unable to load profile information.";
+          showInfoRef.current("Error", message);
+        }
+      } finally {
+        if (isActive) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id]);
 
   const handleLogout = () => {
     showConfirm(
@@ -74,23 +119,41 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const formatDate = (value) => {
+    if (!value) return 'Not updated';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  };
+
+  const displayName = profileData?.fullname || user?.name || user?.username || 'User';
+  const displayUsername = profileData?.username || user?.username || 'Not updated';
+  const displayEmail = profileData?.email || user?.email || 'email@example.com';
+  const displayPhone = profileData?.phone || user?.phone || 'Not updated';
+  const displayRole = getRoleDisplayName(user?.role);
+  const displayAgency = profileData?.agencyId != null
+    ? String(profileData.agencyId)
+    : user?.dealerName || user?.company || (user?.agencyId != null ? String(user.agencyId) : 'Not updated');
+  const displayAddress = profileData?.address || 'Not updated';
+  const displayStartDate = formatDate(profileData?.createAt || user?.startDate);
+  const avatarLetter = displayName ? displayName.charAt(0).toUpperCase() : 'U';
+
   const profileSections = [
     {
       title: 'Personal Information',
       items: [
-        { label: 'Full Name', value: user?.name || 'Not updated', iconName: 'user' },
-        { label: 'Email', value: user?.email || 'Not updated', iconName: 'mail' },
-        { label: 'Phone', value: user?.phone || 'Not updated', iconName: 'phone' },
-        { label: 'Role', value: getRoleDisplayName(user?.role), iconName: 'role' },
+        { label: 'Full Name', value: displayName || 'Not updated', iconName: 'user' },
+        { label: 'Username', value: displayUsername, iconName: 'user' },
+        { label: 'Email', value: displayEmail || 'Not updated', iconName: 'mail' },
+        { label: 'Phone', value: displayPhone, iconName: 'phone' },
+        { label: 'Role', value: displayRole || 'User', iconName: 'role' },
       ],
     },
     {
       title: 'Work Information',
       items: [
-        { label: 'Company/Agency', value: user?.dealerName || user?.company || 'Not updated', iconName: 'building' },
-        { label: 'Department', value: user?.department || 'Not updated', iconName: 'department' },
-        { label: 'Position', value: user?.position || 'Not updated', iconName: 'briefcase' },
-        { label: 'Start Date', value: user?.startDate || 'Not updated', iconName: 'calendar' },
+        { label: 'Agency ID', value: displayAgency || 'Not updated', iconName: 'building' },
+        { label: 'Address', value: displayAddress, iconName: 'department' },
+        { label: 'Account Created', value: displayStartDate, iconName: 'calendar' },
       ],
     },
   ];
@@ -139,17 +202,24 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                {avatarLetter}
               </Text>
             </View>
             <TouchableOpacity style={styles.editAvatarButton}>
               <Camera size={14} color={COLORS.TEXT.WHITE} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
-          <Text style={styles.userRole}>{getRoleDisplayName(user?.role)}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
+          <Text style={styles.userName}>{displayName}</Text>
+          <Text style={styles.userRole}>{displayRole}</Text>
+          <Text style={styles.userEmail}>{displayEmail}</Text>
         </View>
+
+        {isProfileLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        )}
 
         {/* Profile Sections */}
         {profileSections.map((section, sectionIndex) => (
@@ -414,6 +484,17 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  loadingText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginLeft: SIZES.PADDING.XSMALL,
   },
 });
 
