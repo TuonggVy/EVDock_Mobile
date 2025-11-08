@@ -266,6 +266,60 @@ class BatchManagementService {
       };
     }
   }
+
+  /**
+   * Get VNPay payment URL for agency batch payment
+   * @param {Object} params
+   * @param {number} params.batchId - Batch ID
+   * @param {number} params.amount - Payment amount
+   * @param {string} [params.platform='mobile'] - Platform identifier (e.g., 'mobile')
+   * @returns {Promise<Object>} Payment URL response
+   */
+  async getBatchPaymentUrl({ batchId, amount, platform = 'mobile' } = {}) {
+    if (!batchId) {
+      return { success: false, error: 'batchId is required', paymentUrl: null };
+    }
+
+    if (amount === undefined || amount === null) {
+      return { success: false, error: 'amount is required', paymentUrl: null };
+    }
+
+    const endpoint = `/vnpay/agency-bill`;
+    const query = platform ? `?platform=${encodeURIComponent(platform)}` : '';
+
+    try {
+      console.log('🔄 [BatchManagementService] Requesting VNPay payment URL:', { batchId, amount, platform });
+      const response = await axiosInstance.post(`${endpoint}${query}`, {
+        batchId,
+        amount,
+      });
+
+      const paymentUrl = response.data?.data?.paymentUrl || response.data?.paymentUrl || '';
+
+      console.log('✅ [BatchManagementService] Received VNPay payment URL:', Boolean(paymentUrl));
+
+      return {
+        success: true,
+        data: response.data?.data || response.data,
+        paymentUrl,
+        message: response.data?.message || 'Get payment url success',
+      };
+    } catch (error) {
+      console.error('❌ [BatchManagementService] Error requesting VNPay payment URL:', error);
+      console.error('❌ [BatchManagementService] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+
+      return {
+        success: false,
+        error: error.response?.data?.message || error.response?.data?.error || 'Failed to get payment url',
+        paymentUrl: null,
+      };
+    }
+  }
 }
 
 export default new BatchManagementService();

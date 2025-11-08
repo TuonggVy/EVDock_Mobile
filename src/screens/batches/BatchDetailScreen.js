@@ -6,6 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -22,6 +27,10 @@ const BatchDetailScreen = ({ navigation, route }) => {
   const [agencies, setAgencies] = useState([]);
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [isPaying, setIsPaying] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmountInput, setPaymentAmountInput] = useState('');
+  const [paymentError, setPaymentError] = useState('');
 
   // Check if user is Dealer Manager (read-only)
   const isDealerManager = user?.role === USER_ROLES.DEALER_MANAGER;
@@ -125,6 +134,74 @@ const BatchDetailScreen = ({ navigation, route }) => {
     navigation.navigate('EditBatch', { batchId: batch.id, batch });
   };
 
+  const handlePayBatch = async (amountOverride) => {
+    if (!batch?.id) {
+      return;
+    }
+
+    const paymentAmount = amountOverride;
+
+    if (paymentAmount === undefined || paymentAmount === null) {
+      setAlertConfig({
+        title: 'Missing Amount',
+        message: 'Vui lòng nhập số tiền cần thanh toán.',
+        type: 'error'
+      });
+      setShowAlert(true);
+      return;
+    }
+
+    if (paymentAmount <= 0) {
+      setAlertConfig({
+        title: 'Payment Not Required',
+        message: 'Số tiền thanh toán phải lớn hơn 0.',
+        type: 'info'
+      });
+      setShowAlert(true);
+      return;
+    }
+
+    try {
+      setIsPaying(true);
+      const response = await batchManagementService.getBatchPaymentUrl({
+        batchId: batch.id,
+        amount: paymentAmount,
+        platform: 'mobile',
+      });
+
+      if (response.success && response.paymentUrl) {
+        const canOpen = await Linking.canOpenURL(response.paymentUrl);
+        if (canOpen) {
+          await Linking.openURL(response.paymentUrl);
+        } else {
+          setAlertConfig({
+            title: 'Cannot Open URL',
+            message: 'Unable to open the payment link on this device.',
+            type: 'error'
+          });
+          setShowAlert(true);
+        }
+      } else {
+        setAlertConfig({
+          title: 'Payment Error',
+          message: response.error || 'Failed to get payment link.',
+          type: 'error'
+        });
+        setShowAlert(true);
+      }
+    } catch (error) {
+      console.error('Error initiating batch payment:', error);
+      setAlertConfig({
+        title: 'Payment Error',
+        message: 'An unexpected error occurred. Please try again later.',
+        type: 'error'
+      });
+      setShowAlert(true);
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -158,6 +235,49 @@ const BatchDetailScreen = ({ navigation, route }) => {
   const totalPaid = batch.apPayment?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
   const remainingAmount = (batch.amount || 0) - totalPaid;
 
+  const handleOpenPaymentModal = () => {
+    setPaymentAmountInput('');
+    setPaymentError('');
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    if (isPaying) {
+      return;
+    }
+    setShowPaymentModal(false);
+    setPaymentError('');
+    setPaymentAmountInput('');
+  };
+
+  const handleChangePaymentAmount = (value) => {
+    const numericString = value.replace(/[^0-9]/g, '');
+    if (!numericString) {
+      setPaymentAmountInput('');
+      return;
+    }
+    const formattedValue = new Intl.NumberFormat('vi-VN').format(Number(numericString));
+    setPaymentAmountInput(formattedValue);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (isPaying) {
+      return;
+    }
+
+    const numericValue = Number(paymentAmountInput.replace(/[^0-9]/g, ''));
+
+    if (!numericValue || Number.isNaN(numericValue) || numericValue <= 0) {
+      setPaymentError('Vui lòng nhập số tiền hợp lệ.');
+      return;
+    }
+
+    setShowPaymentModal(false);
+    setPaymentError('');
+
+    await handlePayBatch(numericValue);
+  };
+
   return (
     <View style={styles.container}>
       <CustomAlert
@@ -167,6 +287,68 @@ const BatchDetailScreen = ({ navigation, route }) => {
         type={alertConfig.type}
         onClose={() => setShowAlert(false)}
       />
+
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClosePaymentModal}
+      >
+        <TouchableOpacity
+          style={styles.paymentModalOverlay}
+          activeOpacity={1}
+          onPress={handleClosePaymentModal}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.paymentModalWrapper}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {}}
+              style={styles.paymentModalContainer}
+            >
+              <Text style={styles.paymentModalTitle}>Thanh toán batch</Text>
+              <Text style={styles.paymentModalSubtitle}>
+                Số tiền còn lại: {formatPrice(Math.max(0, remainingAmount))}
+              </Text>
+              <TextInput
+                value={paymentAmountInput}
+                onChangeText={handleChangePaymentAmount}
+                keyboardType="numeric"
+                placeholder="Nhập số tiền muốn thanh toán"
+                style={styles.paymentInput}
+                editable={!isPaying}
+              />
+              {paymentError ? (
+                <Text style={styles.paymentErrorText}>{paymentError}</Text>
+              ) : null}
+              <View style={styles.paymentModalActions}>
+                <TouchableOpacity
+                  style={styles.paymentModalButton}
+                  onPress={handleClosePaymentModal}
+                  disabled={isPaying}
+                >
+                  <Text style={styles.paymentModalButtonText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.paymentModalButton,
+                    styles.paymentModalButtonPrimary,
+                    (isPaying || !paymentAmountInput) && styles.paymentModalButtonDisabled,
+                  ]}
+                  onPress={handleConfirmPayment}
+                  disabled={isPaying || !paymentAmountInput}
+                >
+                  <Text style={styles.paymentModalButtonPrimaryText}>
+                    {isPaying ? 'Đang xử lý...' : 'Thanh toán'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Header */}
       <View style={styles.header}>
@@ -185,6 +367,15 @@ const BatchDetailScreen = ({ navigation, route }) => {
           >
             <Edit size={20} color={COLORS.PRIMARY} />
             <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
+        ) : remainingAmount > 0 ? (
+          <TouchableOpacity
+            style={[styles.payButton, isPaying && styles.payButtonDisabled]}
+            onPress={handleOpenPaymentModal}
+            disabled={isPaying}
+          >
+            <DollarSign size={20} color={COLORS.SUCCESS} />
+            <Text style={styles.payButtonText}>{isPaying ? 'Processing...' : 'Pay Batch'}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.headerRight} />
@@ -386,10 +577,94 @@ const styles = StyleSheet.create({
     padding: SIZES.PADDING.SMALL,
     gap: 4,
   },
+  payButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SIZES.PADDING.SMALL,
+    gap: 4,
+  },
   editButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.PRIMARY,
     fontWeight: '600',
+  },
+  payButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.SUCCESS,
+    fontWeight: '600',
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  paymentModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: SIZES.PADDING.LARGE,
+  },
+  paymentModalWrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  paymentModalContainer: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  paymentModalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: '700',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  paymentModalSubtitle: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  paymentInput: {
+    borderWidth: 1,
+    borderColor: COLORS.BORDER?.DEFAULT || '#E5E5E5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+  },
+  paymentErrorText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.ERROR,
+  },
+  paymentModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  paymentModalButton: {
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER?.DEFAULT || COLORS.PRIMARY,
+  },
+  paymentModalButtonPrimary: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  paymentModalButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+  },
+  paymentModalButtonPrimaryText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
+  },
+  paymentModalButtonDisabled: {
+    opacity: 0.7,
   },
   headerRight: {
     width: 60,
