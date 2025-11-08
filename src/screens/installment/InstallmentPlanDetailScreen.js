@@ -250,7 +250,7 @@ const InstallmentPlanDetailScreen = () => {
         {!viewOnly && (
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.actionWrapper} disabled={saving} onPress={onSave}>
-            <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.saveButton}>
+            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.saveButton}>
               <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backButton: { width: 40, height: 40, borderRadius: SIZES.RADIUS.ROUND, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
   backIcon: { color: COLORS.TEXT.WHITE, fontSize: SIZES.FONT.LARGE },
-  headerTitle: { flex: 1, marginLeft: SIZES.PADDING.MEDIUM },
-  headerTitleText: { color: COLORS.TEXT.WHITE, fontSize: SIZES.FONT.HEADER, fontWeight: 'bold' },
+  headerTitle: { flex: 1, alignItems: 'center' },
+  headerTitleText: { color: COLORS.TEXT.WHITE, fontSize: SIZES.FONT.XXLARGE, fontWeight: 'bold', textAlign: 'center' },
   headerSubtitle: { color: COLORS.TEXT.SECONDARY, marginTop: 4 },
   deleteButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   deleteText: { fontSize: SIZES.FONT.LARGE, color: COLORS.ERROR },
