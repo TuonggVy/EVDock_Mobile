@@ -70,12 +70,12 @@ const InventoryManagementScreen = ({ navigation }) => {
         // Ensure error message is always a string
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
-          : (response.error?.message || JSON.stringify(response.error) || 'Không thể tải danh sách tồn kho');
-        showError('Lỗi', errorMessage);
+          : (response.error?.message || JSON.stringify(response.error) || 'Unable to load inventory list');
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error loading inventory:', error);
-      showError('Lỗi', 'Không thể tải danh sách tồn kho');
+      showError('Error', 'Unable to load inventory list');
     }
   };
 
@@ -126,7 +126,7 @@ const InventoryManagementScreen = ({ navigation }) => {
     if (quantity === 0) {
       return {
         color: COLORS.ERROR,
-        label: 'Hết hàng',
+        label: 'Out of Stock',
         Icon: XCircle,
       };
     }
@@ -134,14 +134,14 @@ const InventoryManagementScreen = ({ navigation }) => {
     if (quantity <= 10) {
       return {
         color: COLORS.WARNING,
-        label: 'Sắp hết',
+        label: 'Low Stock',
         Icon: AlertTriangle,
       };
     }
 
     return {
       color: COLORS.SUCCESS,
-      label: 'Còn hàng',
+      label: 'In Stock',
       Icon: CheckCircle,
     };
   };
@@ -156,8 +156,8 @@ const InventoryManagementScreen = ({ navigation }) => {
 
   const handleDeleteItem = (item) => {
     showConfirm(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa mục tồn kho này?',
+      'Delete Inventory Item',
+      'Are you sure you want to delete this inventory item?',
       async () => {
         try {
           const response = await inventoryService.deleteInventoryItem(
@@ -173,7 +173,7 @@ const InventoryManagementScreen = ({ navigation }) => {
               );
             });
             
-            showSuccess('Thành công', 'Xóa tồn kho thành công!');
+            showSuccess('Success', 'Inventory item deleted successfully!');
             
             // Reload inventory to ensure sync with server
             loadInventory();
@@ -181,12 +181,12 @@ const InventoryManagementScreen = ({ navigation }) => {
             // Ensure error message is always a string
             const errorMessage = typeof response.error === 'string' 
               ? response.error 
-              : (response.error?.message || JSON.stringify(response.error) || 'Không thể xóa mục tồn kho');
-            showError('Lỗi', errorMessage);
+              : (response.error?.message || JSON.stringify(response.error) || 'Unable to delete inventory item');
+            showError('Error', errorMessage);
           }
         } catch (error) {
           console.error('Error deleting item:', error);
-          showError('Lỗi', 'Không thể xóa mục tồn kho');
+          showError('Error', 'Unable to delete inventory item');
         }
       }
     );
@@ -229,29 +229,29 @@ const InventoryManagementScreen = ({ navigation }) => {
 
         <View style={styles.cardContent}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mẫu xe:</Text>
+            <Text style={styles.detailLabel}>Model:</Text>
             <Text style={styles.detailValue}>{motorbike?.model || 'N/A'}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Địa điểm kho:</Text>
+            <Text style={styles.detailLabel}>Warehouse Location:</Text>
             <Text style={styles.detailValue}>{warehouse?.location || 'N/A'}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Số lượng:</Text>
+            <Text style={styles.detailLabel}>Quantity:</Text>
             <Text style={[styles.detailValue, { color: statusMeta.color }]}>
-              {item.quantity} xe
+              {item.quantity} units
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Ngày nhập kho:</Text>
+            <Text style={styles.detailLabel}>Stock Date:</Text>
             <Text style={styles.detailValue}>
-              {item.stockDate ? new Date(item.stockDate).toLocaleDateString('vi-VN') : 'N/A'}
+              {item.stockDate ? new Date(item.stockDate).toLocaleDateString('en-US') : 'N/A'}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Cập nhật lần cuối:</Text>
+            <Text style={styles.detailLabel}>Last Updated:</Text>
             <Text style={styles.detailValue}>
-              {item.lastUpdate ? new Date(item.lastUpdate).toLocaleDateString('vi-VN') : 'N/A'}
+              {item.lastUpdate ? new Date(item.lastUpdate).toLocaleDateString('en-US') : 'N/A'}
             </Text>
           </View>
         </View>
@@ -290,7 +290,7 @@ const InventoryManagementScreen = ({ navigation }) => {
         >
           <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý tồn kho</Text>
+        <Text style={styles.headerTitle}>Inventory Management</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddItem}
@@ -304,7 +304,7 @@ const InventoryManagementScreen = ({ navigation }) => {
         <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm xe máy, kho..."
+          placeholder="Search motorbikes, warehouses..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -315,19 +315,19 @@ const InventoryManagementScreen = ({ navigation }) => {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{totalItems}</Text>
-          <Text style={styles.statLabel}>Tổng mục</Text>
+          <Text style={styles.statLabel}>Total Items</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{inStockItems}</Text>
-          <Text style={styles.statLabel}>Còn hàng</Text>
+          <Text style={styles.statLabel}>In Stock</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>{lowStockItems}</Text>
-          <Text style={styles.statLabel}>Sắp hết</Text>
+          <Text style={styles.statLabel}>Low Stock</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{outOfStockItems}</Text>
-          <Text style={styles.statLabel}>Hết hàng</Text>
+          <Text style={styles.statLabel}>Out of Stock</Text>
         </View>
       </View>
 
@@ -344,7 +344,7 @@ const InventoryManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'in_stock' && styles.activeTabText
           ]}>
-            Còn hàng ({inStockItems})
+            In Stock ({inStockItems})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -358,7 +358,7 @@ const InventoryManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'out_of_stock' && styles.activeTabText
           ]}>
-            Hết hàng ({outOfStockItems})
+            Out of Stock ({outOfStockItems})
           </Text>
         </TouchableOpacity>
       </View>
@@ -379,12 +379,12 @@ const InventoryManagementScreen = ({ navigation }) => {
               <PackageX size={64} color={COLORS.TEXT.SECONDARY} />
             )}
             <Text style={styles.emptyTitle}>
-              {activeTab === 'in_stock' ? 'Không có xe còn hàng' : 'Không có xe hết hàng'}
+              {activeTab === 'in_stock' ? 'No Vehicles In Stock' : 'No Vehicles Out of Stock'}
             </Text>
             <Text style={styles.emptySubtitle}>
               {activeTab === 'in_stock' 
-                ? 'Tất cả xe đều đã hết hàng' 
-                : 'Tất cả xe đều còn hàng'
+                ? 'All vehicles are currently out of stock.' 
+                : 'All vehicles are currently available.'
               }
             </Text>
           </View>
