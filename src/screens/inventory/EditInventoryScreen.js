@@ -8,8 +8,9 @@ import {
   SafeAreaView,
   Platform,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -100,61 +101,54 @@ const EditInventoryScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chỉnh sửa tồn kho</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.headerActions} />
       </View>
 
-      {/* Content */}
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
       >
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Thông tin hiện tại</Text>
-          <Text style={styles.infoLabel}>Xe máy:</Text>
-          <Text style={styles.infoValue}>{selectedMotorbike?.name || 'Loading...'}</Text>
-          
-          <Text style={styles.infoLabel}>Kho:</Text>
-          <Text style={styles.infoValue}>{selectedWarehouse?.name || 'Loading...'}</Text>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Số lượng mới *</Text>
-          <Text style={styles.inputSubLabel}>Cập nhật số lượng xe trong kho</Text>
-          <TextInput
-            style={styles.textInput}
-            value={editedItem.quantity}
-            onChangeText={(text) => setEditedItem({ ...editedItem, quantity: text })}
-            placeholder="Nhập số lượng xe"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
-      </ScrollView>
-
-      {/* Save Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.saveButton}
-          onPress={handleSaveItem}
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={[COLORS.PRIMARY, '#FF8A65']}
-            style={styles.saveButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.saveButtonText}>Cập nhật tồn kho</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Thông tin tồn kho</Text>
+
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Xe máy</Text>
+              <Text style={styles.infoValue}>{selectedMotorbike?.name || 'Loading...'}</Text>
+
+              <Text style={styles.infoLabel}>Kho</Text>
+              <Text style={styles.infoValue}>{selectedWarehouse?.name || 'Loading...'}</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Số lượng mới <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.inputSubLabel}>Cập nhật số lượng xe trong kho</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editedItem.quantity}
+                onChangeText={(text) => setEditedItem({ ...editedItem, quantity: text })}
+                placeholder="Nhập số lượng xe"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
+              <Text style={styles.saveButtonText}>Cập nhật tồn kho</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -176,117 +170,110 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 20,
   },
-  
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
   },
-  placeholder: {
+  headerActions: {
     width: 40,
   },
-
-  // Content
-  content: {
+  keyboardView: {
     flex: 1,
   },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
   contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100,
+    padding: SIZES.PADDING.LARGE,
+  },
+  formSection: {
+    paddingBottom: SIZES.PADDING.XXLARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   infoSection: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.XLARGE,
-  },
-  infoTitle: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.LARGE,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   infoLabel: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-    marginTop: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.XSMALL,
   },
   infoValue: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
     fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.XLARGE,
   },
   inputLabel: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.XSMALL,
+  },
+  required: {
+    color: COLORS.ERROR,
   },
   inputSubLabel: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
   },
   textInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
-    minHeight: 50,
-  },
-
-  // Footer
-  footer: {
-    padding: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   saveButton: {
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    overflow: 'hidden',
-  },
-  saveButtonGradient: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
   },
   saveButtonText: {
     fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 
