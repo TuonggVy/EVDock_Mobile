@@ -16,6 +16,18 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { inventoryService } from '../../services/inventoryService';
 import warehouseService from '../../services/warehouseService';
 import motorbikeService from '../../services/motorbikeService';
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  PackageSearch,
+  PackageX,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -110,22 +122,28 @@ const InventoryManagementScreen = ({ navigation }) => {
     return matchesSearch && matchesTab;
   });
 
-  const getStatusColor = (quantity) => {
-    if (quantity === 0) return COLORS.ERROR;
-    if (quantity <= 10) return COLORS.WARNING;
-    return COLORS.SUCCESS;
-  };
+  const getStatusMeta = (quantity) => {
+    if (quantity === 0) {
+      return {
+        color: COLORS.ERROR,
+        label: 'Hết hàng',
+        Icon: XCircle,
+      };
+    }
 
-  const getStatusText = (quantity) => {
-    if (quantity === 0) return 'Hết hàng';
-    if (quantity <= 10) return 'Sắp hết';
-    return 'Còn hàng';
-  };
+    if (quantity <= 10) {
+      return {
+        color: COLORS.WARNING,
+        label: 'Sắp hết',
+        Icon: AlertTriangle,
+      };
+    }
 
-  const getStatusIcon = (quantity) => {
-    if (quantity === 0) return '❌';
-    if (quantity <= 10) return '⚠️';
-    return '✅';
+    return {
+      color: COLORS.SUCCESS,
+      label: 'Còn hàng',
+      Icon: CheckCircle,
+    };
   };
 
   const handleAddItem = () => {
@@ -192,67 +210,68 @@ const InventoryManagementScreen = ({ navigation }) => {
   const renderInventoryCard = (item) => {
     const motorbike = motorbikes.find(m => m.id === item.electricMotorbikeId);
     const warehouse = warehouses.find(w => w.id === item.warehouseId);
+    const statusMeta = getStatusMeta(item.quantity);
 
     return (
       <View key={`${item.electricMotorbikeId}-${item.warehouseId}`} style={styles.inventoryCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.itemInfo}>
+        <View style={styles.cardHeader}>
+          <View style={styles.itemInfo}>
             <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown'}</Text>
             <Text style={styles.warehouseName}>{warehouse?.name || 'Unknown'}</Text>
-        </View>
-        <View style={styles.statusContainer}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.quantity) }]}>
-              <Text style={styles.statusIcon}>{getStatusIcon(item.quantity)}</Text>
-              <Text style={styles.statusText}>{getStatusText(item.quantity)}</Text>
+          </View>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusBadge, { backgroundColor: statusMeta.color }]}>
+              <statusMeta.Icon size={14} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.statusText}>{statusMeta.label}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.cardContent}>
-        <View style={styles.detailRow}>
+        <View style={styles.cardContent}>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Mẫu xe:</Text>
             <Text style={styles.detailValue}>{motorbike?.model || 'N/A'}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Địa điểm kho:</Text>
             <Text style={styles.detailValue}>{warehouse?.location || 'N/A'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Số lượng:</Text>
-            <Text style={[styles.detailValue, { color: getStatusColor(item.quantity) }]}>
-            {item.quantity} xe
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Số lượng:</Text>
+            <Text style={[styles.detailValue, { color: statusMeta.color }]}>
+              {item.quantity} xe
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Ngày nhập kho:</Text>
             <Text style={styles.detailValue}>
               {item.stockDate ? new Date(item.stockDate).toLocaleDateString('vi-VN') : 'N/A'}
             </Text>
-        </View>
-        <View style={styles.detailRow}>
+          </View>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Cập nhật lần cuối:</Text>
             <Text style={styles.detailValue}>
               {item.lastUpdate ? new Date(item.lastUpdate).toLocaleDateString('vi-VN') : 'N/A'}
             </Text>
+          </View>
+        </View>
+
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleEditItem(item)}
+          >
+            <Pencil size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleDeleteItem(item)}
+          >
+            <Trash2 size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleEditItem(item)}
-        >
-          <Text style={styles.editButtonText}>Chỉnh sửa</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-            onPress={() => handleDeleteItem(item)}
-        >
-          <Text style={styles.deleteButtonText}>Xóa</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
   };
 
   // Calculate statistics
@@ -269,20 +288,20 @@ const InventoryManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Quản lý tồn kho</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddItem}
         >
-          <Text style={styles.addIcon}>+</Text>
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Tìm kiếm xe máy, kho..."
@@ -354,9 +373,11 @@ const InventoryManagementScreen = ({ navigation }) => {
           filteredInventory.map(renderInventoryCard)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>
-              {activeTab === 'in_stock' ? '📦' : '❌'}
-            </Text>
+            {activeTab === 'in_stock' ? (
+              <PackageSearch size={64} color={COLORS.TEXT.SECONDARY} />
+            ) : (
+              <PackageX size={64} color={COLORS.TEXT.SECONDARY} />
+            )}
             <Text style={styles.emptyTitle}>
               {activeTab === 'in_stock' ? 'Không có xe còn hàng' : 'Không có xe hết hàng'}
             </Text>
@@ -413,11 +434,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -429,14 +445,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search
@@ -453,11 +464,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -482,7 +489,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SUCCESS,
     marginBottom: 4,
   },
   statLabel: {
@@ -508,7 +515,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
   },
   tabText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -549,7 +556,7 @@ const styles = StyleSheet.create({
   motorbikeName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     marginBottom: 4,
   },
   warehouseName: {
@@ -566,14 +573,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: SIZES.RADIUS.SMALL,
   },
-  statusIcon: {
-    fontSize: SIZES.FONT.SMALL,
-    marginRight: 4,
-  },
   statusText: {
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+    marginLeft: 4,
   },
   cardContent: {
     marginBottom: SIZES.PADDING.MEDIUM,
@@ -598,27 +602,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: SIZES.PADDING.SMALL,
   },
-  editButton: {
-    backgroundColor: COLORS.PRIMARY,
+  iconButton: {
+    backgroundColor: '#000000',
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: COLORS.ERROR,
-    borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
 
   // Empty State
@@ -626,10 +617,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,

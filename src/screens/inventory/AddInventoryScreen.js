@@ -8,8 +8,9 @@ import {
   SafeAreaView,
   Platform,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft, Check } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -104,109 +105,113 @@ const AddInventoryScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thêm tồn kho</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.headerActions} />
       </View>
 
-      {/* Content */}
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
       >
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Xe máy *</Text>
-          <Text style={styles.inputSubLabel}>Chọn xe máy để thêm tồn kho</Text>
-          <View style={styles.selectContainer}>
-            {motorbikes.map((motorbike) => (
-              <TouchableOpacity
-                key={motorbike.id}
-                style={[
-                  styles.selectOption,
-                  newItem.motorbikeId === motorbike.id.toString() && styles.selectedOption
-                ]}
-                onPress={() => setNewItem({ ...newItem, motorbikeId: motorbike.id.toString() })}
-              >
-                <Text style={[
-                  styles.selectOptionText,
-                  newItem.motorbikeId === motorbike.id.toString() && styles.selectedOptionText
-                ]}>
-                  {motorbike.name}
-                </Text>
-                {newItem.motorbikeId === motorbike.id.toString() && (
-                  <Text style={styles.checkIcon}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Kho *</Text>
-          <Text style={styles.inputSubLabel}>Chọn kho để lưu trữ</Text>
-          <View style={styles.selectContainer}>
-            {warehouses.map((warehouse) => (
-              <TouchableOpacity
-                key={warehouse.id}
-                style={[
-                  styles.selectOption,
-                  newItem.warehouseId === warehouse.id.toString() && styles.selectedOption
-                ]}
-                onPress={() => setNewItem({ ...newItem, warehouseId: warehouse.id.toString() })}
-              >
-                <Text style={[
-                  styles.selectOptionText,
-                  newItem.warehouseId === warehouse.id.toString() && styles.selectedOptionText
-                ]}>
-                  {warehouse.name}
-                </Text>
-                <Text style={styles.warehouseLocation}>
-                  {warehouse.location}
-                </Text>
-                {newItem.warehouseId === warehouse.id.toString() && (
-                  <Text style={styles.checkIcon}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Số lượng *</Text>
-          <Text style={styles.inputSubLabel}>Nhập số lượng xe có trong kho</Text>
-          <TextInput
-            style={styles.textInput}
-            value={newItem.quantity}
-            onChangeText={(text) => setNewItem({ ...newItem, quantity: text })}
-            placeholder="Nhập số lượng xe"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
-      </ScrollView>
-
-      {/* Save Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.saveButton}
-          onPress={handleSaveItem}
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={[COLORS.PRIMARY, '#FF8A65']}
-            style={styles.saveButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.saveButtonText}>Thêm tồn kho</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Thông tin tồn kho</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Xe máy <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.inputSubLabel}>Chọn xe máy để thêm tồn kho</Text>
+              <View style={styles.selectContainer}>
+                {motorbikes.map((motorbike) => {
+                  const isSelected = newItem.motorbikeId === motorbike.id.toString();
+                  return (
+                    <TouchableOpacity
+                      key={motorbike.id}
+                      style={[
+                        styles.selectOption,
+                        isSelected && styles.selectedOption
+                      ]}
+                      onPress={() => setNewItem({ ...newItem, motorbikeId: motorbike.id.toString() })}
+                    >
+                      <Text
+                        style={[
+                          styles.selectOptionText,
+                          isSelected && styles.selectedOptionText
+                        ]}
+                      >
+                        {motorbike.name}
+                      </Text>
+                      {isSelected && <Check size={18} color="#009DFF" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Kho <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.inputSubLabel}>Chọn kho để lưu trữ</Text>
+              <View style={styles.selectContainer}>
+                {warehouses.map((warehouse) => {
+                  const isSelected = newItem.warehouseId === warehouse.id.toString();
+                  return (
+                    <TouchableOpacity
+                      key={warehouse.id}
+                      style={[
+                        styles.selectOption,
+                        isSelected && styles.selectedOption
+                      ]}
+                      onPress={() => setNewItem({ ...newItem, warehouseId: warehouse.id.toString() })}
+                    >
+                      <View style={styles.selectInfo}>
+                        <Text
+                          style={[
+                            styles.selectOptionText,
+                            isSelected && styles.selectedOptionText
+                          ]}
+                        >
+                          {warehouse.name}
+                        </Text>
+                        <Text style={styles.warehouseLocation}>{warehouse.location}</Text>
+                      </View>
+                      {isSelected && <Check size={18} color="#009DFF" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Số lượng <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.inputSubLabel}>Nhập số lượng xe có trong kho</Text>
+              <TextInput
+                style={styles.textInput}
+                value={newItem.quantity}
+                onChangeText={(text) => setNewItem({ ...newItem, quantity: text })}
+                placeholder="Nhập số lượng xe"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
+              <Text style={styles.saveButtonText}>Thêm tồn kho</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -228,132 +233,126 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 20,
   },
-  
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
   },
-  placeholder: {
+  headerActions: {
     width: 40,
   },
-
-  // Content
-  content: {
+  keyboardView: {
     flex: 1,
   },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
   contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100,
+    padding: SIZES.PADDING.LARGE,
+  },
+  formSection: {
+    paddingBottom: SIZES.PADDING.XXLARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   inputGroup: {
-    marginBottom: SIZES.PADDING.XLARGE,
+    marginBottom: SIZES.PADDING.LARGE,
   },
   inputLabel: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.XSMALL,
+  },
+  required: {
+    color: COLORS.ERROR,
   },
   inputSubLabel: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  textInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    minHeight: 50,
+    marginBottom: SIZES.PADDING.SMALL,
   },
   selectContainer: {
     gap: SIZES.PADDING.SMALL,
   },
   selectOption: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SIZES.PADDING.SMALL,
   },
   selectedOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0, 157, 255, 0.08)',
+  },
+  selectInfo: {
+    flex: 1,
   },
   selectOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
-    flex: 1,
   },
   selectedOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: 'bold',
+    color: '#009DFF',
   },
   warehouseLocation: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
-    marginLeft: SIZES.PADDING.SMALL,
+    marginTop: 2,
   },
-  checkIcon: {
-    fontSize: 20,
-    color: COLORS.PRIMARY,
-    fontWeight: 'bold',
-  },
-
-  // Footer
-  footer: {
-    padding: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+  textInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   saveButton: {
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    overflow: 'hidden',
-  },
-  saveButtonGradient: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
   },
   saveButtonText: {
     fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 
