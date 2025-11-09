@@ -13,18 +13,21 @@ import {
   FlatList,
   RefreshControl,
   Platform,
+  ScrollView,
+  BackHandler,
 } from 'react-native';
 import { COLORS, SIZES, USER_ROLES } from '../../constants';
-import { vehicleService, formatPrice, getStockStatus } from '../../services/vehicleService';
+import { formatPrice, getStockStatus } from '../../services/vehicleService';
 import { dealerCatalogStorageService } from '../../services/storage/dealerCatalogStorageService';
 import { useAuth } from '../../contexts/AuthContext';
 import agencyStockService from '../../services/agencyStockService';
 import motorbikeService from '../../services/motorbikeService';
 import { ArrowLeft, Search, Sparkles, Car } from 'lucide-react-native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
-const H_PADDING = 20;           // ← chỉ dùng chỗ này để căn 2 bên cho toàn bộ list
+const H_PADDING = SIZES.PADDING.LARGE;
 const NUM_COLS = 2;
 const CARD_WIDTH = (width - H_PADDING * 2 - GAP) / NUM_COLS;
 
@@ -311,12 +314,33 @@ const CatalogScreen = ({ navigation, route }) => {
   const keyExtractorVehicle = useCallback((item, index) => `veh-${safeKey(item.id, index)}`, []);
   const keyExtractorVersion = useCallback((v, index) => `ver-${safeKey(v.id, index)}`, []);
 
+  const handleBackToHome = useCallback(() => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+      })
+    );
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBackToHome();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [handleBackToHome])
+  );
+
 
   const ListEmpty = (
     <View style={styles.emptyWrap}>
       {loading ? (
         <>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading vehicles...</Text>
         </>
       ) : (
@@ -333,39 +357,35 @@ const CatalogScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Fixed Header Section */}
-      <View style={styles.fixedHeader}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Vehicle Catalog</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleBackToHome}>
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Vehicle Catalog</Text>
+        <View style={styles.headerPlaceholder} />
+      </View>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}><Search /></Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search vehicles..."
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-          />
-        </View>
+      <View style={styles.searchContainer}>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search vehicles..."
+          placeholderTextColor={COLORS.TEXT.SECONDARY}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+      </View>
 
-        {/* Filter chips */}
-        <FlatList
+      <View style={styles.versionWrapper}>
+        <ScrollView
           horizontal
-          data={versions}
-          keyExtractor={keyExtractorVersion}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.versionContent}
-          style={styles.versionContainer}
-          renderItem={({ item: version }) => (
+        >
+          {versions.map((version, index) => (
             <TouchableOpacity
+              key={keyExtractorVersion(version, index)}
               onPress={() => setSelectedVersion(version.id)}
               activeOpacity={0.9}
               style={[
@@ -384,18 +404,16 @@ const CatalogScreen = ({ navigation, route }) => {
                 {version.name}
               </Text>
             </TouchableOpacity>
-          )}
-        />
-
-        {/* Results count */}
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsText}>
-            {filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} found
-          </Text>
-        </View>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Scrollable Content */}
+      <View style={styles.resultsContainer}>
+        <Text style={styles.resultsText}>
+          {filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} found
+        </Text>
+      </View>
+
       <FlatList
         data={filteredVehicles}
         keyExtractor={keyExtractorVehicle}
@@ -419,65 +437,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: 20
   },
 
-  // Fixed Header Section
-  fixedHeader: {
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingHorizontal: H_PADDING,
-    paddingBottom: SIZES.PADDING.SMALL,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-
-  // ======= Header =======
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.LARGE,
     paddingTop: SIZES.PADDING.MEDIUM,
-    // KHÔNG paddingHorizontal ở đây
     paddingBottom: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  backButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
 
-  // ======= Search =======
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingVertical: SIZES.PADDING.SMALL,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 0,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
@@ -485,57 +493,51 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
 
-  // ======= Versions (compact chips) =======
-  versionContainer: {
-    maxHeight: 44, // KHÔNG padding/margin ngang
-    marginTop: 6,
+  versionWrapper: {
+    marginTop: SIZES.PADDING.MEDIUM,
   },
   versionContent: {
-    paddingHorizontal: 0, // ăn theo listContent
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   versionChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.XSMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    minWidth: 120,
     height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginRight: 6,
   },
   versionChipActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: 'transparent',
-  },
-  versionChipIcon: {
-    fontSize: 12,
-    marginRight: 6,
+    backgroundColor: '#009DFF',
   },
   versionChipText: {
-    fontSize: 12,
-    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
     fontWeight: '600',
-    maxWidth: 120,
+    maxWidth: 140,
   },
   versionChipTextActive: {
     color: COLORS.TEXT.WHITE,
   },
 
-  // ======= Results =======
   resultsContainer: {
-    marginTop: 6,
-    marginBottom: 10,
+    marginTop: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
   },
   resultsText: {
-    fontSize: 12,
+    fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
 
-  // ======= List/Grid =======
   listContent: {
-    paddingHorizontal: H_PADDING,
-    paddingTop: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.SMALL,
     paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   columnWrapper: {
@@ -560,7 +562,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     height: 120,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
   },
   cardImage: {
@@ -606,7 +608,7 @@ const styles = StyleSheet.create({
   cardPrice: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SECONDARY,
     marginBottom: 6,
   },
   stockRow: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,15 @@ import {
   Dimensions,
   SafeAreaView,
   Platform,
-  Alert,
   ActivityIndicator,
+  Modal,
+  BackHandler,
 } from 'react-native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES } from '../../constants';
 import { formatPrice, getStockStatus } from '../../services/vehicleService';
 import motorbikeService from '../../services/motorbikeService';
-import { Ruler, Settings, Battery, Shield, ArrowLeft, Plus, Search } from 'lucide-react-native';
+import { Ruler, Settings, Battery, Shield, ArrowLeft, Plus, Search, MoreVertical, Home, Car } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +28,7 @@ const CompareScreen = ({ navigation, route }) => {
   );
   const [vehicleDetails, setVehicleDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Update compareVehicles when new vehicles are added from catalog
   useEffect(() => {
@@ -66,10 +69,27 @@ const CompareScreen = ({ navigation, route }) => {
     loadVehicleDetails();
   }, [compareVehicles]);
 
-  const handleBack = () => {
-    // Go back to the previous screen in the navigation stack
-    navigation.goBack();
-  };
+  const handleBack = useCallback(() => {
+    const primaryVehicle = compareVehicles[0] || selectedVehicle;
+    if (primaryVehicle) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 1,
+          routes: [
+            { name: 'Catalog' },
+            { name: 'VehicleDetail', params: { vehicle: primaryVehicle, fromCompare: true } },
+          ],
+        })
+      );
+    } else {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Catalog' }],
+        })
+      );
+    }
+  }, [navigation, compareVehicles, selectedVehicle]);
 
   const handleAddVehicle = () => {
     // Navigate to catalog to select another vehicle
@@ -83,20 +103,40 @@ const CompareScreen = ({ navigation, route }) => {
     setCompareVehicles(prev => prev.filter(v => v.id !== vehicleId));
   };
 
-  const handleClearAll = () => {
-    Alert.alert(
-      'Clear Comparison',
-      'Are you sure you want to clear all vehicles from comparison?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear All', 
-          style: 'destructive',
-          onPress: () => setCompareVehicles([])
-        },
-      ]
+  const handleNavigateEmployeeHome = () => {
+    setShowMenu(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+      })
     );
   };
+
+  const handleNavigateCatalog = () => {
+    setShowMenu(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 1,
+        routes: [
+          { name: 'Main', params: { screen: 'Home' } },
+          { name: 'Catalog' },
+        ],
+      })
+    );
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [handleBack])
+  );
 
   const renderVehicleCard = (vehicle, index) => {
     const stockStatus = getStockStatus(vehicle);
@@ -167,15 +207,44 @@ const CompareScreen = ({ navigation, route }) => {
           <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Compare Vehicles</Text>
-        {compareVehicles.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={handleClearAll}
-          >
-            <Text style={styles.clearText}>Clear All</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setShowMenu(true)}
+        >
+          <MoreVertical color={COLORS.TEXT.WHITE} size={20} />
+        </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleNavigateEmployeeHome}
+            >
+              <Home color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Employee Home</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleNavigateCatalog}
+            >
+              <Car color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Catalog</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Content */}
       <ScrollView 
@@ -185,7 +254,7 @@ const CompareScreen = ({ navigation, route }) => {
       >
         {compareVehicles.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}><Search size={60} color="#FFFFFF" /></Text>
+            <Text style={styles.emptyIcon}><Search size={60} color="#009DFF" /></Text>
             <Text style={styles.emptyTitle}>No vehicles to compare</Text>
             <Text style={styles.emptySubtitle}>
               Add vehicles from the catalog to start comparing
@@ -207,7 +276,7 @@ const CompareScreen = ({ navigation, route }) => {
               <View style={styles.comparisonTable}>
                 {loadingDetails ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+                    <ActivityIndicator size="large" color="#009DFF" />
                     <Text style={styles.loadingText}>Loading specifications...</Text>
                   </View>
                 ) : (
@@ -394,14 +463,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
-  clearButton: {
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: 4,
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.ERROR,
-    fontWeight: '600',
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: SIZES.PADDING.XXXLARGE + 60,
+    paddingRight: SIZES.PADDING.LARGE,
+  },
+  menuContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+  },
+  menuItemText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.PRIMARY,
+    marginHorizontal: SIZES.PADDING.SMALL,
   },
 
   // Scroll View
@@ -435,7 +539,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
   },
   browseButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     paddingHorizontal: SIZES.PADDING.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.MEDIUM,
@@ -520,7 +624,7 @@ const styles = StyleSheet.create({
   vehiclePrice: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SECONDARY,
     marginBottom: 4,
   },
   stockRow: {

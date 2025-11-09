@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -666,7 +667,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.backButtonText}><ArrowLeft color="#FFFFFF" size={18} /></Text>
+        <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Create Quotation</Text>
       <View style={styles.placeholder} />
@@ -1267,16 +1268,27 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.container}>
       {renderHeader()}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderVehicleInfo()}
-        {renderColorSelection()}
-        {renderQuotationTypeSelection()}
-        {renderValidUntilSelection()}
-        {renderCustomerInfo()}
-        {renderPromotionSelection()}
-        {renderPricing()}
-      </ScrollView>
-      {renderActionButtons()}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.contentContainer}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {renderVehicleInfo()}
+            {renderColorSelection()}
+            {renderQuotationTypeSelection()}
+            {renderValidUntilSelection()}
+            {renderCustomerInfo()}
+            {renderPromotionSelection()}
+            {renderPricing()}
+          </ScrollView>
+          {renderActionButtons()}
+        </View>
+      </KeyboardAvoidingView>
       
       <CustomAlert
         visible={alertConfig.visible}
@@ -1351,28 +1363,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XXXLARGE : SIZES.PADDING.XXXLARGE,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 20,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -1382,9 +1387,23 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  keyboardView: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    overflow: 'hidden',
+  },
   content: {
     flex: 1,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
+  },
+  scrollContent: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   section: {
     marginVertical: SIZES.PADDING.MEDIUM,
@@ -1392,19 +1411,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: "#000000",
     marginBottom: SIZES.PADDING.SMALL,
   },
   vehicleCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
     shadowColor: COLORS.SHADOW,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   vehicleImage: {
     width: 80,
@@ -1418,12 +1439,12 @@ const styles = StyleSheet.create({
   vehicleName: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: 4,
+    color: '#000000',
+    marginBottom: 2,
   },
   vehicleModel: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     marginBottom: SIZES.PADDING.SMALL,
   },
   specsRow: {
@@ -1433,7 +1454,7 @@ const styles = StyleSheet.create({
   },
   specText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
   },
   colorsContainer: {
     flexDirection: 'row',
@@ -1459,7 +1480,6 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    // backgroundColor: COLORS.PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1470,7 +1490,7 @@ const styles = StyleSheet.create({
   },
   selectedColorText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     fontStyle: 'italic',
   },
   colorOptionWrapper: {
@@ -1486,7 +1506,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1508,22 +1528,22 @@ const styles = StyleSheet.create({
   },
   typeOption: {
     flex: 1,
-    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
     paddingHorizontal: SIZES.PADDING.SMALL,
     borderRadius: SIZES.RADIUS.SMALL,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: '#F5F5F5',
     borderWidth: 1,
     borderColor: COLORS.BORDER.PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
   typeOptionSelected: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
+    borderColor: '#009DFF',
   },
   typeText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     fontWeight: '600',
   },
   typeTextSelected: {
@@ -1536,39 +1556,39 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     marginBottom: SIZES.PADDING.SMALL,
   },
   textInput: {
     borderWidth: 1,
     borderColor: COLORS.BORDER.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    color: '#000000',
+    backgroundColor: '#F5F5F5',
   },
   hintText: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     marginTop: SIZES.PADDING.XSMALL,
     fontStyle: 'italic',
   },
   dateInput: {
     borderWidth: 1,
     borderColor: COLORS.BORDER.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: '#F5F5F5',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   dateInputText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
   },
   datePickerIcon: {
     fontSize: 20,
@@ -1579,7 +1599,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     marginBottom: SIZES.PADDING.MEDIUM,
     fontStyle: 'italic',
   },
@@ -1591,7 +1611,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   createCustomerButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -1604,8 +1624,8 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
   },
   editCustomerButton: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
-    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -1615,14 +1635,14 @@ const styles = StyleSheet.create({
   },
   editCustomerButtonText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     fontWeight: '600',
   },
   dateInputPlaceholder: {
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
   },
   customerInfoCard: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     marginTop: SIZES.PADDING.SMALL,
@@ -1642,12 +1662,12 @@ const styles = StyleSheet.create({
   customerInfoLabel: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     width: 100,
   },
   customerInfoValue: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     flex: 1,
   },
   quantityContainer: {
@@ -1660,7 +1680,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1672,20 +1692,22 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     marginHorizontal: SIZES.PADDING.MEDIUM,
     minWidth: 30,
     textAlign: 'center',
   },
   pricingContainer: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    shadowColor: COLORS.SHADOW,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   pricingRow: {
     flexDirection: 'row',
@@ -1695,32 +1717,31 @@ const styles = StyleSheet.create({
   },
   pricingLabel: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
   },
   pricingValue: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
   },
   discountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: 'rgba(52, 211, 153, 0.1)',
     borderRadius: SIZES.RADIUS.SMALL,
     paddingHorizontal: SIZES.PADDING.SMALL,
     marginVertical: SIZES.PADDING.SMALL,
   },
   discountLabel: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.SUCCESS,
+    color: '#000000',
     fontWeight: '600',
   },
   discountValue: {
     fontSize: SIZES.FONT.SMALL,
     fontWeight: 'bold',
-    color: COLORS.SUCCESS,
+    color: '#000000',
   },
   pricingDivider: {
     height: 1,
@@ -1731,7 +1752,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderRadius: SIZES.RADIUS.SMALL,
     padding: SIZES.PADDING.MEDIUM,
     marginTop: SIZES.PADDING.SMALL,
@@ -1739,26 +1759,24 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
   },
   totalValue: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
   },
   actionButtons: {
     flexDirection: 'row',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+    backgroundColor: COLORS.SURFACE,
     borderTopWidth: 1,
     borderTopColor: COLORS.BORDER.PRIMARY,
   },
   resetButton: {
     flex: 1,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.PRIMARY,
+    backgroundColor: '#000000',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -1771,7 +1789,7 @@ const styles = StyleSheet.create({
   },
   createButton: {
     flex: 2,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -1788,13 +1806,13 @@ const styles = StyleSheet.create({
 
   // Promotion Styles
   selectedPromotionCard: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.PRIMARY,
+    borderColor: '#009DFF',
   },
   promotionInfo: {
     flex: 1,
@@ -1802,23 +1820,23 @@ const styles = StyleSheet.create({
   promotionCode: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     marginBottom: 4,
   },
   promotionName: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     fontWeight: '600',
     marginBottom: 2,
   },
   promotionDescription: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     marginBottom: 4,
   },
   promotionDiscount: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.SUCCESS,
+    color: '#000000',
     fontWeight: '600',
   },
   removePromotionButton: {
@@ -1840,7 +1858,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   promotionButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
@@ -1925,7 +1943,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   promotionItem: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     marginBottom: SIZES.PADDING.SMALL,
@@ -1940,23 +1958,23 @@ const styles = StyleSheet.create({
   promotionItemCode: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     marginBottom: 2,
   },
   promotionItemName: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
+    color: '#000000',
     fontWeight: '600',
     marginBottom: 2,
   },
   promotionItemDescription: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.SECONDARY,
+    color: '#000000',
     marginBottom: 2,
   },
   promotionItemDiscount: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.SUCCESS,
+    color: '#000000',
     fontWeight: '600',
   },
   promotionItemArrow: {
@@ -1970,7 +1988,7 @@ const styles = StyleSheet.create({
     gap: SIZES.PADDING.SMALL,
   },
   promotionCard: {
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     borderWidth: 1,
@@ -1978,9 +1996,8 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.SMALL,
   },
   promotionCardSelected: {
-    borderColor: COLORS.PRIMARY,
+    borderColor: '#009DFF',
     borderWidth: 2,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
   },
   promotionCardHeader: {
     flexDirection: 'row',
@@ -2011,7 +2028,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
