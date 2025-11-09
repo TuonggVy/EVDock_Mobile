@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import creditLineService from '../../services/creditLineService';
@@ -18,7 +19,16 @@ const EVMStaffCreditLineDetailScreen = ({ navigation, route }) => {
   const [creditLine, setCreditLine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAlert, setShowAlert] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    type: 'info',
+    showCancel: false,
+    confirmText: 'OK',
+    cancelText: 'Cancel',
+    onConfirm: null,
+    onCancel: null,
+  });
 
   useEffect(() => {
     loadCreditLineDetail();
@@ -42,20 +52,32 @@ const EVMStaffCreditLineDetailScreen = ({ navigation, route }) => {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : (response.error?.message || JSON.stringify(response.error) || 'Failed to load credit line detail');
-        setAlertConfig({
+        setAlertConfig(prev => ({
+          ...prev,
           title: 'Error',
           message: errorMessage,
-          type: 'error'
-        });
+          type: 'error',
+          showCancel: false,
+          confirmText: 'OK',
+          cancelText: 'Cancel',
+          onConfirm: null,
+          onCancel: null,
+        }));
         setShowAlert(true);
       }
     } catch (error) {
       console.error('Error loading credit line detail:', error);
-      setAlertConfig({
+      setAlertConfig(prev => ({
+        ...prev,
         title: 'Error',
         message: 'An unexpected error occurred',
-        type: 'error'
-      });
+        type: 'error',
+        showCancel: false,
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        onConfirm: null,
+        onCancel: null,
+      }));
       setShowAlert(true);
     } finally {
       setLoading(false);
@@ -71,192 +93,223 @@ const EVMStaffCreditLineDetailScreen = ({ navigation, route }) => {
   const handleDelete = () => {
     if (!creditLine) return;
     
-    Alert.alert(
-      'Delete Credit Line',
-      `Are you sure you want to delete credit line for "${creditLine.agency?.name || `Agency #${creditLine.agencyId}`}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const response = await creditLineService.deleteCreditLine(creditLineId);
-            if (response.success) {
-              setAlertConfig({
+    const agencyName = creditLine.agency?.name || `Agency #${creditLine.agencyId}`;
+    setAlertConfig({
+      title: 'Delete Credit Line',
+      message: `Are you sure you want to delete credit line for "${agencyName}"?`,
+      type: 'warning',
+      showCancel: true,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const response = await creditLineService.deleteCreditLine(creditLineId);
+          if (response.success) {
+            setTimeout(() => {
+              setAlertConfig(prev => ({
+                ...prev,
                 title: 'Success',
                 message: 'Credit line deleted successfully',
-                type: 'success'
-              });
+                type: 'success',
+                showCancel: false,
+                confirmText: 'OK',
+                cancelText: 'Cancel',
+                onConfirm: null,
+                onCancel: null,
+              }));
               setShowAlert(true);
               setTimeout(() => {
                 navigation.goBack();
               }, 1500);
-            } else {
-              const errorMessage = typeof response.error === 'string' 
-                ? response.error 
-                : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
-              setAlertConfig({
+            }, 0);
+          } else {
+            const errorMessage = typeof response.error === 'string' 
+              ? response.error 
+              : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
+            setTimeout(() => {
+              setAlertConfig(prev => ({
+                ...prev,
                 title: 'Error',
                 message: errorMessage,
-                type: 'error'
-              });
+                type: 'error',
+                showCancel: false,
+                confirmText: 'OK',
+                cancelText: 'Cancel',
+                onConfirm: null,
+                onCancel: null,
+              }));
               setShowAlert(true);
-            }
+            }, 0);
           }
+        } catch (error) {
+          console.error('Error deleting credit line:', error);
+          setTimeout(() => {
+            setAlertConfig(prev => ({
+              ...prev,
+              title: 'Error',
+              message: 'An unexpected error occurred',
+              type: 'error',
+              showCancel: false,
+              confirmText: 'OK',
+              cancelText: 'Cancel',
+              onConfirm: null,
+              onCancel: null,
+            }));
+            setShowAlert(true);
+          }, 0);
         }
-      ]
-    );
+      },
+      onCancel: null,
+    });
+    setShowAlert(true);
   };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Credit Line Detail</Text>
+      <View style={styles.headerActions} />
+    </View>
+  );
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Credit Line Detail</Text>
-          <View style={styles.placeholder} />
-        </View>
+      <SafeAreaView style={styles.container}>
+        {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!creditLine) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Credit Line Detail</Text>
-          <View style={styles.placeholder} />
-        </View>
+      <SafeAreaView style={styles.container}>
+        {renderHeader()}
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Credit line not found</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
         onClose={() => setShowAlert(false)}
       />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Credit Line Detail</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleEdit}
-          >
-            <Pencil size={16} color={COLORS.PRIMARY} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteActionButton]}
-            onPress={handleDelete}
-          >
-            <Trash2 size={16} color={COLORS.ERROR} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      {renderHeader()}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Agency Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Agency Information</Text>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Agency Name:</Text>
-              <Text style={styles.infoValue}>
-                {creditLine.agency?.name || `Agency #${creditLine.agencyId}`}
-              </Text>
-            </View>
-            {creditLine.agency?.location && (
+        <View style={styles.detailContainer}>
+          {/* Agency Information */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Agency Information</Text>
+            <View style={styles.infoCard}>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Location:</Text>
-                <Text style={styles.infoValue}>{creditLine.agency.location}</Text>
-              </View>
-            )}
-            {creditLine.agency?.address && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Address:</Text>
-                <Text style={styles.infoValue}>{creditLine.agency.address}</Text>
-              </View>
-            )}
-            {creditLine.agency?.contactInfo && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Contact:</Text>
-                <Text style={styles.infoValue}>{creditLine.agency.contactInfo}</Text>
-              </View>
-            )}
-            {creditLine.agency?.status && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Status:</Text>
-                <Text style={styles.infoValue}>{creditLine.agency.status}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Credit Line Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Credit Line Information</Text>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Credit Line ID:</Text>
-              <Text style={styles.infoValue}>#{creditLine.id}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Credit Limit:</Text>
-              <Text style={[styles.infoValue, styles.highlightValue]}>
-                {creditLineService.formatCreditLimit(creditLine.creditLimit)}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Warning Threshold:</Text>
-              <Text style={styles.infoValue}>{creditLine.warningThreshold}%</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Overdue Threshold:</Text>
-              <Text style={styles.infoValue}>{creditLine.overDueThreshHoldDays} days</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Status:</Text>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: creditLine.isBlocked ? COLORS.ERROR : COLORS.SUCCESS }
-              ]}>
-                <Text style={styles.statusText}>
-                  {creditLine.isBlocked ? 'Blocked' : 'Active'}
+                <Text style={styles.infoLabel}>Agency Name</Text>
+                <Text style={styles.infoValue}>
+                  {creditLine.agency?.name || `Agency #${creditLine.agencyId}`}
                 </Text>
               </View>
+              {creditLine.agency?.location && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Location</Text>
+                  <Text style={styles.infoValue}>{creditLine.agency.location}</Text>
+                </View>
+              )}
+              {creditLine.agency?.address && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Address</Text>
+                  <Text style={styles.infoValue}>{creditLine.agency.address}</Text>
+                </View>
+              )}
+              {creditLine.agency?.contactInfo && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Contact</Text>
+                  <Text style={styles.infoValue}>{creditLine.agency.contactInfo}</Text>
+                </View>
+              )}
+              {creditLine.agency?.status && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Status</Text>
+                  <Text style={styles.infoValue}>{creditLine.agency.status}</Text>
+                </View>
+              )}
             </View>
+          </View>
+
+          {/* Credit Line Information */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Credit Line Information</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Credit Line ID</Text>
+                <Text style={styles.infoValue}>#{creditLine.id}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Credit Limit</Text>
+                <Text style={[styles.infoValue, styles.highlightValue]}>
+                  {creditLineService.formatCreditLimit(creditLine.creditLimit)}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Warning Threshold</Text>
+                <Text style={styles.infoValue}>{creditLine.warningThreshold}%</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Overdue Threshold</Text>
+                <Text style={styles.infoValue}>{creditLine.overDueThreshHoldDays} days</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Status</Text>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: creditLine.isBlocked ? COLORS.ERROR : COLORS.SUCCESS }
+                ]}>
+                  <Text style={styles.statusText}>
+                    {creditLine.isBlocked ? 'Blocked' : 'Active'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.actionsSection}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.editButton]}
+              onPress={handleEdit}
+            >
+              <Pencil size={20} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.actionButtonText}>Edit Credit Line</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={handleDelete}
+            >
+              <Trash2 size={20} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.actionButtonText}>Delete Credit Line</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -269,38 +322,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
-    padding: SIZES.PADDING.SMALL,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
   },
-  placeholder: {
-    width: 60,
-  },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: SIZES.RADIUS.SMALL,
-    backgroundColor: COLORS.PRIMARY + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SIZES.PADDING.XSMALL,
-  },
-  deleteActionButton: {
-    backgroundColor: COLORS.ERROR + '20',
+    width: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -319,6 +360,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  detailContainer: {
     padding: SIZES.PADDING.LARGE,
   },
   section: {
@@ -327,7 +373,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   infoCard: {
@@ -362,12 +408,12 @@ const styles = StyleSheet.create({
   },
   highlightValue: {
     fontSize: SIZES.FONT.LARGE,
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     fontWeight: 'bold',
   },
   statusBadge: {
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: 4,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.XSMALL,
     borderRadius: SIZES.RADIUS.SMALL,
     alignSelf: 'flex-end',
   },
@@ -375,6 +421,35 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+  },
+  actionsSection: {
+    marginTop: SIZES.PADDING.LARGE,
+    gap: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  actionButton: {
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.PADDING.SMALL,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  editButton: {
+    backgroundColor: '#009DFF',
+  },
+  deleteButton: {
+    backgroundColor: '#000000',
   },
 });
 
