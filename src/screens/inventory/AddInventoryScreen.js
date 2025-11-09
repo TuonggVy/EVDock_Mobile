@@ -59,14 +59,14 @@ const AddInventoryScreen = ({ navigation }) => {
 
   const handleSaveItem = async () => {
     if (!newItem.motorbikeId || !newItem.warehouseId || !newItem.quantity) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
     // Validate that quantity is a positive number
     const quantity = parseInt(newItem.quantity);
     if (isNaN(quantity) || quantity <= 0) {
-      showError('Lỗi', 'Số lượng phải là số dương lớn hơn 0');
+      showError('Error', 'Quantity must be a positive number greater than 0');
       return;
     }
 
@@ -74,7 +74,7 @@ const AddInventoryScreen = ({ navigation }) => {
     const motorbikeId = parseInt(newItem.motorbikeId);
     const warehouseId = parseInt(newItem.warehouseId);
     if (isNaN(motorbikeId) || isNaN(warehouseId)) {
-      showError('Lỗi', 'Vui lòng chọn xe máy và kho');
+      showError('Error', 'Please select both a motorbike and a warehouse');
       return;
     }
 
@@ -86,18 +86,18 @@ const AddInventoryScreen = ({ navigation }) => {
       );
 
       if (response.success) {
-        showSuccess('Thành công', 'Thêm mới tồn kho thành công!', () => {
+        showSuccess('Success', 'Inventory item added successfully!', () => {
           navigation.goBack();
         });
       } else {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
-          : (response.error?.message || JSON.stringify(response.error) || 'Không thể lưu thông tin tồn kho');
-        showError('Lỗi', errorMessage);
+          : (response.error?.message || JSON.stringify(response.error) || 'Unable to save inventory information');
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error saving item:', error);
-      showError('Lỗi', 'Không thể lưu thông tin tồn kho');
+      showError('Error', 'Unable to save inventory information');
     }
   };
 
@@ -108,7 +108,7 @@ const AddInventoryScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thêm tồn kho</Text>
+        <Text style={styles.headerTitle}>Add Inventory</Text>
         <View style={styles.headerActions} />
       </View>
 
@@ -122,13 +122,13 @@ const AddInventoryScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Thông tin tồn kho</Text>
+            <Text style={styles.sectionTitle}>Inventory Details</Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>
-                Xe máy <Text style={styles.required}>*</Text>
+                Motorbike <Text style={styles.required}>*</Text>
               </Text>
-              <Text style={styles.inputSubLabel}>Chọn xe máy để thêm tồn kho</Text>
+              <Text style={styles.inputSubLabel}>Select a motorbike to add to inventory</Text>
               <View style={styles.selectContainer}>
                 {motorbikes.map((motorbike) => {
                   const isSelected = newItem.motorbikeId === motorbike.id.toString();
@@ -158,9 +158,9 @@ const AddInventoryScreen = ({ navigation }) => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>
-                Kho <Text style={styles.required}>*</Text>
+                Warehouse <Text style={styles.required}>*</Text>
               </Text>
-              <Text style={styles.inputSubLabel}>Chọn kho để lưu trữ</Text>
+              <Text style={styles.inputSubLabel}>Choose a warehouse for storage</Text>
               <View style={styles.selectContainer}>
                 {warehouses.map((warehouse) => {
                   const isSelected = newItem.warehouseId === warehouse.id.toString();
@@ -193,21 +193,21 @@ const AddInventoryScreen = ({ navigation }) => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>
-                Số lượng <Text style={styles.required}>*</Text>
+                Quantity <Text style={styles.required}>*</Text>
               </Text>
-              <Text style={styles.inputSubLabel}>Nhập số lượng xe có trong kho</Text>
+              <Text style={styles.inputSubLabel}>Enter the number of vehicles in stock</Text>
               <TextInput
                 style={styles.textInput}
                 value={newItem.quantity}
                 onChangeText={(text) => setNewItem({ ...newItem, quantity: text })}
-                placeholder="Nhập số lượng xe"
+                placeholder="Enter quantity"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 keyboardType="numeric"
               />
             </View>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
-              <Text style={styles.saveButtonText}>Thêm tồn kho</Text>
+              <Text style={styles.saveButtonText}>Add Inventory</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

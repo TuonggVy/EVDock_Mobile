@@ -60,14 +60,14 @@ const EditInventoryScreen = ({ navigation, route }) => {
 
   const handleSaveItem = async () => {
     if (!editedItem.motorbikeId || !editedItem.warehouseId || !editedItem.quantity) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+      showError('Error', 'Please fill in all required fields');
       return;
     }
 
     // Validate that quantity is a positive number
     const quantity = parseInt(editedItem.quantity);
     if (isNaN(quantity) || quantity <= 0) {
-      showError('Lỗi', 'Số lượng phải là số dương lớn hơn 0');
+      showError('Error', 'Quantity must be a positive number greater than 0');
       return;
     }
 
@@ -79,18 +79,18 @@ const EditInventoryScreen = ({ navigation, route }) => {
       );
 
       if (response.success) {
-        showSuccess('Thành công', 'Cập nhật tồn kho thành công!', () => {
+        showSuccess('Success', 'Inventory updated successfully!', () => {
           navigation.goBack();
         });
       } else {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
-          : (response.error?.message || JSON.stringify(response.error) || 'Không thể cập nhật thông tin tồn kho');
-        showError('Lỗi', errorMessage);
+          : (response.error?.message || JSON.stringify(response.error) || 'Unable to update inventory information');
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error saving item:', error);
-      showError('Lỗi', 'Không thể cập nhật thông tin tồn kho');
+      showError('Error', 'Unable to update inventory information');
     }
   };
 
@@ -104,7 +104,7 @@ const EditInventoryScreen = ({ navigation, route }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chỉnh sửa tồn kho</Text>
+        <Text style={styles.headerTitle}>Edit Inventory</Text>
         <View style={styles.headerActions} />
       </View>
 
@@ -118,33 +118,33 @@ const EditInventoryScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Thông tin tồn kho</Text>
+            <Text style={styles.sectionTitle}>Inventory Details</Text>
 
             <View style={styles.infoSection}>
-              <Text style={styles.infoLabel}>Xe máy</Text>
+              <Text style={styles.infoLabel}>Motorbike</Text>
               <Text style={styles.infoValue}>{selectedMotorbike?.name || 'Loading...'}</Text>
 
-              <Text style={styles.infoLabel}>Kho</Text>
+              <Text style={styles.infoLabel}>Warehouse</Text>
               <Text style={styles.infoValue}>{selectedWarehouse?.name || 'Loading...'}</Text>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>
-                Số lượng mới <Text style={styles.required}>*</Text>
+                New Quantity <Text style={styles.required}>*</Text>
               </Text>
-              <Text style={styles.inputSubLabel}>Cập nhật số lượng xe trong kho</Text>
+              <Text style={styles.inputSubLabel}>Update the number of vehicles in stock</Text>
               <TextInput
                 style={styles.textInput}
                 value={editedItem.quantity}
                 onChangeText={(text) => setEditedItem({ ...editedItem, quantity: text })}
-                placeholder="Nhập số lượng xe"
+                placeholder="Enter quantity"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 keyboardType="numeric"
               />
             </View>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
-              <Text style={styles.saveButtonText}>Cập nhật tồn kho</Text>
+              <Text style={styles.saveButtonText}>Update Inventory</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
