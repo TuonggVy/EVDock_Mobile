@@ -1,37 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
+  SafeAreaView,
+  StyleSheet,
   View,
   Text,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
   TextInput,
-  Modal,
-  ActivityIndicator,
   Platform,
-  SafeAreaView,
   KeyboardAvoidingView,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { ArrowLeft, Calendar, Check, X } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
 import promotionService from '../../services/promotionService';
 import motorbikeService from '../../services/motorbikeService';
-import { Calendar, ArrowLeft } from 'lucide-react-native';
 
-const AddPromotionScreen = ({ navigation, route }) => {
+const EditPromotionScreen = ({ navigation, route }) => {
   const promotion = route?.params?.promotion;
-  const isEditMode = !!promotion;
-  
-  const [loading, setLoading] = useState(false);
-  const [motorbikes, setMotorbikes] = useState([]);
-  const [motorbikeModalVisible, setMotorbikeModalVisible] = useState(false);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [selectedStartDate, setSelectedStartDate] = useState(new Date());
-  const [selectedEndDate, setSelectedEndDate] = useState(new Date());
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+
+  const {
+    alertConfig,
+    hideAlert,
+    showSuccess,
+    showError,
+  } = useCustomAlert();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -42,68 +39,74 @@ const AddPromotionScreen = ({ navigation, route }) => {
     endAt: '',
     status: 'ACTIVE',
     motorbikeId: null,
-    motorbikeScope: 'system', // 'system' or 'specific'
+    motorbikeScope: 'system',
   });
 
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [motorbikes, setMotorbikes] = useState([]);
+  const [motorbikeModalVisible, setMotorbikeModalVisible] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [selectedStartDate, setSelectedStartDate] = useState(new Date());
+  const [selectedEndDate, setSelectedEndDate] = useState(new Date());
 
   useEffect(() => {
-    loadMotorbikes();
-    
-    if (isEditMode && promotion) {
-      // Pre-fill form with promotion data
-      setFormData({
-        name: promotion.name || '',
-        description: promotion.description || '',
-        valueType: promotion.valueType || 'PERCENT',
-        value: promotion.value?.toString() || '',
-        startAt: promotion.startAt || '',
-        endAt: promotion.endAt || '',
-        status: promotion.status || 'ACTIVE',
-        motorbikeId: promotion.motorbikeId || null,
-        motorbikeScope: promotion.motorbikeId ? 'specific' : 'system',
-      });
-      
-      if (promotion.startAt) {
-        setSelectedStartDate(new Date(promotion.startAt));
-      }
-      if (promotion.endAt) {
-        setSelectedEndDate(new Date(promotion.endAt));
-      }
-    } else {
-      // Set default dates for new promotion
-      const today = new Date();
-      setSelectedStartDate(today);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setSelectedEndDate(tomorrow);
-      setFormData(prev => ({
-        ...prev,
-        startAt: formatDate(today),
-        endAt: formatDate(tomorrow),
-      }));
+    if (!promotion) {
+      showError('Error', 'Promotion information is missing');
+      navigation.goBack();
+      return;
     }
+
+    setFormData({
+      name: promotion.name || '',
+      description: promotion.description || '',
+      valueType: promotion.valueType || 'PERCENT',
+      value: promotion.value?.toString() || '',
+      startAt: promotion.startAt || '',
+      endAt: promotion.endAt || '',
+      status: promotion.status || 'ACTIVE',
+      motorbikeId: promotion.motorbikeId || null,
+      motorbikeScope: promotion.motorbikeId ? 'specific' : 'system',
+    });
+
+    if (promotion.startAt) {
+      setSelectedStartDate(new Date(promotion.startAt));
+    }
+    if (promotion.endAt) {
+      setSelectedEndDate(new Date(promotion.endAt));
+    }
+    // We only care about the initial promotion payload
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promotion]);
 
-  const loadMotorbikes = async () => {
-    try {
-      const response = await motorbikeService.getAllMotorbikes({ limit: 100 });
-      if (response.success && Array.isArray(response.data)) {
-        setMotorbikes(response.data);
+  useEffect(() => {
+    const fetchMotorbikes = async () => {
+      try {
+        const response = await motorbikeService.getAllMotorbikes({ limit: 100 });
+        if (response.success && Array.isArray(response.data)) {
+          setMotorbikes(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading motorbikes:', error);
       }
-    } catch (error) {
-      console.error('Error loading motorbikes:', error);
-    }
-  };
+    };
 
-  const formatDate = (date) => {
+    fetchMotorbikes();
+  }, []);
+
+  const selectedMotorbike = useMemo(
+    () => motorbikes.find((bike) => bike.id === formData.motorbikeId),
+    [motorbikes, formData.motorbikeId]
+  );
+
+  const formatDateISO = (date) => {
     if (!date) return '';
-    const d = new Date(date);
-    return d.toISOString();
+    return new Date(date).toISOString();
   };
 
   const formatDateForDisplay = (dateString) => {
-    if (!dateString) return '';
+    if (!dateString) return 'Select date';
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -111,24 +114,24 @@ const AddPromotionScreen = ({ navigation, route }) => {
     return `${day}/${month}/${year}`;
   };
 
-  const handleStartDateChange = (event, selectedDate) => {
+  const handleStartDateChange = (_, selectedDate) => {
     setShowStartDatePicker(false);
     if (selectedDate) {
       setSelectedStartDate(selectedDate);
-      setFormData(prev => ({ ...prev, startAt: formatDate(selectedDate) }));
+      setFormData((prev) => ({ ...prev, startAt: formatDateISO(selectedDate) }));
     }
   };
 
-  const handleEndDateChange = (event, selectedDate) => {
+  const handleEndDateChange = (_, selectedDate) => {
     setShowEndDatePicker(false);
     if (selectedDate) {
       setSelectedEndDate(selectedDate);
-      setFormData(prev => ({ ...prev, endAt: formatDate(selectedDate) }));
+      setFormData((prev) => ({ ...prev, endAt: formatDateISO(selectedDate) }));
     }
   };
 
   const handleScopeChange = (scope) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       motorbikeScope: scope,
       motorbikeId: scope === 'system' ? null : prev.motorbikeId,
@@ -136,13 +139,13 @@ const AddPromotionScreen = ({ navigation, route }) => {
   };
 
   const handleMotorbikeSelect = (motorbike) => {
-    setFormData(prev => ({ ...prev, motorbikeId: motorbike.id }));
+    setFormData((prev) => ({ ...prev, motorbikeId: motorbike.id }));
     setMotorbikeModalVisible(false);
   };
 
   const handleSubmit = async () => {
-    setErrors({});
-    
+    if (!promotion) return;
+
     const submissionData = {
       ...formData,
       value: parseFloat(formData.value),
@@ -150,74 +153,38 @@ const AddPromotionScreen = ({ navigation, route }) => {
     };
 
     const validation = promotionService.validatePromotion(submissionData);
-    
+
     if (!validation.isValid) {
-      setErrors(validation.errors);
+      setErrors(validation.errors || {});
+      showError('Error', 'Please fill in all required fields correctly');
       return;
     }
 
     setLoading(true);
-    
     try {
-      let response;
-      if (isEditMode) {
-        response = await promotionService.updatePromotion(promotion.id, submissionData);
-      } else {
-        response = await promotionService.createPromotion(submissionData);
-      }
-
+      const response = await promotionService.updatePromotion(promotion.id, submissionData);
       if (response.success) {
-        setAlertConfig({
-          title: 'Success',
-          message: isEditMode ? 'Promotion updated successfully!' : 'Promotion created successfully!',
-          type: 'success'
-        });
-        setShowAlert(true);
-        setTimeout(() => {
-          navigation.goBack();
-        }, 1500);
+        showSuccess('Success', 'Promotion updated successfully!');
+        setTimeout(() => navigation.goBack(), 1500);
       } else {
-        const errorMessage = typeof response.error === 'string' 
-          ? response.error 
-          : (response.error?.message || JSON.stringify(response.error) || 'Failed to save promotion');
-        setAlertConfig({
-          title: 'Error',
-          message: errorMessage,
-          type: 'error'
-        });
-        setShowAlert(true);
+        showError('Error', response?.error || 'Unable to update promotion');
       }
     } catch (error) {
-      console.error('Error saving promotion:', error);
-      setAlertConfig({
-        title: 'Error',
-        message: 'An unexpected error occurred',
-        type: 'error'
-      });
-      setShowAlert(true);
+      console.error('Error updating promotion:', error);
+      showError('Error', 'Unable to update promotion');
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedMotorbike = motorbikes.find(m => m.id === formData.motorbikeId);
-
   return (
     <SafeAreaView style={styles.container}>
-      <CustomAlert
-        visible={showAlert}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setShowAlert(false)}
-      />
-
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Promotion' : 'Add Promotion'}</Text>
-        <View style={styles.headerActions} />
+        <Text style={styles.headerTitle}>Edit Promotion</Text>
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <KeyboardAvoidingView
@@ -238,10 +205,13 @@ const AddPromotionScreen = ({ navigation, route }) => {
               </Text>
               <TextInput
                 style={[styles.input, errors.name && styles.inputError]}
-                value={formData.name}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
                 placeholder="Enter promotion name"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={formData.name}
+                onChangeText={(text) => {
+                  setFormData((prev) => ({ ...prev, name: text }));
+                  if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+                }}
               />
               {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
@@ -252,12 +222,15 @@ const AddPromotionScreen = ({ navigation, route }) => {
               </Text>
               <TextInput
                 style={[styles.input, styles.textArea, errors.description && styles.inputError]}
-                value={formData.description}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
                 placeholder="Enter promotion description"
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 multiline
                 numberOfLines={4}
+                value={formData.description}
+                onChangeText={(text) => {
+                  setFormData((prev) => ({ ...prev, description: text }));
+                  if (errors.description) setErrors((prev) => ({ ...prev, description: null }));
+                }}
               />
               {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
             </View>
@@ -268,14 +241,14 @@ const AddPromotionScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    formData.valueType === 'PERCENT' && styles.toggleButtonActive
+                    formData.valueType === 'PERCENT' && styles.toggleButtonActive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, valueType: 'PERCENT' }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, valueType: 'PERCENT' }))}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      formData.valueType === 'PERCENT' && styles.toggleButtonTextActive
+                      formData.valueType === 'PERCENT' && styles.toggleButtonTextActive,
                     ]}
                   >
                     Percentage
@@ -284,14 +257,14 @@ const AddPromotionScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    formData.valueType === 'FIXED' && styles.toggleButtonActive
+                    formData.valueType === 'FIXED' && styles.toggleButtonActive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, valueType: 'FIXED' }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, valueType: 'FIXED' }))}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      formData.valueType === 'FIXED' && styles.toggleButtonTextActive
+                      formData.valueType === 'FIXED' && styles.toggleButtonTextActive,
                     ]}
                   >
                     Fixed Amount
@@ -306,11 +279,14 @@ const AddPromotionScreen = ({ navigation, route }) => {
               </Text>
               <TextInput
                 style={[styles.input, errors.value && styles.inputError]}
-                value={formData.value}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, value: text }))}
-                placeholder={formData.valueType === 'PERCENT' ? 'e.g., 10' : 'e.g., 50000'}
+                placeholder={formData.valueType === 'PERCENT' ? 'e.g. 10' : 'e.g. 50000'}
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 keyboardType="numeric"
+                value={formData.value}
+                onChangeText={(text) => {
+                  setFormData((prev) => ({ ...prev, value: text }));
+                  if (errors.value) setErrors((prev) => ({ ...prev, value: null }));
+                }}
               />
               {errors.value && <Text style={styles.errorText}>{errors.value}</Text>}
             </View>
@@ -327,14 +303,12 @@ const AddPromotionScreen = ({ navigation, route }) => {
                 style={styles.dateButton}
                 onPress={() => setShowStartDatePicker(true)}
               >
-                <Text style={styles.dateText}>
-                  {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Select start date'}
-                </Text>
+                <Text style={styles.dateText}>{formatDateForDisplay(formData.startAt)}</Text>
                 <Calendar size={18} color={COLORS.TEXT.PRIMARY} />
               </TouchableOpacity>
               {showStartDatePicker && (
                 <DateTimePicker
-                  value={selectedStartDate}
+                  value={selectedStartDate || new Date()}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleStartDateChange}
@@ -346,28 +320,22 @@ const AddPromotionScreen = ({ navigation, route }) => {
               <Text style={styles.label}>
                 End Date <Text style={styles.required}>*</Text>
               </Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowEndDatePicker(true)}
-              >
-                <Text style={styles.dateText}>
-                  {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Select end date'}
-                </Text>
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndDatePicker(true)}>
+                <Text style={styles.dateText}>{formatDateForDisplay(formData.endAt)}</Text>
                 <Calendar size={18} color={COLORS.TEXT.PRIMARY} />
               </TouchableOpacity>
               {showEndDatePicker && (
                 <DateTimePicker
-                  value={selectedEndDate}
+                  value={selectedEndDate || new Date()}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={handleEndDateChange}
-                  minimumDate={new Date()}
                 />
               )}
             </View>
           </View>
 
-          <View style={styles.formSection}>
+  <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Scope</Text>
 
             <View style={styles.inputGroup}>
@@ -376,14 +344,14 @@ const AddPromotionScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    formData.motorbikeScope === 'system' && styles.toggleButtonActive
+                    formData.motorbikeScope === 'system' && styles.toggleButtonActive,
                   ]}
                   onPress={() => handleScopeChange('system')}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      formData.motorbikeScope === 'system' && styles.toggleButtonTextActive
+                      formData.motorbikeScope === 'system' && styles.toggleButtonTextActive,
                     ]}
                   >
                     System-wide
@@ -392,14 +360,14 @@ const AddPromotionScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    formData.motorbikeScope === 'specific' && styles.toggleButtonActive
+                    formData.motorbikeScope === 'specific' && styles.toggleButtonActive,
                   ]}
                   onPress={() => handleScopeChange('specific')}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      formData.motorbikeScope === 'specific' && styles.toggleButtonTextActive
+                      formData.motorbikeScope === 'specific' && styles.toggleButtonTextActive,
                     ]}
                   >
                     Specific Motorbike
@@ -418,7 +386,7 @@ const AddPromotionScreen = ({ navigation, route }) => {
                   onPress={() => setMotorbikeModalVisible(true)}
                 >
                   <Text style={styles.selectText}>
-                    {selectedMotorbike ? selectedMotorbike.name : 'Select motorbike'}
+                    {selectedMotorbike ? selectedMotorbike.name : 'Choose motorbike'}
                   </Text>
                   <Text style={styles.selectIcon}>▼</Text>
                 </TouchableOpacity>
@@ -431,23 +399,25 @@ const AddPromotionScreen = ({ navigation, route }) => {
             <Text style={styles.sectionTitle}>Status</Text>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Promotion Status *</Text>
-              <View style={styles.statusRow}>
+              <View style={styles.toggleRow}>
                 <TouchableOpacity
                   style={[
                     styles.statusButton,
-                    formData.status === 'ACTIVE' && styles.statusButtonActive
+                    formData.status === 'ACTIVE' && styles.statusButtonActive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, status: 'ACTIVE' }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, status: 'ACTIVE' }))}
                 >
+                  <Check size={18} color={COLORS.TEXT.WHITE} />
                   <Text style={styles.statusButtonText}>Active</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.statusButton,
-                    formData.status === 'INACTIVE' && styles.statusButtonInactive
+                    formData.status === 'INACTIVE' && styles.statusButtonInactive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, status: 'INACTIVE' }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, status: 'INACTIVE' }))}
                 >
+                  <X size={18} color={COLORS.TEXT.WHITE} />
                   <Text style={styles.statusButtonText}>Inactive</Text>
                 </TouchableOpacity>
               </View>
@@ -462,9 +432,7 @@ const AddPromotionScreen = ({ navigation, route }) => {
             {loading ? (
               <ActivityIndicator size="small" color="#009DFF" />
             ) : (
-              <Text style={styles.submitButtonText}>
-                {isEditMode ? 'Update Promotion' : 'Create Promotion'}
-              </Text>
+              <Text style={styles.submitButtonText}>Update Promotion</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -485,22 +453,35 @@ const AddPromotionScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
-              {motorbikes.map((motorbike) => (
+              {motorbikes.map((bike) => (
                 <TouchableOpacity
-                  key={motorbike.id}
+                  key={bike.id}
                   style={[
                     styles.modalItem,
-                    motorbike.id === formData.motorbikeId && styles.modalItemActive
+                    bike.id === formData.motorbikeId && styles.modalItemActive,
                   ]}
-                  onPress={() => handleMotorbikeSelect(motorbike)}
+                  onPress={() => handleMotorbikeSelect(bike)}
                 >
-                  <Text style={styles.modalItemText}>{motorbike.name}</Text>
+                  <Text style={styles.modalItemText}>{bike.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
@@ -532,7 +513,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  headerActions: {
+  headerPlaceholder: {
     width: 40,
   },
   keyboardView: {
@@ -610,8 +591,8 @@ const styles = StyleSheet.create({
   },
   toggleButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
     color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   toggleButtonTextActive: {
     color: COLORS.TEXT.WHITE,
@@ -646,14 +627,12 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
     marginLeft: SIZES.PADDING.SMALL,
   },
-  statusRow: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
-  },
   statusButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SIZES.PADDING.XSMALL,
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
@@ -731,5 +710,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddPromotionScreen;
+export default EditPromotionScreen;
+
 

@@ -73,6 +73,7 @@ import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
 import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
 import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
 import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
+import EditPromotionScreen from '../screens/promotion/EditPromotionScreen';
 import OrderRestockManagementScreen from '../screens/order/OrderRestockManagementScreen';
 import OrderRestockDetailScreen from '../screens/order/OrderRestockDetailScreen';
 import OrderRestockDetailManagerScreen from '../screens/orderrestockmanager/OrderRestockDetailManagerScreen';
@@ -484,6 +485,11 @@ const AppNavigator = () => {
             <Stack.Screen
               name="AddPromotion"
               component={AddPromotionScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditPromotion"
+              component={EditPromotionScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
