@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import creditLineService from '../../services/creditLineService';
@@ -26,7 +27,16 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'blocked'
   const [showAlert, setShowAlert] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    type: 'info',
+    showCancel: false,
+    confirmText: 'OK',
+    cancelText: 'Cancel',
+    onConfirm: null,
+    onCancel: null,
+  });
 
   useEffect(() => {
     loadAgencies();
@@ -74,20 +84,32 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : (response.error?.message || JSON.stringify(response.error) || 'Failed to load credit lines');
-        setAlertConfig({
+        setAlertConfig(prev => ({
+          ...prev,
           title: 'Error',
           message: errorMessage,
-          type: 'error'
-        });
+          type: 'error',
+          showCancel: false,
+          confirmText: 'OK',
+          cancelText: 'Cancel',
+          onConfirm: null,
+          onCancel: null,
+        }));
         setShowAlert(true);
       }
     } catch (error) {
       console.error('Error loading credit lines:', error);
-      setAlertConfig({
+      setAlertConfig(prev => ({
+        ...prev,
         title: 'Error',
         message: 'An unexpected error occurred',
-        type: 'error'
-      });
+        type: 'error',
+        showCancel: false,
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        onConfirm: null,
+        onCancel: null,
+      }));
       setShowAlert(true);
     } finally {
       setLoading(false);
@@ -109,41 +131,74 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
     navigation.navigate('EVMStaffCreditLineDetail', { creditLineId: creditLine.id });
   };
 
-  const handleDelete = async (creditLineId, agencyName, event) => {
+  const handleDelete = (creditLineId, agencyName, event) => {
     event?.stopPropagation();
-    Alert.alert(
-      'Delete Credit Line',
-      `Are you sure you want to delete credit line for "${agencyName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const response = await creditLineService.deleteCreditLine(creditLineId);
-            if (response.success) {
-              setAlertConfig({
+    setAlertConfig({
+      title: 'Delete Credit Line',
+      message: `Are you sure you want to delete credit line for "${agencyName}"?`,
+      type: 'warning',
+      showCancel: true,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const response = await creditLineService.deleteCreditLine(creditLineId);
+          if (response.success) {
+            await loadCreditLines();
+            setTimeout(() => {
+              setAlertConfig(prev => ({
+                ...prev,
                 title: 'Success',
                 message: 'Credit line deleted successfully',
-                type: 'success'
-              });
+                type: 'success',
+                showCancel: false,
+                confirmText: 'OK',
+                cancelText: 'Cancel',
+                onConfirm: null,
+                onCancel: null,
+              }));
               setShowAlert(true);
-              loadCreditLines();
-            } else {
-              const errorMessage = typeof response.error === 'string' 
-                ? response.error 
-                : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
-              setAlertConfig({
+            }, 0);
+          } else {
+            const errorMessage = typeof response.error === 'string' 
+              ? response.error 
+              : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
+            setTimeout(() => {
+              setAlertConfig(prev => ({
+                ...prev,
                 title: 'Error',
                 message: errorMessage,
-                type: 'error'
-              });
+                type: 'error',
+                showCancel: false,
+                confirmText: 'OK',
+                cancelText: 'Cancel',
+                onConfirm: null,
+                onCancel: null,
+              }));
               setShowAlert(true);
-            }
+            }, 0);
           }
+        } catch (error) {
+          console.error('Error deleting credit line:', error);
+          setTimeout(() => {
+            setAlertConfig(prev => ({
+              ...prev,
+              title: 'Error',
+              message: 'An unexpected error occurred',
+              type: 'error',
+              showCancel: false,
+              confirmText: 'OK',
+              cancelText: 'Cancel',
+              onConfirm: null,
+              onCancel: null,
+            }));
+            setShowAlert(true);
+          }, 0);
         }
-      ]
-    );
+      },
+      onCancel: null,
+    });
+    setShowAlert(true);
   };
 
   const filteredCreditLines = creditLines.filter(creditLine => {
@@ -163,14 +218,20 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
   // Calculate counts for each tab
   const activeCount = creditLines.filter(cl => !cl.isBlocked).length;
   const blockedCount = creditLines.filter(cl => cl.isBlocked).length;
+  const totalCreditLines = creditLines.length;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
         onClose={() => setShowAlert(false)}
       />
 
@@ -180,7 +241,7 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Credit Line Management</Text>
         <View style={styles.placeholder} />
@@ -196,6 +257,22 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+      </View>
+
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{totalCreditLines}</Text>
+          <Text style={styles.statLabel}>Total</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{activeCount}</Text>
+          <Text style={styles.statLabel}>Active</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{blockedCount}</Text>
+          <Text style={styles.statLabel}>Blocked</Text>
+        </View>
       </View>
 
       {/* Tab Navigation */}
@@ -233,11 +310,13 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
       {/* Credit Lines List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
       ) : (
         <ScrollView
-          style={styles.listContainer}
+          style={styles.creditLinesList}
+          contentContainerStyle={styles.creditLinesContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -278,13 +357,13 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
                       style={[styles.iconButton, styles.editButton]}
                       onPress={(e) => handleEdit(creditLine, e)}
                     >
-                      <Pencil size={16} color={COLORS.PRIMARY} />
+                      <Pencil size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.iconButton, styles.deleteButton]}
                       onPress={(e) => handleDelete(creditLine.id, creditLine.agency?.name || getAgencyName(creditLine.agencyId), e)}
                     >
-                      <Trash2 size={16} color={COLORS.ERROR} />
+                      <Trash2 size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -316,7 +395,7 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -324,17 +403,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    paddingTop: 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
-    padding: SIZES.PADDING.SMALL,
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: SIZES.FONT.HEADER,
@@ -350,11 +438,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.LARGE,
+    margin: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.LARGE,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: SIZES.PADDING.SMALL,
   },
   searchIcon: {
     marginRight: SIZES.PADDING.SMALL,
@@ -364,14 +457,40 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  statNumber: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listContainer: {
+  creditLinesList: {
     flex: 1,
-    paddingHorizontal: SIZES.PADDING.LARGE,
+  },
+  creditLinesContent: {
+    padding: SIZES.PADDING.MEDIUM,
   },
   creditLineCard: {
     backgroundColor: COLORS.SURFACE,
@@ -396,7 +515,7 @@ const styles = StyleSheet.create({
   agencyName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
+    color: '#009DFF',
     marginBottom: SIZES.PADDING.XSMALL,
   },
   statusBadge: {
@@ -412,6 +531,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
+    gap: SIZES.PADDING.XSMALL,
   },
   iconButton: {
     width: 36,
@@ -419,13 +539,11 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.SMALL,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.XSMALL,
+    backgroundColor: '#000000',
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY + '20',
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR + '20',
   },
   creditLineDetails: {
     borderTopWidth: 1,
@@ -475,7 +593,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   tabText: {
     fontSize: SIZES.FONT.MEDIUM,

@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  SafeAreaView,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -109,7 +112,7 @@ const EVMStaffCreditLineEditScreen = ({ navigation, route }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
@@ -119,119 +122,135 @@ const EVMStaffCreditLineEditScreen = ({ navigation, route }) => {
       />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ArrowLeft size={20} color={COLORS.TEXT.SECONDARY} />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Credit Line</Text>
-        <TouchableOpacity onPress={handleSubmit} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-          ) : (
-            <Save size={20} color={COLORS.PRIMARY} />
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerPlaceholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Agency Display (Read-only) */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Agency</Text>
-          <View style={styles.readOnlyField}>
-            <Text style={styles.readOnlyText}>
-              {creditLine?.agency?.name || `Agency #${creditLine?.agencyId || 'N/A'}`}
-            </Text>
-          </View>
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.formSection}>
+            {/* Agency Display (Read-only) */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Agency</Text>
+              <View style={styles.readOnlyField}>
+                <Text style={styles.readOnlyText}>
+                  {creditLine?.agency?.name || `Agency #${creditLine?.agencyId || 'N/A'}`}
+                </Text>
+              </View>
+            </View>
 
-        {/* Credit Limit */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Credit Limit (VND) *</Text>
-          <TextInput
-            style={[styles.input, errors.creditLimit && styles.inputError]}
-            value={formData.creditLimit}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, creditLimit: text.replace(/[^0-9]/g, '') }))}
-            placeholder="Enter credit limit"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.creditLimit && <Text style={styles.errorText}>{errors.creditLimit}</Text>}
-          {formData.creditLimit && !errors.creditLimit && (
-            <Text style={styles.hintText}>
-              {creditLineService.formatCreditLimit(parseFloat(formData.creditLimit) || 0)}
-            </Text>
-          )}
-        </View>
+            {/* Credit Limit */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Credit Limit (VND) *</Text>
+              <TextInput
+                style={[styles.input, errors.creditLimit && styles.inputError]}
+                value={formData.creditLimit}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, creditLimit: text.replace(/[^0-9]/g, '') }))}
+                placeholder="Enter credit limit"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+              {errors.creditLimit && <Text style={styles.errorText}>{errors.creditLimit}</Text>}
+              {formData.creditLimit && !errors.creditLimit && (
+                <Text style={styles.hintText}>
+                  {creditLineService.formatCreditLimit(parseFloat(formData.creditLimit) || 0)}
+                </Text>
+              )}
+            </View>
 
-        {/* Warning Threshold */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Warning Threshold (%) *</Text>
-          <TextInput
-            style={[styles.input, errors.warningThreshold && styles.inputError]}
-            value={formData.warningThreshold}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, warningThreshold: text.replace(/[^0-9]/g, '') }))}
-            placeholder="Enter warning threshold (0-100)"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.warningThreshold && <Text style={styles.errorText}>{errors.warningThreshold}</Text>}
-          <Text style={styles.hintText}>
-            Alert when credit usage reaches this percentage
-          </Text>
-        </View>
-
-        {/* Overdue Threshold Days */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Overdue Threshold (Days) *</Text>
-          <TextInput
-            style={[styles.input, errors.overDueThreshHoldDays && styles.inputError]}
-            value={formData.overDueThreshHoldDays}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, overDueThreshHoldDays: text.replace(/[^0-9]/g, '') }))}
-            placeholder="Enter overdue threshold in days"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.overDueThreshHoldDays && <Text style={styles.errorText}>{errors.overDueThreshHoldDays}</Text>}
-          <Text style={styles.hintText}>
-            Number of days after which payment is considered overdue
-          </Text>
-        </View>
-
-        {/* Blocked Status */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Status</Text>
-          <View style={styles.statusButtons}>
-            <TouchableOpacity
-              style={[
-                styles.statusButton,
-                !formData.isBlocked && [styles.statusButtonActive, { backgroundColor: COLORS.SUCCESS }]
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, isBlocked: false }))}
-            >
-              <Text style={[
-                styles.statusButtonText,
-                !formData.isBlocked && styles.statusButtonTextActive
-              ]}>
-                Active
+            {/* Warning Threshold */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Warning Threshold (%) *</Text>
+              <TextInput
+                style={[styles.input, errors.warningThreshold && styles.inputError]}
+                value={formData.warningThreshold}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, warningThreshold: text.replace(/[^0-9]/g, '') }))}
+                placeholder="Enter warning threshold (0-100)"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+              {errors.warningThreshold && <Text style={styles.errorText}>{errors.warningThreshold}</Text>}
+              <Text style={styles.hintText}>
+                Alert when credit usage reaches this percentage
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.statusButton,
-                formData.isBlocked && [styles.statusButtonActive, { backgroundColor: COLORS.ERROR }]
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, isBlocked: true }))}
-            >
-              <Text style={[
-                styles.statusButtonText,
-                formData.isBlocked && styles.statusButtonTextActive
-              ]}>
-                Blocked
+            </View>
+
+            {/* Overdue Threshold Days */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Overdue Threshold (Days) *</Text>
+              <TextInput
+                style={[styles.input, errors.overDueThreshHoldDays && styles.inputError]}
+                value={formData.overDueThreshHoldDays}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, overDueThreshHoldDays: text.replace(/[^0-9]/g, '') }))}
+                placeholder="Enter overdue threshold in days"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+              {errors.overDueThreshHoldDays && <Text style={styles.errorText}>{errors.overDueThreshHoldDays}</Text>}
+              <Text style={styles.hintText}>
+                Number of days after which payment is considered overdue
               </Text>
+            </View>
+
+            {/* Blocked Status */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Status</Text>
+              <View style={styles.statusButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.statusButton,
+                    !formData.isBlocked && styles.activeStatusButton
+                  ]}
+                  onPress={() => setFormData(prev => ({ ...prev, isBlocked: false }))}
+                >
+                  <Text style={[
+                    styles.statusButtonText,
+                    !formData.isBlocked && styles.statusButtonTextActive
+                  ]}>
+                    Active
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.statusButton,
+                    formData.isBlocked && styles.blockedStatusButton
+                  ]}
+                  onPress={() => setFormData(prev => ({ ...prev, isBlocked: true }))}
+                >
+                  <Text style={[
+                    styles.statusButtonText,
+                    formData.isBlocked && styles.statusButtonTextActive
+                  ]}>
+                    Blocked
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#009DFF" />
+              ) : (
+                <>
+                  <Save size={20} color={COLORS.TEXT.WHITE} />
+                  <Text style={styles.submitButtonText}>Save Changes</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -240,21 +259,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
+  keyboardView: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  formSection: {
     padding: SIZES.PADDING.LARGE,
   },
   section: {
@@ -262,16 +301,19 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
     fontWeight: '600',
   },
   input: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   inputError: {
     borderWidth: 1,
@@ -289,14 +331,16 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   readOnlyField: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    opacity: 0.6,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   readOnlyText: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
+    color: COLORS.TEXT.PRIMARY,
   },
   statusButtons: {
     flexDirection: 'row',
@@ -304,21 +348,54 @@ const styles = StyleSheet.create({
   },
   statusButton: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: "#D1D1D1",
     borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   statusButtonActive: {
     opacity: 0.8,
   },
+  activeStatusButton: {
+    backgroundColor: COLORS.SUCCESS,
+  },
+  blockedStatusButton: {
+    backgroundColor: COLORS.ERROR,
+  },
   statusButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
+    color: COLORS.TEXT.PRIMARY,
   },
   statusButtonTextActive: {
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+  },
+  submitButton: {
+    marginTop: SIZES.PADDING.XLARGE,
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.XXXLARGE,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonDisabled: {
+    backgroundColor: COLORS.SURFACE,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
   },
 });
 
