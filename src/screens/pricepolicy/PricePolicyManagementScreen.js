@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import pricePolicyService from '../../services/pricePolicyService';
@@ -16,6 +17,7 @@ import agencyService from '../../services/agencyService';
 import motorbikeService from '../../services/motorbikeService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { Pencil, Trash2, ArrowLeft, Plus, Search, DollarSign } from 'lucide-react-native';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
 
 const PricePolicyManagementScreen = ({ navigation }) => {
   const [pricePolicies, setPricePolicies] = useState([]);
@@ -24,8 +26,7 @@ const PricePolicyManagementScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const { alertConfig, hideAlert, showError, showSuccess, showDeleteConfirm } = useCustomAlert();
 
   useEffect(() => {
     loadPricePolicies();
@@ -73,21 +74,11 @@ const PricePolicyManagementScreen = ({ navigation }) => {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : (response.error?.message || JSON.stringify(response.error) || 'Failed to load price policies');
-        setAlertConfig({
-          title: 'Error',
-          message: errorMessage,
-          type: 'error'
-        });
-        setShowAlert(true);
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error loading price policies:', error);
-      setAlertConfig({
-        title: 'Error',
-        message: 'An unexpected error occurred',
-        type: 'error'
-      });
-      setShowAlert(true);
+      showError('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,38 +91,21 @@ const PricePolicyManagementScreen = ({ navigation }) => {
   };
 
   const handleDelete = async (policyId, policyTitle) => {
-    Alert.alert(
+    showDeleteConfirm(
       'Delete Price Policy',
       `Are you sure you want to delete "${policyTitle}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const response = await pricePolicyService.deletePricePolicy(policyId);
-            if (response.success) {
-              setAlertConfig({
-                title: 'Success',
-                message: 'Price policy deleted successfully',
-                type: 'success'
-              });
-              setShowAlert(true);
-              loadPricePolicies();
-            } else {
-              const errorMessage = typeof response.error === 'string' 
-                ? response.error 
-                : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete price policy');
-              setAlertConfig({
-                title: 'Error',
-                message: errorMessage,
-                type: 'error'
-              });
-              setShowAlert(true);
-            }
-          }
+      async () => {
+        const response = await pricePolicyService.deletePricePolicy(policyId);
+        if (response.success) {
+          showSuccess('Success', 'Price policy deleted successfully');
+          await loadPricePolicies();
+        } else {
+          const errorMessage = typeof response.error === 'string' 
+            ? response.error 
+            : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete price policy');
+          showError('Error', errorMessage);
         }
-      ]
+      }
     );
   };
 
@@ -159,14 +133,31 @@ const PricePolicyManagementScreen = ({ navigation }) => {
       policy.policy?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const stats = useMemo(() => {
+    const total = pricePolicies.length;
+    const uniqueAgencies = new Set(pricePolicies.map(policy => policy.agencyId).filter(Boolean)).size;
+    const uniqueMotorbikes = new Set(pricePolicies.map(policy => policy.motorbikeId).filter(Boolean)).size;
+
+    return {
+      total,
+      agencies: uniqueAgencies,
+      motorbikes: uniqueMotorbikes,
+    };
+  }, [pricePolicies]);
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <CustomAlert
-        visible={showAlert}
+        visible={alertConfig.visible}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => setShowAlert(false)}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
       />
 
       <View style={styles.header}>
@@ -174,23 +165,19 @@ const PricePolicyManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.backButtonText}>Back</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Price Policy</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAdd}
         >
-          <Plus size={20} color={COLORS.PRIMARY} />
-          <Text style={styles.addButtonText}>Add</Text>
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={styles.searchIcon}>
-          <Search size={20} color={COLORS.TEXT.SECONDARY} />
-        </View>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search price policies..."
@@ -200,64 +187,89 @@ const PricePolicyManagementScreen = ({ navigation }) => {
         />
       </View>
 
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{stats.total}</Text>
+          <Text style={styles.statLabel}>Total Policies</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, styles.statAccent]}>{stats.agencies}</Text>
+          <Text style={styles.statLabel}>Agencies</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, styles.statAccent]}>{stats.motorbikes}</Text>
+          <Text style={styles.statLabel}>Motorbikes</Text>
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
       ) : (
         <ScrollView
           style={styles.listContainer}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           {filteredPolicies.length === 0 ? (
-            <View style={styles.emptyContainer}>
+            <View style={styles.emptyState}>
               <DollarSign size={64} color={COLORS.TEXT.SECONDARY} />
-              <Text style={styles.emptyText}>No price policies found</Text>
+              <Text style={styles.emptyTitle}>No Price Policies</Text>
+              <Text style={styles.emptySubtitle}>
+                Try adjusting your search or add a new price policy.
+              </Text>
             </View>
           ) : (
             filteredPolicies.map((policy) => (
               <View key={policy.id} style={styles.policyCard}>
-                <View style={styles.policyHeader}>
-                  <View style={styles.policyHeaderLeft}>
-                    <Text style={styles.policyTitle}>{policy.title}</Text>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderInfo}>
+                    <Text style={styles.policyTitle}>{policy.title || 'Untitled Policy'}</Text>
+                    <Text style={styles.policyMeta}>
+                      {getAgencyName(policy.agencyId)} • {getMotorbikeName(policy.motorbikeId)}
+                    </Text>
                   </View>
-                  <View style={styles.actionButtons}>
+                  <View style={styles.cardActions}>
                     <TouchableOpacity
-                      style={[styles.iconButton, styles.editButton]}
+                      style={styles.actionButton}
                       onPress={() => handleEdit(policy)}
                     >
-                      <Pencil size={16} color={COLORS.PRIMARY} />
+                      <Pencil size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.iconButton, styles.deleteButton]}
+                      style={styles.actionButton}
                       onPress={() => handleDelete(policy.id, policy.title)}
                     >
-                      <Trash2 size={16} color={COLORS.ERROR} />
+                      <Trash2 size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <Text style={styles.policyContent}>{policy.content}</Text>
+                <View style={styles.priceBadge}>
+                  <Text style={styles.priceLabel}>Wholesale Price</Text>
+                  <Text style={styles.priceValue}>
+                    {pricePolicyService.formatPrice(policy.wholesalePrice)}
+                  </Text>
+                </View>
+
+                {!!policy.content && (
+                  <Text style={styles.policyContent}>{policy.content}</Text>
+                )}
 
                 <View style={styles.policyDetails}>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Policy:</Text>
-                    <Text style={styles.detailValue}>{policy.policy}</Text>
+                    <Text style={styles.detailLabel}>Policy Code</Text>
+                    <Text style={styles.detailValue}>{policy.policy || 'N/A'}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Wholesale Price:</Text>
-                    <Text style={styles.detailValue}>
-                      {pricePolicyService.formatPrice(policy.wholesalePrice)}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Agency:</Text>
+                    <Text style={styles.detailLabel}>Agency</Text>
                     <Text style={styles.detailValue}>{getAgencyName(policy.agencyId)}</Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Motorbike:</Text>
+                    <Text style={styles.detailLabel}>Motorbike</Text>
                     <Text style={styles.detailValue}>{getMotorbikeName(policy.motorbikeId)}</Text>
                   </View>
                 </View>
@@ -266,11 +278,16 @@ const PricePolicyManagementScreen = ({ navigation }) => {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    paddingTop: Platform.OS === 'ios' ? 30 : 20,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
@@ -279,20 +296,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  backButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: SIZES.FONT.HEADER,
@@ -302,33 +318,59 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
-    padding: SIZES.PADDING.SMALL,
-    gap: 4,
-  },
-  addButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    justifyContent: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.LARGE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-  },
-  searchIcon: {
-    marginRight: SIZES.PADDING.SMALL,
+    margin: SIZES.PADDING.MEDIUM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  statNumber: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginBottom: 4,
+  },
+  statAccent: {
+    color: COLORS.SUCCESS,
+  },
+  statLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -337,7 +379,10 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-    paddingHorizontal: SIZES.PADDING.LARGE,
+  },
+  listContent: {
+    padding: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   policyCard: {
     backgroundColor: COLORS.SURFACE,
@@ -350,56 +395,75 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  policyHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: SIZES.PADDING.SMALL,
   },
-  policyHeaderLeft: {
+  cardHeaderInfo: {
     flex: 1,
   },
   policyTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.XSMALL,
+    color: "#009DFF",
+    marginBottom: 4,
   },
-  actionButtons: {
+  policyMeta: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  cardActions: {
     flexDirection: 'row',
+    gap: SIZES.PADDING.XSMALL,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
+  actionButton: {
+    backgroundColor: '#000000',
     borderRadius: SIZES.RADIUS.SMALL,
+    padding: SIZES.PADDING.SMALL,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.XSMALL,
   },
-  editButton: {
-    backgroundColor: COLORS.PRIMARY + '20',
+  priceBadge: {
+    backgroundColor: 'rgba(0, 157, 255, 0.08)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.SMALL,
   },
-  deleteButton: {
-    backgroundColor: COLORS.ERROR + '20',
+  priceLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  priceValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.PRIMARY,
+    fontWeight: '700',
   },
   policyContent: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+    lineHeight: 22,
   },
   policyDetails: {
     borderTopWidth: 1,
     borderTopColor: '#EFEFEF',
     paddingTop: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.XSMALL,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SIZES.PADDING.XSMALL,
   },
   detailLabel: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
   },
   detailValue: {
     fontSize: SIZES.FONT.SMALL,
@@ -408,15 +472,24 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  emptyContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
-  emptyText: {
+  emptyTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginTop: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  emptySubtitle: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
   },
 });
 

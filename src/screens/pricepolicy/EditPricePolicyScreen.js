@@ -9,6 +9,8 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -16,6 +18,7 @@ import pricePolicyService from '../../services/pricePolicyService';
 import agencyService from '../../services/agencyService';
 import motorbikeService from '../../services/motorbikeService';
 import { ChevronDown, PencilOff, ArrowLeft, X } from 'lucide-react-native';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
 
 const EditPricePolicyScreen = ({ navigation, route }) => {
   const pricePolicy = route?.params?.pricePolicy;
@@ -29,8 +32,7 @@ const EditPricePolicyScreen = ({ navigation, route }) => {
   const [motorbikes, setMotorbikes] = useState([]);
   const [agencyModalVisible, setAgencyModalVisible] = useState(false);
   const [motorbikeModalVisible, setMotorbikeModalVisible] = useState(false);
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -111,12 +113,7 @@ const EditPricePolicyScreen = ({ navigation, route }) => {
 
     if (!validation.isValid) {
       setErrors(validation.errors);
-      setAlertConfig({
-        title: 'Validation Error',
-        message: Object.values(validation.errors)[0],
-        type: 'error'
-      });
-      setShowAlert(true);
+      showError('Validation Error', Object.values(validation.errors)[0]);
       return;
     }
 
@@ -125,34 +122,20 @@ const EditPricePolicyScreen = ({ navigation, route }) => {
       const response = await pricePolicyService.updatePricePolicy(pricePolicy.id, formData);
 
       if (response.success) {
-        setAlertConfig({
-          title: 'Success',
-          message: 'Price policy updated successfully!',
-          type: 'success'
-        });
-        setShowAlert(true);
+        showSuccess('Success', 'Price policy updated successfully!');
         setTimeout(() => {
+          hideAlert();
           navigation.goBack();
         }, 1500);
       } else {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : (response.error?.message || JSON.stringify(response.error) || 'Failed to save price policy');
-        setAlertConfig({
-          title: 'Error',
-          message: errorMessage,
-          type: 'error'
-        });
-        setShowAlert(true);
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error saving price policy:', error);
-      setAlertConfig({
-        title: 'Error',
-        message: 'An unexpected error occurred',
-        type: 'error'
-      });
-      setShowAlert(true);
+      showError('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -170,101 +153,113 @@ const EditPricePolicyScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomAlert
-        visible={showAlert}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setShowAlert(false)}
-      />
+      <CustomAlert {...alertConfig} onClose={hideAlert} />
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color={COLORS.PRIMARY} />
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Price Policy</Text>
-        <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Title</Text>
-          <View style={[styles.textInput, styles.readOnlyInput, styles.readOnlyContainer]}>
-            <Text style={styles.readOnlyText}>{formData.title || 'Policy title'}</Text>
-            <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Policy Details</Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Title</Text>
+              <View style={[styles.textInput, styles.readOnlyInput, styles.readOnlyContainer]}>
+                <Text style={styles.readOnlyText}>{formData.title || 'Policy title'}</Text>
+                <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Content</Text>
+              <View style={[styles.textInput, styles.textArea, styles.readOnlyInput, styles.readOnlyContainer]}>
+                <Text style={styles.readOnlyText}>{formData.content || 'Policy content'}</Text>
+                <PencilOff size={16} color={COLORS.TEXT.SECONDARY} style={styles.readOnlyIcon} />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Policy <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea, errors.policy && styles.inputError]}
+                value={formData.policy}
+                onChangeText={(text) => setFormData({ ...formData, policy: text })}
+                placeholder="Enter policy details"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                multiline
+                numberOfLines={3}
+              />
+              {errors.policy && <Text style={styles.errorText}>{errors.policy}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Wholesale Price (VND) <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, errors.wholesalePrice && styles.inputError]}
+                value={formData.wholesalePrice}
+                onChangeText={(text) => setFormData({ ...formData, wholesalePrice: text })}
+                placeholder="Enter wholesale price"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+              {errors.wholesalePrice && <Text style={styles.errorText}>{errors.wholesalePrice}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Agency</Text>
+              <View style={[styles.dropdownButton, styles.readOnlyInput]}>
+                <Text style={styles.readOnlyText}>
+                  {formData.agencyId
+                    ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
+                    : 'No agency selected'}
+                </Text>
+                <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Motorbike</Text>
+              <View style={[styles.dropdownButton, styles.readOnlyInput]}>
+                <Text style={styles.readOnlyText}>
+                  {formData.motorbikeId
+                    ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
+                    : 'No motorbike selected'}
+                </Text>
+                <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#009DFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Update Price Policy</Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Content</Text>
-          <View style={[styles.textInput, styles.textArea, styles.readOnlyInput, styles.readOnlyContainer]}>
-            <Text style={styles.readOnlyText}>{formData.content || 'Policy content'}</Text>
-            <PencilOff size={16} color={COLORS.TEXT.SECONDARY} style={styles.readOnlyIcon} />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Policy *</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea, errors.policy && styles.inputError]}
-            value={formData.policy}
-            onChangeText={(text) => setFormData({ ...formData, policy: text })}
-            placeholder="Enter policy details"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            multiline
-            numberOfLines={3}
-          />
-          {errors.policy && <Text style={styles.errorText}>{errors.policy}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Wholesale Price (VND) *</Text>
-          <TextInput
-            style={[styles.textInput, errors.wholesalePrice && styles.inputError]}
-            value={formData.wholesalePrice}
-            onChangeText={(text) => setFormData({ ...formData, wholesalePrice: text })}
-            placeholder="Enter wholesale price"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-          {errors.wholesalePrice && <Text style={styles.errorText}>{errors.wholesalePrice}</Text>}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Agency</Text>
-          <View style={[styles.dropdownButton, styles.readOnlyInput]}>
-            <Text style={styles.readOnlyText}>
-              {formData.agencyId 
-                ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
-                : 'No agency selected'}
-            </Text>
-            <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Motorbike</Text>
-          <View style={[styles.dropdownButton, styles.readOnlyInput]}>
-            <Text style={styles.readOnlyText}>
-              {formData.motorbikeId 
-                ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
-                : 'No motorbike selected'}
-            </Text>
-            <PencilOff size={16} color={COLORS.TEXT.SECONDARY} />
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Agency Modal */}
       <Modal
@@ -335,48 +330,73 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.LARGE,
+    fontSize: SIZES.FONT.XXLARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
   },
-  saveButton: {
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    paddingVertical: SIZES.PADDING.SMALL,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: SIZES.RADIUS.SMALL,
+  headerActions: {
+    width: 40,
   },
-  saveButtonDisabled: { opacity: 0.5 },
-  saveButtonText: { color: COLORS.TEXT.WHITE, fontWeight: '600' },
-  content: { padding: SIZES.PADDING.LARGE },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
+  contentContainer: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.XLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.LARGE,
+  },
   inputGroup: { marginBottom: SIZES.PADDING.LARGE },
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
   },
+  required: {
+    color: COLORS.ERROR,
+  },
   textInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  inputError: { borderWidth: 1, borderColor: COLORS.ERROR },
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
+  inputError: { borderColor: COLORS.ERROR },
   errorText: { color: COLORS.ERROR, fontSize: SIZES.FONT.SMALL, marginTop: 4 },
   readOnlyInput: {
-    backgroundColor: "#BABABA",
+    backgroundColor: '#E0E0E0',
+    borderColor: 'transparent',
   },
   readOnlyContainer: {
     flexDirection: 'row',
@@ -392,12 +412,14 @@ const styles = StyleSheet.create({
     marginLeft: SIZES.PADDING.SMALL,
   },
   dropdownButton: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   dropdownButtonText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
   dropdownButtonTextPlaceholder: { color: COLORS.TEXT.SECONDARY },
@@ -424,6 +446,22 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
   modalItem: { padding: SIZES.PADDING.MEDIUM, borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
   modalItemText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
+    marginBottom: SIZES.PADDING.XXXLARGE,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
 });
 
 export default EditPricePolicyScreen;
