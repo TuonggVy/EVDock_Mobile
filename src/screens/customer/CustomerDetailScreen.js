@@ -152,27 +152,28 @@ const CustomerDetailScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Customer Info Card */}
-        <View style={styles.infoCard}>
-          <View style={styles.cardHeader}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {customer.name?.charAt(0).toUpperCase() || '?'}
-              </Text>
+      <View style={styles.content}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Customer Info Card */}
+          <View style={styles.infoCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {customer.name?.charAt(0).toUpperCase() || '?'}
+                </Text>
+              </View>
+              <View style={styles.cardHeaderInfo}>
+                <Text style={styles.customerName}>{customer.name}</Text>
+                <Text style={styles.customerPhone}>{customer.phone}</Text>
+              </View>
             </View>
-            <View style={styles.cardHeaderInfo}>
-              <Text style={styles.customerName}>{customer.name}</Text>
-              <Text style={styles.customerPhone}>{customer.phone}</Text>
-            </View>
-          </View>
 
-          {/* Display Mode */}
-          <View style={styles.infoSection}>
+            {/* Display Mode */}
+            <View style={styles.infoSection}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLabelContainer}>
                   <Hash size={14} color={COLORS.TEXT.SECONDARY} />
@@ -226,14 +227,14 @@ const CustomerDetailScreen = ({ navigation, route }) => {
           </View>
         </ScrollView>
 
-      {/* Action Buttons at Bottom */}
-      <View style={styles.bottomActions}>
+        {/* Action Buttons at Bottom */}
+        <View style={styles.bottomActions}>
           <TouchableOpacity
             style={styles.editButton}
             onPress={handleEdit}
           >
             <LinearGradient
-              colors={COLORS.GRADIENT.BLUE}
+              colors={['#009DFF', '#009DFF']}
               style={styles.buttonGradient}
             >
               <View style={styles.editButtonContent}>
@@ -259,6 +260,7 @@ const CustomerDetailScreen = ({ navigation, route }) => {
             </View>
           </TouchableOpacity>
         </View>
+      </View>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -322,11 +324,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.XLARGE,
     paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   infoCard: {
@@ -346,13 +355,13 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
     paddingBottom: SIZES.PADDING.LARGE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SIZES.PADDING.MEDIUM,
@@ -384,7 +393,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   infoLabel: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -403,7 +412,7 @@ const styles = StyleSheet.create({
     padding: SIZES.PADDING.LARGE,
     backgroundColor: COLORS.SURFACE,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: COLORS.BORDER.PRIMARY,
     gap: SIZES.PADDING.MEDIUM,
   },
   editButton: {

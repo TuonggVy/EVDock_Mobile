@@ -122,22 +122,10 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('PromotionManagement'),
     },
     {
-      title: 'Installments',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <CalendarClock color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('InstallmentManagement'),
-    },
-    {
       title: 'Installment Plan',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <SquareChartGantt color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('StaffInstallmentPlanList'),
-    },
-    {
-      title: 'Deposits',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <Gem color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('DepositManagement'),
     },
     {
       title: 'Booking Drive',
@@ -156,12 +144,6 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <ReceiptText color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('CustomerContractManagement'),
-    },
-    {
-      title: 'Installment Contract',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <NotebookPen color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('InstallmentContractManagement'),
     },
   ];
 

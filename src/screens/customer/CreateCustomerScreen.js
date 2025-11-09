@@ -181,139 +181,141 @@ const CreateCustomerScreen = ({ navigation }) => {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Form Section */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Customer Information</Text>
+        <View style={styles.content}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Form Section */}
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Customer Information</Text>
 
-            {/* Name */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>
-                Name <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.formInput, errors.name && styles.formInputError]}
-                placeholder="Enter customer name"
-                value={formData.name}
-                onChangeText={(text) => handleInputChange('name', text)}
-                autoCapitalize="words"
-              />
-              {errors.name && (
-                <Text style={styles.errorText}>{errors.name}</Text>
-              )}
-            </View>
-
-            {/* Email */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>
-                Email <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.formInput, errors.email && styles.formInputError]}
-                placeholder="Enter email"
-                value={formData.email}
-                onChangeText={(text) => handleInputChange('email', text)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.email && (
-                <Text style={styles.errorText}>{errors.email}</Text>
-              )}
-            </View>
-
-            {/* Phone */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>
-                Phone <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.formInput, errors.phone && styles.formInputError]}
-                placeholder="Enter phone number (10-11 digits)"
-                value={formData.phone}
-                onChangeText={(text) => handleInputChange('phone', text)}
-                keyboardType="phone-pad"
-              />
-              {errors.phone && (
-                <Text style={styles.errorText}>{errors.phone}</Text>
-              )}
-            </View>
-
-            {/* Address */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Enter address"
-                value={formData.address}
-                onChangeText={(text) => handleInputChange('address', text)}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-
-            {/* Credential ID */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>ID Card</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Enter ID card number"
-                value={formData.credentialId}
-                onChangeText={(text) => handleInputChange('credentialId', text)}
-                keyboardType="default"
-              />
-            </View>
-
-            {/* Date of Birth */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Date of Birth</Text>
-              <TouchableOpacity
-                style={[styles.dateInput, errors.dob && styles.formInputError]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[
-                  styles.dateInputText,
-                  !formData.dob && styles.dateInputPlaceholder
-                ]}>
-                  {formData.dob ? formatDateForDisplay(formData.dob) : 'Select date of birth'}
+              {/* Name */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Name <Text style={styles.required}>*</Text>
                 </Text>
-                <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
-              </TouchableOpacity>
-              {errors.dob && (
-                <Text style={styles.errorText}>{errors.dob}</Text>
-              )}
-            </View>
-          </View>
-        </ScrollView>
+                <TextInput
+                  style={[styles.formInput, errors.name && styles.formInputError]}
+                  placeholder="Enter customer name"
+                  value={formData.name}
+                  onChangeText={(text) => handleInputChange('name', text)}
+                  autoCapitalize="words"
+                />
+                {errors.name && (
+                  <Text style={styles.errorText}>{errors.name}</Text>
+                )}
+              </View>
 
-        {/* Action Buttons */}
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => navigation.goBack()}
-            disabled={loading}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            <LinearGradient
-              colors={COLORS.GRADIENT.BLUE}
-              style={styles.submitGradient}
+              {/* Email */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Email <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.formInput, errors.email && styles.formInputError]}
+                  placeholder="Enter email"
+                  value={formData.email}
+                  onChangeText={(text) => handleInputChange('email', text)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {errors.email && (
+                  <Text style={styles.errorText}>{errors.email}</Text>
+                )}
+              </View>
+
+              {/* Phone */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Phone <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.formInput, errors.phone && styles.formInputError]}
+                  placeholder="Enter phone number (10-11 digits)"
+                  value={formData.phone}
+                  onChangeText={(text) => handleInputChange('phone', text)}
+                  keyboardType="phone-pad"
+                />
+                {errors.phone && (
+                  <Text style={styles.errorText}>{errors.phone}</Text>
+                )}
+              </View>
+
+              {/* Address */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Address</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Enter address"
+                  value={formData.address}
+                  onChangeText={(text) => handleInputChange('address', text)}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Credential ID */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ID Card</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Enter ID card number"
+                  value={formData.credentialId}
+                  onChangeText={(text) => handleInputChange('credentialId', text)}
+                  keyboardType="default"
+                />
+              </View>
+
+              {/* Date of Birth */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Date of Birth</Text>
+                <TouchableOpacity
+                  style={[styles.dateInput, errors.dob && styles.formInputError]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !formData.dob && styles.dateInputPlaceholder
+                  ]}>
+                    {formData.dob ? formatDateForDisplay(formData.dob) : 'Select date of birth'}
+                  </Text>
+                  <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
+                </TouchableOpacity>
+                {errors.dob && (
+                  <Text style={styles.errorText}>{errors.dob}</Text>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Action Buttons */}
+          <View style={styles.bottomActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => navigation.goBack()}
+              disabled={loading}
             >
-              <Text style={styles.submitButtonText}>
-                {loading ? 'Creating...' : 'Create Customer'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={['#009DFF', '#009DFF']}
+                style={styles.submitGradient}
+              >
+                <Text style={styles.submitButtonText}>
+                  {loading ? 'Creating...' : 'Create Customer'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -384,20 +386,27 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.XLARGE,
     paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   formSection: {
-    marginTop: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.XXLARGE,
   },
   sectionTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.LARGE,
   },
   formGroup: {
@@ -406,21 +415,21 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
   },
   required: {
     color: COLORS.ERROR,
   },
   formInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   formInputError: {
     borderColor: COLORS.ERROR,
@@ -432,12 +441,12 @@ const styles = StyleSheet.create({
     marginTop: SIZES.PADDING.XSMALL,
   },
   dateInput: {
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: '#F5F5F5',
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: COLORS.BORDER.PRIMARY,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -453,9 +462,9 @@ const styles = StyleSheet.create({
   bottomActions: {
     flexDirection: 'row',
     padding: SIZES.PADDING.LARGE,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    backgroundColor: COLORS.SURFACE,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: COLORS.BORDER.PRIMARY,
     gap: SIZES.PADDING.MEDIUM,
   },
   cancelButton: {
@@ -463,13 +472,13 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.MEDIUM,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: COLORS.BORDER.PRIMARY,
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#F5F5F5',
   },
   cancelButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
   },
   submitButton: {
