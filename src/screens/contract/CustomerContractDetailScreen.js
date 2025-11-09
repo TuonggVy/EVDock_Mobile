@@ -17,6 +17,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState(null);
   const [hasInstallmentContract, setHasInstallmentContract] = useState(false);
+  const [linkedInstallmentContractId, setLinkedInstallmentContractId] = useState(null);
 
   useEffect(() => {
     loadContractDetail();
@@ -48,7 +49,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       if (response.success && response.data) {
         setContract(response.data);
         // Check if this contract has an installment contract
-        await checkInstallmentContract();
+        await checkInstallmentContract(response.data);
       } else {
         showError('Error', response.error || 'Failed to load contract details');
         setTimeout(() => navigation.goBack(), 2000);
@@ -62,13 +63,68 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
     }
   };
 
-  const checkInstallmentContract = async () => {
+  const checkInstallmentContract = async (contractData) => {
+    setHasInstallmentContract(false);
+    setLinkedInstallmentContractId(null);
+
+    if (!contractId) {
+      return;
+    }
+
+    const installmentContractIds = new Set();
+
+    if (contractData?.installmentContractId) {
+      installmentContractIds.add(contractData.installmentContractId);
+    }
+
+    if (contractData?.installmentContract?.id) {
+      installmentContractIds.add(contractData.installmentContract.id);
+    }
+
+    if (Array.isArray(contractData?.installmentContracts)) {
+      contractData.installmentContracts.forEach(item => {
+        if (item?.id) {
+          installmentContractIds.add(item.id);
+        }
+      });
+    }
+
     try {
       const response = await installmentContractService.getInstallmentContractByCustomerContract(contractId);
-      setHasInstallmentContract(response.success && response.data !== null);
+      if (response.success && response.data) {
+        const candidateContracts = Array.isArray(response.data) ? response.data : [response.data];
+        candidateContracts.forEach(item => {
+          if (item?.id) {
+            installmentContractIds.add(item.id);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching installment contracts by customer contract:', error);
+    }
+
+    if (installmentContractIds.size === 0) {
+      return;
+    }
+
+    try {
+      for (const installmentContractId of installmentContractIds) {
+        const response = await installmentContractService.getInstallmentContractDetail(installmentContractId);
+
+        if (response.success && response.data) {
+          const detail = response.data;
+          const matchesCustomerContract = Number(detail.customerContractId) === Number(contractId);
+          const hasInstallmentPlan = detail.installmentPlanId !== null && detail.installmentPlanId !== undefined;
+
+          if (matchesCustomerContract && hasInstallmentPlan) {
+            setHasInstallmentContract(true);
+            setLinkedInstallmentContractId(detail.id || installmentContractId);
+            return;
+          }
+        }
+      }
     } catch (error) {
       console.error('Error checking installment contract:', error);
-      setHasInstallmentContract(false);
     }
   };
 
@@ -145,6 +201,18 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   };
 
   const handleShowInstallmentContract = () => {
+    if (linkedInstallmentContractId) {
+      navigation.navigate('InstallmentContractDetail', { installmentContractId: linkedInstallmentContractId });
+      return;
+    }
+    navigation.navigate('InstallmentContractManagement', { customerContractId: contractId });
+  };
+
+  const handleManageInstallmentPayments = () => {
+    if (linkedInstallmentContractId) {
+      navigation.navigate('InstallmentPayment', { installmentContractId: linkedInstallmentContractId });
+      return;
+    }
     navigation.navigate('InstallmentContractManagement', { customerContractId: contractId });
   };
 
@@ -368,17 +436,27 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
-          <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <CreditCard color={COLORS.TEXT.WHITE} size={20} />
-            <Text style={styles.buttonText}>Choose Installment Plan</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {!hasInstallmentContract && (
+          <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
+            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <CreditCard color={COLORS.TEXT.WHITE} size={20} />
+              <Text style={styles.buttonText}>Choose Installment Plan</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
         {hasInstallmentContract && (
           <TouchableOpacity style={styles.showInstallmentButton} onPress={handleShowInstallmentContract}>
             <LinearGradient colors={COLORS.GRADIENT.INFO} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <FileText color={COLORS.TEXT.WHITE} size={20} />
               <Text style={styles.buttonText}>Show Installment Contract</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        {hasInstallmentContract && (
+          <TouchableOpacity style={styles.manageInstallmentButton} onPress={handleManageInstallmentPayments}>
+            <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <CreditCard color={COLORS.TEXT.WHITE} size={20} />
+              <Text style={styles.buttonText}>Manage Installment Payments</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -513,6 +591,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   showInstallmentButton: {
+    width: '100%',
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  manageInstallmentButton: {
     width: '100%',
     borderRadius: SIZES.RADIUS.LARGE,
     overflow: 'hidden',
