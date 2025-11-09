@@ -8,11 +8,14 @@ import {
   SafeAreaView,
   Platform,
 } from 'react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import orderRestockService from '../../services/orderRestockService';
 import agencyService from '../../services/agencyService';
+
+const ACCENT_COLOR = '#009DFF';
 
 const OrderRestockDetailScreen = ({ navigation, route }) => {
   const { orderId, onStatusUpdate } = route.params || {};
@@ -319,10 +322,10 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Details</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.headerActions} />
       </View>
 
       <ScrollView
@@ -460,14 +463,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 0 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderBottomWidth: 1,
@@ -476,15 +478,8 @@ const styles = StyleSheet.create({
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -493,15 +488,19 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  placeholder: {
+  headerActions: {
     width: 40,
   },
   content: {
     flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    paddingTop: SIZES.PADDING.LARGE,
   },
   contentContainer: {
-    padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: 100, // Space for fixed action buttons
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
@@ -558,7 +557,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   infoRow: {
@@ -600,6 +599,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: SIZES.PADDING.MEDIUM,
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nextStatusButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: ACCENT_COLOR,
   },
   actionButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
   orderItemTitle: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: ACCENT_COLOR,
     marginBottom: SIZES.PADDING.SMALL,
   },
 });

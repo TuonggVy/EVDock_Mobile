@@ -15,7 +15,9 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import orderRestockService from '../../services/orderRestockService';
 import agencyService from '../../services/agencyService';
-import { Search } from 'lucide-react-native';
+import { ArrowLeft, Search, Package } from 'lucide-react-native';
+
+const ACCENT_COLOR = '#009DFF';
 
 const OrderRestockManagementScreen = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
@@ -40,7 +42,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     { key: 'all', label: 'All', color: COLORS.TEXT.SECONDARY },
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
-    { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
+    { key: 'DELIVERED', label: 'Delivered', color: ACCENT_COLOR },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
@@ -390,13 +392,13 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       <View style={styles.orderActions}>
         {getNextStatus(order) && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.nextStatusButton]}
+            style={[styles.actionButton, styles.primaryActionButton]}
             onPress={(e) => {
               e.stopPropagation();
               handleUpdateToNextStatus(order);
             }}
           >
-            <Text style={styles.actionButtonText}>
+            <Text style={styles.primaryActionText}>
               {getStatusLabel(getNextStatus(order))}
             </Text>
           </TouchableOpacity>
@@ -404,13 +406,13 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         
         {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
+            style={[styles.actionButton, styles.secondaryActionButton]}
             onPress={(e) => {
               e.stopPropagation();
               handleCancelOrder(order);
             }}
           >
-            <Text style={styles.cancelButtonText}>Cancel Order</Text>
+            <Text style={styles.secondaryActionText}>Cancel Order</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -431,18 +433,18 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.headerButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Restock Management</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.headerButtonPlaceholder} />
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}><Search /></Text>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by ID, vehicle name, warehouse..."
@@ -471,7 +473,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           <Text style={styles.statLabel}>Approved</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: COLORS.PRIMARY }]}>
+          <Text style={[styles.statNumber, { color: ACCENT_COLOR }]}>
             {statusCounts.DELIVERED || 0}
           </Text>
           <Text style={styles.statLabel}>Delivered</Text>
@@ -479,44 +481,53 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       </View>
 
       {/* Status Filter */}
-      <View style={styles.statusFilterWrapper}>
+      <View style={styles.statusTabsWrapper}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.statusFilter}
-          contentContainerStyle={styles.statusFilterContent}
+          contentContainerStyle={styles.statusTabsContent}
         >
-          {orderStatuses.map((status) => (
-            <TouchableOpacity
-              key={status.key}
-              style={[
-                styles.statusChip,
-                selectedStatus === status.key && styles.selectedStatusChip,
-                status.key === 'all' && styles.statusChipCenter
-              ]}
-              onPress={() => handleStatusFilter(status.key)}
-            >
-              <Text style={[
-                styles.statusChipText,
-                selectedStatus === status.key && styles.selectedStatusChipText
-              ]}>
-                {status.label}
-              </Text>
-              {status.key !== 'all' && (
-                <View style={[
-                  styles.statusCount,
-                  selectedStatus === status.key && styles.statusCountActive
-                ]}>
-                  <Text style={[
-                    styles.statusCountText,
-                    selectedStatus === status.key && styles.statusCountTextActive
-                  ]}>
-                    {statusCounts[status.key] || 0}
+          {orderStatuses.map((status) => {
+            const isActive = selectedStatus === status.key;
+            const count = status.key === 'all'
+              ? totalOrders
+              : statusCounts[status.key] || 0;
+
+            return (
+              <TouchableOpacity
+                key={status.key}
+                style={[
+                  styles.statusTab,
+                  isActive && styles.statusTabActive,
+                ]}
+                onPress={() => handleStatusFilter(status.key)}
+              >
+                <Text
+                  style={[
+                    styles.statusTabLabel,
+                    isActive && styles.statusTabLabelActive,
+                  ]}
+                >
+                  {status.label}
+                </Text>
+                <View
+                  style={[
+                    styles.statusTabCount,
+                    isActive && styles.statusTabCountActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusTabCountText,
+                      isActive && styles.statusTabCountTextActive,
+                    ]}
+                  >
+                    {count}
                   </Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -529,20 +540,24 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.PRIMARY}
+            tintColor={ACCENT_COLOR}
           />
         }
       >
         {loading && filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>⏳</Text>
+            <View style={styles.emptyIconWrapper}>
+              <Package size={64} color={COLORS.TEXT.SECONDARY} />
+            </View>
             <Text style={styles.emptyTitle}>Loading...</Text>
           </View>
         ) : filteredOrders.length > 0 ? (
           filteredOrders.map(renderOrderCard)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📦</Text>
+            <View style={styles.emptyIconWrapper}>
+              <Package size={64} color={COLORS.TEXT.SECONDARY} />
+            </View>
             <Text style={styles.emptyTitle}>No Orders</Text>
             <Text style={styles.emptySubtitle}>
               {selectedStatus !== 'all'
@@ -586,7 +601,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  backButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
@@ -594,10 +609,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+  headerButtonPlaceholder: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -605,9 +619,6 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -622,11 +633,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -649,7 +656,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: ACCENT_COLOR,
     marginBottom: 4,
   },
   statLabel: {
@@ -657,59 +664,53 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
   },
-  statusFilterWrapper: {
+  statusTabsWrapper: {
     marginBottom: SIZES.PADDING.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
   },
-  statusFilter: {
-    maxHeight: 50,
-  },
-  statusFilterContent: {
+  statusTabsContent: {
+    flexDirection: 'row',
     gap: SIZES.PADDING.SMALL,
     paddingRight: SIZES.PADDING.MEDIUM,
   },
-  statusChip: {
+  statusTab: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: SIZES.RADIUS.LARGE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     gap: SIZES.PADDING.SMALL,
-    minWidth: 80,
-    maxWidth: 120,
   },
-  statusChipCenter: {
-    justifyContent: 'center',
+  statusTabActive: {
+    backgroundColor: ACCENT_COLOR,
   },
-  selectedStatusChip: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  statusChipText: {
+  statusTabLabel: {
     fontSize: SIZES.FONT.XSMALL,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.SECONDARY,
     fontWeight: '600',
   },
-  selectedStatusChipText: {
+  statusTabLabelActive: {
     color: COLORS.TEXT.WHITE,
   },
-  statusCount: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: SIZES.RADIUS.ROUND,
+  statusTabCount: {
+    minWidth: 28,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    minWidth: 24,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  statusCountActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  statusTabCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  statusCountText: {
+  statusTabCountText: {
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  statusCountTextActive: {
+  statusTabCountTextActive: {
     color: COLORS.TEXT.WHITE,
   },
   ordersList: {
@@ -741,7 +742,7 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: ACCENT_COLOR,
     marginBottom: 4,
   },
   orderDate: {
@@ -784,29 +785,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: SIZES.PADDING.SMALL,
+    flexWrap: 'wrap',
   },
   actionButton: {
     borderRadius: SIZES.RADIUS.SMALL,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    minWidth: 100,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 36,
   },
-  nextStatusButton: {
-    backgroundColor: COLORS.PRIMARY,
+  primaryActionButton: {
+    backgroundColor: '#000000',
   },
-  actionButtonText: {
+  primaryActionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
   },
-  cancelButton: {
+  secondaryActionButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: COLORS.ERROR,
   },
-  cancelButtonText: {
+  secondaryActionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.ERROR,
     fontWeight: '600',
@@ -816,8 +818,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
-  emptyIcon: {
-    fontSize: 64,
+  emptyIconWrapper: {
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
