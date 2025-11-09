@@ -197,110 +197,112 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Booking Info Card */}
-        <View style={styles.infoCard}>
-          <View style={styles.cardHeader}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {booking.fullname?.charAt(0).toUpperCase() || '?'}
-              </Text>
-            </View>
-            <View style={styles.cardHeaderInfo}>
-              <Text style={styles.customerName}>{booking.fullname}</Text>
-              <View style={styles.statusBadge}>
-                <View style={[styles.statusDot, { backgroundColor: getStatusColor(booking.status) }]} />
-                <Text style={[styles.statusText, { color: getStatusColor(booking.status) }]}>
-                  {getStatusText(booking.status)}
+      <View style={styles.content}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Booking Info Card */}
+          <View style={styles.infoCard}>
+            <View style={styles.cardHeader}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {booking.fullname?.charAt(0).toUpperCase() || '?'}
                 </Text>
               </View>
-            </View>
-          </View>
-
-          {/* Display Mode */}
-          <View style={styles.infoSection}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabelContainer}>
-                <Mail size={14} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.infoLabel}> Email</Text>
+              <View style={styles.cardHeaderInfo}>
+                <Text style={styles.customerName}>{booking.fullname}</Text>
+                <View style={styles.statusBadge}>
+                  <View style={[styles.statusDot, { backgroundColor: getStatusColor(booking.status) }]} />
+                  <Text style={[styles.statusText, { color: getStatusColor(booking.status) }]}>
+                    {getStatusText(booking.status)}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.infoValue}>{booking.email || 'N/A'}</Text>
             </View>
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabelContainer}>
-                <Phone size={14} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.infoLabel}> Phone</Text>
-              </View>
-              <Text style={styles.infoValue}>{booking.phone || 'N/A'}</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabelContainer}>
-                <Calendar size={14} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.infoLabel}> Drive Date</Text>
-              </View>
-              <Text style={styles.infoValue}>{formatDate(booking.driveDate)}</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabelContainer}>
-                <Clock size={14} color={COLORS.TEXT.SECONDARY} />
-                <Text style={styles.infoLabel}> Drive Time</Text>
-              </View>
-              <Text style={styles.infoValue}>{formatTime(booking.driveTime)}</Text>
-            </View>
-
-            {booking.electricMotorbikeId && (
+            {/* Display Mode */}
+            <View style={styles.infoSection}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLabelContainer}>
-                  <User size={14} color={COLORS.TEXT.SECONDARY} />
-                  <Text style={styles.infoLabel}> Vehicle ID</Text>
+                  <Mail size={14} color={COLORS.TEXT.SECONDARY} />
+                  <Text style={styles.infoLabel}> Email</Text>
                 </View>
-                <Text style={styles.infoValue}>#{booking.electricMotorbikeId}</Text>
+                <Text style={styles.infoValue}>{booking.email || 'N/A'}</Text>
               </View>
-            )}
-          </View>
-        </View>
-      </ScrollView>
 
-      {/* Action Buttons at Bottom */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity
-          style={styles.statusButton}
-          onPress={() => setShowStatusModal(true)}
-          disabled={updating}
-        >
-          <LinearGradient
-            colors={[getStatusColor(booking.status), getStatusColor(booking.status)]}
-            style={styles.buttonGradient}
-          >
-            <View style={styles.buttonContent}>
-              <Pencil size={14} color="#FFFFFF" />
-              <Text style={styles.buttonText}> Update Status</Text>
+              <View style={styles.infoRow}>
+                <View style={styles.infoLabelContainer}>
+                  <Phone size={14} color={COLORS.TEXT.SECONDARY} />
+                  <Text style={styles.infoLabel}> Phone</Text>
+                </View>
+                <Text style={styles.infoValue}>{booking.phone || 'N/A'}</Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoLabelContainer}>
+                  <Calendar size={14} color={COLORS.TEXT.SECONDARY} />
+                  <Text style={styles.infoLabel}> Drive Date</Text>
+                </View>
+                <Text style={styles.infoValue}>{formatDate(booking.driveDate)}</Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoLabelContainer}>
+                  <Clock size={14} color={COLORS.TEXT.SECONDARY} />
+                  <Text style={styles.infoLabel}> Drive Time</Text>
+                </View>
+                <Text style={styles.infoValue}>{formatTime(booking.driveTime)}</Text>
+              </View>
+
+              {booking.electricMotorbikeId && (
+                <View style={styles.infoRow}>
+                  <View style={styles.infoLabelContainer}>
+                    <User size={14} color={COLORS.TEXT.SECONDARY} />
+                    <Text style={styles.infoLabel}> Vehicle ID</Text>
+                  </View>
+                  <Text style={styles.infoValue}>#{booking.electricMotorbikeId}</Text>
+                </View>
+              )}
             </View>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleDelete}
-          disabled={loading}
-        >
-          <View style={styles.deleteButtonContent}>
-            {loading ? (
-              <Text style={styles.deleteButtonText}>Deleting...</Text>
-            ) : (
-              <>
-                <Trash size={14} color={COLORS.TEXT.WHITE} />
-                <Text style={styles.deleteButtonText}> Delete</Text>
-              </>
-            )}
           </View>
-        </TouchableOpacity>
+        </ScrollView>
+
+        {/* Action Buttons at Bottom */}
+        <View style={styles.bottomActions}>
+          <TouchableOpacity
+            style={styles.statusButton}
+            onPress={() => setShowStatusModal(true)}
+            disabled={updating}
+          >
+            <LinearGradient
+              colors={['#009DFF', '#009DFF']}
+              style={styles.buttonGradient}
+            >
+              <View style={styles.buttonContent}>
+                <Pencil size={14} color="#FFFFFF" />
+                <Text style={styles.buttonText}> Update Status</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            disabled={loading}
+          >
+            <View style={styles.deleteButtonContent}>
+              {loading ? (
+                <Text style={styles.deleteButtonText}>Deleting...</Text>
+              ) : (
+                <>
+                  <Trash size={14} color={COLORS.TEXT.WHITE} />
+                  <Text style={styles.deleteButtonText}> Delete</Text>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Status Update Modal */}
@@ -366,7 +368,18 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <CustomAlert config={alertConfig} onDismiss={hideAlert} />
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
@@ -406,6 +419,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+  },
   scrollView: {
     flex: 1,
   },
@@ -436,7 +455,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SIZES.PADDING.MEDIUM,
@@ -500,7 +519,7 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderTopWidth: 1,
     borderTopColor: COLORS.BORDER.PRIMARY,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    backgroundColor: COLORS.SURFACE,
     gap: SIZES.PADDING.SMALL,
   },
   statusButton: {
@@ -571,8 +590,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER.PRIMARY,
   },
   statusOptionButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
+    borderColor: "#009DFF",
   },
   statusOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -603,7 +622,7 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
   modalButtonConfirm: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   modalButtonConfirmText: {
     fontSize: SIZES.FONT.MEDIUM,

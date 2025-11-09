@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     marginRight: SIZES.PADDING.SMALL,
   },
   filterButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   filterButtonText: {
     fontSize: SIZES.FONT.SMALL,
