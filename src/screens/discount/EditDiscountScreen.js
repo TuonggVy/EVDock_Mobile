@@ -9,6 +9,8 @@ import {
   Platform,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -17,7 +19,7 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { discountService } from '../../services/discountService';
 import motorbikeService from '../../services/motorbikeService';
 import agencyService from '../../services/agencyService';
-import { Calendar, Lock } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Lock } from 'lucide-react-native';
 
 const EditDiscountScreen = ({ navigation, route }) => {
   const discount = route.params?.discount;
@@ -195,175 +197,192 @@ const EditDiscountScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={20} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Discount</Text>
-        <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={loading}
-        >
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Discount Name *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
-            placeholder="Enter discount name"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-          />
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.formSection}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Discount Name *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.name}
+                onChangeText={(text) => setFormData({ ...formData, name: text })}
+                placeholder="Enter discount name"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+              />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Type *</Text>
-          <View style={styles.typeSelector}>
-            {['VOLUME', 'SPECIAL'].map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.typeOption,
-                  formData.type === type && styles.selectedTypeOption
-                ]}
-                onPress={() => setFormData({ ...formData, type })}
-              >
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Type *</Text>
+              <View style={styles.typeSelector}>
+                {['VOLUME', 'SPECIAL'].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.typeOption,
+                      formData.type === type && styles.selectedTypeOption
+                    ]}
+                    onPress={() => setFormData({ ...formData, type })}
+                  >
+                    <Text style={[
+                      styles.typeOptionText,
+                      formData.type === type && styles.selectedTypeOptionText
+                    ]}>
+                      {type === 'VOLUME' ? 'Volume' : 'Special'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Agency {formData.type === 'SPECIAL' ? '*' : ''}</Text>
+              <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
                 <Text style={[
-                  styles.typeOptionText,
-                  formData.type === type && styles.selectedTypeOptionText
+                  styles.dropdownButtonText,
+                  !formData.agencyId && styles.dropdownButtonTextPlaceholder
                 ]}>
-                  {type === 'VOLUME' ? 'Volume' : 'Special'}
+                  {formData.agencyId 
+                    ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
+                    : 'Select agency'}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+                <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
+              </View>
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Agency {formData.type === 'SPECIAL' ? '*' : ''}</Text>
-          <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
-            <Text style={[
-              styles.dropdownButtonText,
-              !formData.agencyId && styles.dropdownButtonTextPlaceholder
-            ]}>
-              {formData.agencyId 
-                ? agencies.find(a => a.id === formData.agencyId)?.name || `Agency ${formData.agencyId}`
-                : 'Select agency'}
-            </Text>
-            <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Motorbike *</Text>
-          <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
-            <Text style={[
-              styles.dropdownButtonText,
-              !formData.motorbikeId && styles.dropdownButtonTextPlaceholder
-            ]}>
-              {formData.motorbikeId 
-                ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
-                : 'Select motorbike'}
-            </Text>
-            <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Value *</Text>
-          <View style={styles.valueTypeSelector}>
-            {['PERCENT', 'FIXED'].map((vt) => (
-              <TouchableOpacity
-                key={vt}
-                style={[
-                  styles.valueTypeOption,
-                  formData.valueType === vt && styles.selectedValueTypeOption
-                ]}
-                onPress={() => setFormData({ ...formData, valueType: vt })}
-              >
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Motorbike *</Text>
+              <View style={[styles.dropdownButton, styles.dropdownButtonReadOnly]}>
                 <Text style={[
-                  styles.valueTypeOptionText,
-                  formData.valueType === vt && styles.selectedValueTypeOptionText
+                  styles.dropdownButtonText,
+                  !formData.motorbikeId && styles.dropdownButtonTextPlaceholder
                 ]}>
-                  {vt === 'PERCENT' ? 'Percent (%)' : 'Fixed (VND)'}x
+                  {formData.motorbikeId 
+                    ? motorbikes.find(b => b.id === formData.motorbikeId)?.name || `ID: ${formData.motorbikeId}`
+                    : 'Select motorbike'}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            style={styles.textInput}
-            value={formData.value}
-            onChangeText={(text) => setFormData({ ...formData, value: text })}
-            placeholder={formData.valueType === 'PERCENT' ? 'Example: 10' : 'Example: 50000'}
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
+                <Text style={styles.readOnlyLabel}><Lock size={14} /></Text>
+              </View>
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Minimum Quantity *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={formData.min_quantity}
-            onChangeText={(text) => setFormData({ ...formData, min_quantity: text })}
-            placeholder="Enter minimum quantity"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            keyboardType="numeric"
-          />
-        </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Value *</Text>
+              <View style={styles.valueTypeSelector}>
+                {['PERCENT', 'FIXED'].map((vt) => (
+                  <TouchableOpacity
+                    key={vt}
+                    style={[
+                      styles.valueTypeOption,
+                      formData.valueType === vt && styles.selectedValueTypeOption
+                    ]}
+                    onPress={() => setFormData({ ...formData, valueType: vt })}
+                  >
+                    <Text style={[
+                      styles.valueTypeOptionText,
+                      formData.valueType === vt && styles.selectedValueTypeOptionText
+                    ]}>
+                      {vt === 'PERCENT' ? 'Percent (%)' : 'Fixed (VND)'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.textInput}
+                value={formData.value}
+                onChangeText={(text) => setFormData({ ...formData, value: text })}
+                placeholder={formData.valueType === 'PERCENT' ? 'Example: 10' : 'Example: 50000'}
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Start Date *</Text>
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => setShowStartDatePicker(true)}
-          >
-            <Text style={[styles.dateInputText, !formData.startAt && styles.dateInputTextPlaceholder]}>
-              {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Select start date'}
-            </Text>
-            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Minimum Quantity *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.min_quantity}
+                onChangeText={(text) => setFormData({ ...formData, min_quantity: text })}
+                placeholder="Enter minimum quantity"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>End Date *</Text>
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => setShowEndDatePicker(true)}
-          >
-            <Text style={[styles.dateInputText, !formData.endAt && styles.dateInputTextPlaceholder]}>
-              {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Select end date'}
-            </Text>
-            <Text style={styles.dateIcon}><Calendar size={14} /></Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Status *</Text>
-          <View style={styles.statusSelector}>
-            {['ACTIVE', 'INACTIVE'].map((status) => (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Start Date *</Text>
               <TouchableOpacity
-                key={status}
-                style={[
-                  styles.statusOption,
-                  formData.status === status && styles.selectedStatusOption
-                ]}
-                onPress={() => setFormData({ ...formData, status })}
+                style={styles.dateInput}
+                onPress={() => setShowStartDatePicker(true)}
               >
-                <Text style={[
-                  styles.statusOptionText,
-                  formData.status === status && styles.selectedStatusOptionText
-                ]}>
-                  {status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                <Text style={[styles.dateInputText, !formData.startAt && styles.dateInputTextPlaceholder]}>
+                  {formData.startAt ? formatDateForDisplay(formData.startAt) : 'Select start date'}
                 </Text>
+                <Text style={styles.dateIcon}><Calendar size={14} /></Text>
               </TouchableOpacity>
-            ))}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text style={[styles.dateInputText, !formData.endAt && styles.dateInputTextPlaceholder]}>
+                  {formData.endAt ? formatDateForDisplay(formData.endAt) : 'Select end date'}
+                </Text>
+                <Text style={styles.dateIcon}><Calendar size={14} /></Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Status *</Text>
+              <View style={styles.statusSelector}>
+                {['ACTIVE', 'INACTIVE'].map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.statusOption,
+                      formData.status === status && styles.selectedStatusOption
+                    ]}
+                    onPress={() => setFormData({ ...formData, status })}
+                  >
+                    <Text style={[
+                      styles.statusOptionText,
+                      formData.status === status && styles.selectedStatusOptionText
+                    ]}>
+                      {status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#009DFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Agency Dropdown Modal */}
       <Modal
@@ -490,20 +509,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.LARGE,
     paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
-    padding: SIZES.PADDING.SMALL,
-  },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -512,30 +529,34 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  saveButton: {
-    backgroundColor: COLORS.PRIMARY,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderRadius: SIZES.RADIUS.MEDIUM,
+  headerActions: {
+    width: 40,
+    height: 40,
   },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    overflow: 'hidden',
+  },
+  contentContainer: {
+    flexGrow: 1,
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    gap: SIZES.PADDING.MEDIUM,
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   inputLabel: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: SIZES.PADDING.SMALL,
     fontWeight: '600',
   },
@@ -546,6 +567,8 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.SMALL,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   typeSelector: {
     flexDirection: 'row',
@@ -553,7 +576,7 @@ const styles = StyleSheet.create({
   },
   typeOption: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: "#EDEDED",
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -561,15 +584,15 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedTypeOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
   typeOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
   selectedTypeOptionText: {
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     fontWeight: '600',
   },
   dropdownButton: {
@@ -581,9 +604,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     minHeight: 48,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   dropdownButtonReadOnly: {
-    backgroundColor: '#BABABA',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   dropdownButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -598,6 +623,7 @@ const styles = StyleSheet.create({
   },
   readOnlyLabel: {
     fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
   },
   modalOverlay: {
     flex: 1,
@@ -646,7 +672,7 @@ const styles = StyleSheet.create({
   },
   valueTypeOption: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: "#EDEDED",
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -654,15 +680,15 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedValueTypeOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
   valueTypeOptionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
   },
   selectedValueTypeOptionText: {
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     fontWeight: '600',
   },
   statusSelector: {
@@ -671,7 +697,7 @@ const styles = StyleSheet.create({
   },
   statusOption: {
     flex: 1,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: "#EDEDED",
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
@@ -679,16 +705,31 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedStatusOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
   statusOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
   selectedStatusOptionText: {
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
     fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.XLARGE,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: '600',
+    color: COLORS.TEXT.WHITE,
   },
   dateInput: {
     backgroundColor: COLORS.SURFACE,
@@ -699,6 +740,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     minHeight: 48,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
   },
   dateInputText: {
     fontSize: SIZES.FONT.MEDIUM,

@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Platform,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -15,6 +16,22 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { discountService } from '../../services/discountService';
 import motorbikeService from '../../services/motorbikeService';
 import agencyService from '../../services/agencyService';
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  Tag,
+  Percent,
+  Calendar,
+  Building2,
+  Bike,
+  CheckCircle,
+  XCircle,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
+
+const ACCENT_COLOR = '#009DFF';
 
 const DiscountManagementScreen = ({ navigation }) => {
   const [discounts, setDiscounts] = useState([]);
@@ -108,6 +125,18 @@ const DiscountManagementScreen = ({ navigation }) => {
     );
   };
 
+  const statusTabs = [
+    { value: 'all', label: 'All' },
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'INACTIVE', label: 'Inactive' },
+  ];
+
+  const typeFilters = [
+    { value: 'all', label: 'All' },
+    { value: 'VOLUME', label: 'Volume' },
+    { value: 'SPECIAL', label: 'Special' },
+  ];
+
   const filteredDiscounts = discounts.filter((discount) => {
     const matchesSearch = discount.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       discount.type.toLowerCase().includes(searchQuery.toLowerCase());
@@ -116,78 +145,116 @@ const DiscountManagementScreen = ({ navigation }) => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const totalDiscounts = discounts.length;
+  const activeDiscounts = discounts.filter(discount => discount.status === 'ACTIVE').length;
+  const inactiveDiscounts = discounts.filter(discount => discount.status === 'INACTIVE').length;
+
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('vi-VN');
   };
 
-  const renderDiscountCard = (discount) => (
-    <View key={discount.id} style={styles.discountCard}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.discountName}>{discount.name}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: discount.status === 'ACTIVE' ? COLORS.SUCCESS : COLORS.ERROR }]}>
-          <Text style={styles.statusText}>{discount.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Text>
-        </View>
-      </View>
+  const renderDiscountCard = (discount) => {
+    const numericValue = Number(discount.value);
+    const formattedValue = discount.valueType === 'PERCENT'
+      ? `${discount.value}%`
+      : Number.isNaN(numericValue)
+        ? `${discount.value || 0} VND`
+        : `${numericValue.toLocaleString('vi-VN')} VND`;
 
-      <View style={styles.cardContent}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Type:</Text>
-          <Text style={styles.detailValue}>{discount.type === 'VOLUME' ? 'Volume' : 'Special'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Value:</Text>
-          <Text style={styles.detailValue}>
-            {discount.valueType === 'PERCENT' ? `${discount.value}%` : `${discount.value} VND`}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Minimum Quantity:</Text>
-          <Text style={styles.detailValue}>{discount.min_quantity} units</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>From Date:</Text>
-          <Text style={styles.detailValue}>{formatDate(discount.startAt)}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>To Date:</Text>
-          <Text style={styles.detailValue}>{formatDate(discount.endAt)}</Text>
-        </View>
-        {discount.agencyId && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Agency:</Text>
-            <Text style={styles.detailValue}>
-              {agencies.find(a => a.id === discount.agencyId)?.name || `ID: ${discount.agencyId}`}
-            </Text>
+    return (
+      <View key={discount.id} style={styles.discountCard}>
+        <View style={styles.cardHeader}>
+          <View style={styles.discountInfo}>
+            <Text style={styles.discountName}>{discount.name}</Text>
+            <View style={styles.metaRow}>
+              <View style={styles.metaChip}>
+                <Tag size={14} color={ACCENT_COLOR} />
+                <Text style={styles.metaChipText}>{discount.type === 'VOLUME' ? 'Volume' : 'Special'}</Text>
+              </View>
+              <View style={styles.metaChip}>
+                <Percent size={14} color={ACCENT_COLOR} />
+                <Text style={styles.metaChipText}>{formattedValue}</Text>
+              </View>
+              {discount.min_quantity ? (
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>{`Min ${discount.min_quantity}`}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
-        )}
-        {discount.motorbikeId && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Motorbike:</Text>
-            <Text style={styles.detailValue}>
-              {motorbikes.find(b => b.id === discount.motorbikeId)?.name || `ID: ${discount.motorbikeId}`}
-            </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: discount.status === 'ACTIVE' ? COLORS.SUCCESS : COLORS.ERROR },
+            ]}
+          >
+            {discount.status === 'ACTIVE' ? (
+              <CheckCircle size={14} color={COLORS.TEXT.WHITE} style={styles.statusIcon} />
+            ) : (
+              <XCircle size={14} color={COLORS.TEXT.WHITE} style={styles.statusIcon} />
+            )}
+            <Text style={styles.statusText}>{discount.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Text>
           </View>
-        )}
-      </View>
+        </View>
 
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleEditDiscount(discount)}
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteDiscount(discount)}
-        >
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
+        <View style={styles.cardContent}>
+          <View style={styles.detailRow}>
+            <View style={styles.detailLabelWrapper}>
+              <Calendar size={14} color={COLORS.TEXT.SECONDARY} />
+              <Text style={styles.detailLabel}>From</Text>
+            </View>
+            <Text style={styles.detailValue}>{formatDate(discount.startAt)}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <View style={styles.detailLabelWrapper}>
+              <Calendar size={14} color={COLORS.TEXT.SECONDARY} />
+              <Text style={styles.detailLabel}>To</Text>
+            </View>
+            <Text style={styles.detailValue}>{formatDate(discount.endAt)}</Text>
+          </View>
+          {discount.agencyId && (
+            <View style={styles.detailRow}>
+              <View style={styles.detailLabelWrapper}>
+                <Building2 size={14} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.detailLabel}>Agency</Text>
+              </View>
+              <Text style={styles.detailValue}>
+                {agencies.find(a => a.id === discount.agencyId)?.name || `ID: ${discount.agencyId}`}
+              </Text>
+            </View>
+          )}
+          {discount.motorbikeId && (
+            <View style={styles.detailRow}>
+              <View style={styles.detailLabelWrapper}>
+                <Bike size={14} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.detailLabel}>Motorbike</Text>
+              </View>
+              <Text style={styles.detailValue}>
+                {motorbikes.find(b => b.id === discount.motorbikeId)?.name || `ID: ${discount.motorbikeId}`}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleEditDiscount(discount)}
+          >
+            <Pencil size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconButton, styles.iconButtonDanger]}
+            onPress={() => handleDeleteDiscount(discount)}
+          >
+            <Trash2 size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -197,20 +264,20 @@ const DiscountManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Discount Management</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddDiscount}
         >
-          <Text style={styles.addIcon}>+</Text>
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search discount name..."
@@ -220,53 +287,70 @@ const DiscountManagementScreen = ({ navigation }) => {
         />
       </View>
 
-      {/* Filters */}
-      <View style={styles.filtersContainer}>
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Status:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {['all', 'ACTIVE', 'INACTIVE'].map((status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.filterChip,
-                  filterStatus === status && styles.filterChipActive
-                ]}
-                onPress={() => setFilterStatus(status)}
-              >
-                <Text style={[
-                  styles.filterChipText,
-                  filterStatus === status && styles.filterChipTextActive
-                ]}>
-                  {status === 'all' ? 'All' : status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{totalDiscounts}</Text>
+          <Text style={styles.statLabel}>Total Discounts</Text>
         </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{activeDiscounts}</Text>
+          <Text style={styles.statLabel}>Active</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{inactiveDiscounts}</Text>
+          <Text style={styles.statLabel}>Inactive</Text>
+        </View>
+      </View>
 
-        <View style={styles.filterGroup}>
-          <Text style={styles.filterLabel}>Type:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {['all', 'VOLUME', 'SPECIAL'].map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.filterChip,
-                  filterType === type && styles.filterChipActive
-                ]}
-                onPress={() => setFilterType(type)}
-              >
-                <Text style={[
-                  styles.filterChipText,
-                  filterType === type && styles.filterChipTextActive
-                ]}>
-                  {type === 'all' ? 'All' : type === 'VOLUME' ? 'Volume' : 'Special'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+      {/* Status Tabs */}
+      <View style={styles.tabContainer}>
+        {statusTabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.value}
+            style={[
+              styles.tabButton,
+              filterStatus === tab.value && styles.activeTabButton,
+            ]}
+            onPress={() => setFilterStatus(tab.value)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                filterStatus === tab.value && styles.activeTabText,
+              ]}
+            >
+              {tab.value === 'all'
+                ? `All (${totalDiscounts})`
+                : tab.value === 'ACTIVE'
+                  ? `Active (${activeDiscounts})`
+                  : `Inactive (${inactiveDiscounts})`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Type Filters */}
+      <View style={styles.typeFilterContainer}>
+        {typeFilters.map((type) => (
+          <TouchableOpacity
+            key={type.value}
+            style={[
+              styles.typeFilterChip,
+              filterType === type.value && styles.typeFilterChipActive,
+            ]}
+            onPress={() => setFilterType(type.value)}
+          >
+            <Text
+              style={[
+                styles.typeFilterText,
+                filterType === type.value && styles.typeFilterTextActive,
+              ]}
+            >
+              {type.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Discounts List */}
@@ -275,11 +359,16 @@ const DiscountManagementScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.discountsContent}
       >
-        {filteredDiscounts.length > 0 ? (
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={ACCENT_COLOR} />
+            <Text style={styles.loadingText}>Loading discounts...</Text>
+          </View>
+        ) : filteredDiscounts.length > 0 ? (
           filteredDiscounts.map(renderDiscountCard)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎁</Text>
+            <Tag size={64} color={COLORS.TEXT.SECONDARY} />
             <Text style={styles.emptyTitle}>No discounts</Text>
             <Text style={styles.emptySubtitle}>Create a new discount to get started</Text>
           </View>
@@ -327,11 +416,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -343,14 +427,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: ACCENT_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -365,49 +444,89 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
-  filtersContainer: {
+  statsContainer: {
+    flexDirection: 'row',
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingBottom: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
   },
-  filterGroup: {
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  filterLabel: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.XSMALL,
-  },
-  filterChip: {
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  statNumber: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: ACCENT_COLOR,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    backgroundColor: ACCENT_COLOR,
+  },
+  tabText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  typeFilterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+  },
+  typeFilterChip: {
+    flex: 1,
     backgroundColor: COLORS.SURFACE,
-    marginRight: SIZES.PADDING.SMALL,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.SMALL,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  filterChipActive: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+  typeFilterChipActive: {
+    borderColor: ACCENT_COLOR,
+    backgroundColor: 'rgba(0, 157, 255, 0.12)',
   },
-  filterChipText: {
+  typeFilterText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
-  },
-  filterChipTextActive: {
-    color: COLORS.PRIMARY,
     fontWeight: '600',
+  },
+  typeFilterTextActive: {
+    color: ACCENT_COLOR,
   },
   discountsList: {
     flex: 1,
@@ -432,16 +551,43 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: SIZES.PADDING.SMALL,
   },
+  discountInfo: {
+    flex: 1,
+  },
   discountName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-    flex: 1,
+    color: ACCENT_COLOR,
+    marginBottom: SIZES.PADDING.XSMALL,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.XSMALL,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 157, 255, 0.08)',
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  metaChipText: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: ACCENT_COLOR,
+    fontWeight: '600',
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: SIZES.PADDING.SMALL,
     paddingVertical: 4,
     borderRadius: SIZES.RADIUS.SMALL,
+  },
+  statusIcon: {
+    marginRight: 4,
   },
   statusText: {
     fontSize: SIZES.FONT.XSMALL,
@@ -450,12 +596,17 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     marginBottom: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.XSMALL,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+  },
+  detailLabelWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   detailLabel: {
     fontSize: SIZES.FONT.SMALL,
@@ -471,203 +622,43 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: SIZES.PADDING.SMALL,
   },
-  editButton: {
-    backgroundColor: COLORS.PRIMARY,
+  iconButton: {
+    backgroundColor: '#000000',
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
-  deleteButton: {
+  iconButtonDanger: {
     backgroundColor: COLORS.ERROR,
-    borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.SMALL,
   },
   emptySubtitle: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-  },
-  modalHeader: {
-    flexDirection: 'row',
+  loadingState: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingTop: Platform.OS === 'ios' ? 20 : 0,
-    paddingBottom: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  modalCloseButton: {
-    padding: SIZES.PADDING.SMALL,
-  },
-  modalCloseText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-    flex: 1,
-    textAlign: 'center',
-  },
-  modalSaveButton: {
-    padding: SIZES.PADDING.SMALL,
-  },
-  modalSaveText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  modalContent: {
-    flex: 1,
-    padding: SIZES.PADDING.MEDIUM,
-  },
-  inputGroup: {
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  inputLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.SMALL,
-    fontWeight: '600',
-  },
-  textInput: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  typeSelector: {
-    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.XXLARGE,
     gap: SIZES.PADDING.SMALL,
   },
-  typeOption: {
-    flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  selectedTypeOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  typeOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedTypeOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  valueTypeSelector: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  valueTypeOption: {
-    flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  selectedValueTypeOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  valueTypeOptionText: {
+  loadingText: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedValueTypeOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  selector: {
-    maxHeight: 200,
-  },
-  selectorOption: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  selectedSelectorOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  selectorOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedSelectorOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  statusSelector: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
-  },
-  statusOption: {
-    flex: 1,
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  selectedStatusOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  statusOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedStatusOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
   },
 });
 
