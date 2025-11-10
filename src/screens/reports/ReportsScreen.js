@@ -168,7 +168,7 @@ const ReportsScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+        <ActivityIndicator size="large" color="#009DFF" />
         <Text style={styles.loadingText}>Loading data...</Text>
       </View>
     );
@@ -182,7 +182,7 @@ const ReportsScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
+          <ArrowLeft size={20} color="#009DFF" />
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Dashboard Reports</Text>
@@ -208,7 +208,7 @@ const ReportsScreen = ({ navigation }) => {
           <View style={styles.kpiGrid}>
             <View style={styles.kpiCard}>
               <LinearGradient
-                colors={COLORS.GRADIENT.BLUE}
+                colors={['#009DFF', '#009DFF']}
                 style={styles.kpiGradient}
               >
                 <Text style={styles.kpiNumber}>{kpiData.totalAgencies}</Text>
@@ -218,7 +218,7 @@ const ReportsScreen = ({ navigation }) => {
 
             <View style={styles.kpiCard}>
               <LinearGradient
-                colors={COLORS.GRADIENT.PURPLE}
+                colors={['#009DFF', '#009DFF']}
                 style={styles.kpiGradient}
               >
                 <Text style={styles.kpiNumber}>{kpiData.totalWarehouses}</Text>
@@ -228,7 +228,7 @@ const ReportsScreen = ({ navigation }) => {
 
             <View style={styles.kpiCard}>
               <LinearGradient
-                colors={COLORS.GRADIENT.PINK}
+                colors={['#009DFF', '#009DFF']}
                 style={styles.kpiGradient}
               >
                 <Text style={styles.kpiNumber}>{kpiData.totalMotorbikes}</Text>
@@ -238,7 +238,7 @@ const ReportsScreen = ({ navigation }) => {
 
             <View style={styles.kpiCard}>
               <LinearGradient
-                colors={COLORS.GRADIENT.PINK_PURPLE}
+                colors={['#009DFF', '#009DFF']}
                 style={styles.kpiGradient}
               >
                 <Text style={styles.kpiNumber}>{kpiData.totalApBatches}</Text>
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '600',
   },
   headerTitle: {
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.SMALL,
   },
   quarterButtonActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
   },
   quarterButtonText: {
     fontSize: SIZES.FONT.SMALL,
