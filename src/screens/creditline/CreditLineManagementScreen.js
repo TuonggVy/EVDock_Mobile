@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import creditLineService from '../../services/creditLineService';
@@ -27,6 +28,11 @@ const CreditLineManagementScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'blocked'
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [confirmState, setConfirmState] = useState({
+    visible: false,
+    creditLineId: null,
+    agencyName: '',
+  });
 
   useEffect(() => {
     loadAgencies();
@@ -109,41 +115,13 @@ const CreditLineManagementScreen = ({ navigation }) => {
     navigation.navigate('CreditLineDetail', { creditLineId: creditLine.id });
   };
 
-  const handleDelete = async (creditLineId, agencyName, event) => {
+  const handleDelete = (creditLineId, agencyName, event) => {
     event?.stopPropagation();
-    Alert.alert(
-      'Delete Credit Line',
-      `Are you sure you want to delete credit line for "${agencyName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const response = await creditLineService.deleteCreditLine(creditLineId);
-            if (response.success) {
-              setAlertConfig({
-                title: 'Success',
-                message: 'Credit line deleted successfully',
-                type: 'success'
-              });
-              setShowAlert(true);
-              loadCreditLines();
-            } else {
-              const errorMessage = typeof response.error === 'string' 
-                ? response.error 
-                : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
-              setAlertConfig({
-                title: 'Error',
-                message: errorMessage,
-                type: 'error'
-              });
-              setShowAlert(true);
-            }
-          }
-        }
-      ]
-    );
+    setConfirmState({
+      visible: true,
+      creditLineId,
+      agencyName,
+    });
   };
 
   const handleAdd = () => {
@@ -169,7 +147,7 @@ const CreditLineManagementScreen = ({ navigation }) => {
   const blockedCount = creditLines.filter(cl => cl.isBlocked).length;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <CustomAlert
         visible={showAlert}
         title={alertConfig.title}
@@ -177,155 +155,205 @@ const CreditLineManagementScreen = ({ navigation }) => {
         type={alertConfig.type}
         onClose={() => setShowAlert(false)}
       />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft size={20} color={COLORS.PRIMARY} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Credit Line Management</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAdd}
-        >
-          <Plus size={20} color={COLORS.PRIMARY} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Search size={20} color={COLORS.TEXT.SECONDARY} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by agency name or ID..."
-          placeholderTextColor={COLORS.TEXT.SECONDARY}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'active' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('active')}
-        >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'active' && styles.activeTabText
-          ]}>
-            Active ({activeCount})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'blocked' && styles.activeTabButton
-          ]}
-          onPress={() => setActiveTab('blocked')}
-        >
-          <Text style={[
-            styles.tabText,
-            activeTab === 'blocked' && styles.activeTabText
-          ]}>
-            Blocked ({blockedCount})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Credit Lines List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.listContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      <CustomAlert
+        visible={confirmState.visible}
+        title="Delete Credit Line"
+        message={`Are you sure you want to delete credit line for "${confirmState.agencyName || 'this agency'}"?`}
+        type="warning"
+        showCancel
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={async () => {
+          const creditLineId = confirmState.creditLineId;
+          setConfirmState({ visible: false, creditLineId: null, agencyName: '' });
+          if (!creditLineId) return;
+          try {
+            const response = await creditLineService.deleteCreditLine(creditLineId);
+            if (response.success) {
+              setAlertConfig({
+                title: 'Success',
+                message: 'Credit line deleted successfully',
+                type: 'success'
+              });
+              setShowAlert(true);
+              loadCreditLines();
+            } else {
+              const errorMessage = typeof response.error === 'string' 
+                ? response.error 
+                : (response.error?.message || JSON.stringify(response.error) || 'Failed to delete credit line');
+              setAlertConfig({
+                title: 'Error',
+                message: errorMessage,
+                type: 'error'
+              });
+              setShowAlert(true);
+            }
+          } catch (error) {
+            console.error('Error deleting credit line:', error);
+            setAlertConfig({
+              title: 'Error',
+              message: 'An unexpected error occurred while deleting the credit line',
+              type: 'error'
+            });
+            setShowAlert(true);
           }
-        >
-          {filteredCreditLines.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <CreditCard size={60} color={COLORS.TEXT.SECONDARY} />
-              <Text style={styles.emptyText}>
-                {activeTab === 'active' 
-                  ? 'No active credit lines found' 
-                  : 'No blocked credit lines found'}
-              </Text>
-            </View>
-          ) : (
-            filteredCreditLines.map((creditLine) => (
-              <TouchableOpacity 
-                key={creditLine.id} 
-                style={styles.creditLineCard}
-                onPress={() => handleViewDetail(creditLine)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.creditLineHeader}>
-                  <View style={styles.creditLineHeaderLeft}>
-                    <Text style={styles.agencyName}>
-                      {creditLine.agency?.name || getAgencyName(creditLine.agencyId)}
-                    </Text>
-                    <View style={[
-                      styles.statusBadge, 
-                      { backgroundColor: creditLine.isBlocked ? COLORS.ERROR : COLORS.SUCCESS }
-                    ]}>
-                      <Text style={styles.statusText}>
-                        {creditLine.isBlocked ? 'Blocked' : 'Active'}
+        }}
+        onCancel={() => setConfirmState({ visible: false, creditLineId: null, agencyName: '' })}
+        onClose={() => setConfirmState({ visible: false, creditLineId: null, agencyName: '' })}
+      />
+
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Credit Line Management</Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAdd}
+          >
+            <Plus size={18} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Search size={18} color={COLORS.TEXT.SECONDARY} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by agency name or ID..."
+            placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === 'active' && styles.activeTabButton
+            ]}
+            onPress={() => setActiveTab('active')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'active' && styles.activeTabText
+            ]}>
+              Active ({activeCount})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === 'blocked' && styles.activeTabButton
+            ]}
+            onPress={() => setActiveTab('blocked')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'blocked' && styles.activeTabText
+            ]}>
+              Blocked ({blockedCount})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Credit Lines List */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#009DFF" />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.listContainer}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            {filteredCreditLines.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <CreditCard size={64} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.emptyText}>
+                  {activeTab === 'active' 
+                    ? 'No active credit lines found' 
+                    : 'No blocked credit lines found'}
+                </Text>
+              </View>
+            ) : (
+              filteredCreditLines.map((creditLine) => (
+                <TouchableOpacity 
+                  key={creditLine.id} 
+                  style={styles.creditLineCard}
+                  onPress={() => handleViewDetail(creditLine)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.creditLineHeader}>
+                    <View style={styles.creditLineHeaderLeft}>
+                      <Text style={styles.agencyName}>
+                        {creditLine.agency?.name || getAgencyName(creditLine.agencyId)}
+                      </Text>
+                      <View style={[
+                        styles.statusBadge, 
+                        { backgroundColor: creditLine.isBlocked ? COLORS.ERROR : COLORS.SUCCESS }
+                      ]}>
+                        <Text style={styles.statusText}>
+                          {creditLine.isBlocked ? 'Blocked' : 'Active'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.actionButtons}>
+                      <TouchableOpacity
+                        style={[styles.iconButton, styles.editButton]}
+                        onPress={(e) => handleEdit(creditLine, e)}
+                      >
+                        <Pencil size={16} color={COLORS.TEXT.WHITE} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.iconButton, styles.deleteButton]}
+                        onPress={(e) => handleDelete(creditLine.id, creditLine.agency?.name || getAgencyName(creditLine.agencyId), e)}
+                      >
+                        <Trash2 size={16} color={COLORS.TEXT.WHITE} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.creditLineDetails}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Credit Limit</Text>
+                      <Text style={styles.detailValue}>
+                        {creditLineService.formatCreditLimit(creditLine.creditLimit)}
                       </Text>
                     </View>
-                  </View>
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.iconButton, styles.editButton]}
-                      onPress={(e) => handleEdit(creditLine, e)}
-                    >
-                      <Pencil size={16} color={COLORS.PRIMARY} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.iconButton, styles.deleteButton]}
-                      onPress={(e) => handleDelete(creditLine.id, creditLine.agency?.name || getAgencyName(creditLine.agencyId), e)}
-                    >
-                      <Trash2 size={16} color={COLORS.ERROR} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.creditLineDetails}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Credit Limit:</Text>
-                    <Text style={styles.detailValue}>
-                      {creditLineService.formatCreditLimit(creditLine.creditLimit)}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Warning Threshold:</Text>
-                    <Text style={styles.detailValue}>{creditLine.warningThreshold}%</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Overdue Threshold:</Text>
-                    <Text style={styles.detailValue}>{creditLine.overDueThreshHoldDays} days</Text>
-                  </View>
-                  {creditLine.agency?.location && (
                     <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Location:</Text>
-                      <Text style={styles.detailValue}>{creditLine.agency.location}</Text>
+                      <Text style={styles.detailLabel}>Warning Threshold</Text>
+                      <Text style={styles.detailValue}>{creditLine.warningThreshold}%</Text>
                     </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      )}
-    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Overdue Threshold</Text>
+                      <Text style={styles.detailValue}>{creditLine.overDueThreshHoldDays} days</Text>
+                    </View>
+                    {creditLine.agency?.location && (
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Location</Text>
+                        <Text style={styles.detailValue}>{creditLine.agency.location}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -334,36 +362,56 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
   },
+  content: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 20 : 0,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SIZES.PADDING.LARGE,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: SIZES.PADDING.XXXLARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
-    padding: SIZES.PADDING.SMALL,
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: SIZES.FONT.HEADER,
+    fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     flex: 1,
     textAlign: 'center',
   },
   addButton: {
-    padding: SIZES.PADDING.SMALL,
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: '#009DFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.LARGE,
-    borderRadius: SIZES.RADIUS.LARGE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
+    margin: SIZES.PADDING.MEDIUM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchIcon: {
     marginRight: SIZES.PADDING.SMALL,
@@ -380,7 +428,9 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-    paddingHorizontal: SIZES.PADDING.LARGE,
+  },
+  listContent: {
+    padding: SIZES.PADDING.MEDIUM,
   },
   creditLineCard: {
     backgroundColor: COLORS.SURFACE,
@@ -431,14 +481,14 @@ const styles = StyleSheet.create({
     marginLeft: SIZES.PADDING.XSMALL,
   },
   editButton: {
-    backgroundColor: COLORS.PRIMARY + '20',
+    backgroundColor: '#000000',
   },
   deleteButton: {
-    backgroundColor: COLORS.ERROR + '20',
+    backgroundColor: '#000000',
   },
   creditLineDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#EFEFEF',
+    borderTopColor: 'rgba(0,0,0,0.08)',
     paddingTop: SIZES.PADDING.SMALL,
   },
   detailRow: {
@@ -458,21 +508,20 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
+    marginTop: SIZES.PADDING.SMALL,
   },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: SIZES.PADDING.LARGE,
-    marginBottom: SIZES.PADDING.MEDIUM,
-    backgroundColor: COLORS.SURFACE,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: SIZES.RADIUS.MEDIUM,
+    marginHorizontal: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
     padding: 4,
   },
   tabButton: {
@@ -484,7 +533,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
   },
   tabText: {
     fontSize: SIZES.FONT.MEDIUM,
