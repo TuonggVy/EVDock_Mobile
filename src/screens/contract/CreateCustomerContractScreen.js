@@ -433,13 +433,48 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
         </View></View>
       </Modal>
 
-      {showSignDatePicker && (
-        <DateTimePicker
-          value={formData.signDate || new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, date) => handleDateChange(event, date, 'signDate')}
-        />
+      {Platform.OS === 'ios' ? (
+        <Modal
+          visible={showSignDatePicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowSignDatePicker(false)}
+        >
+          <View style={styles.datePickerModalOverlay}>
+            <View style={styles.datePickerModalContent}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowSignDatePicker(false)}>
+                  <Text style={styles.datePickerCancelButton}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.datePickerTitle}>Select Date</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSignDatePicker(false);
+                  }}
+                >
+                  <Text style={styles.datePickerDoneButton}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={formData.signDate || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(event, date) => handleDateChange(event, date, 'signDate')}
+                style={styles.datePickerIOS}
+                textColor={COLORS.TEXT.PRIMARY}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showSignDatePicker && (
+          <DateTimePicker
+            value={formData.signDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={(event, date) => handleDateChange(event, date, 'signDate')}
+          />
+        )
       )}
 
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
@@ -504,6 +539,13 @@ const styles = StyleSheet.create({
   loadQuotationButton: { backgroundColor: "#009DFF", borderRadius: SIZES.RADIUS.MEDIUM, paddingHorizontal: SIZES.PADDING.LARGE, justifyContent: 'center', alignItems: 'center', minWidth: 80 },
   loadQuotationButtonDisabled: { opacity: 0.6 },
   loadQuotationButtonText: { color: COLORS.TEXT.WHITE, fontSize: SIZES.FONT.MEDIUM, fontWeight: '600' },
+  datePickerModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  datePickerModalContent: { backgroundColor: COLORS.SURFACE, borderTopLeftRadius: SIZES.RADIUS.LARGE, borderTopRightRadius: SIZES.RADIUS.LARGE, paddingBottom: SIZES.PADDING.LARGE },
+  datePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BORDER.PRIMARY },
+  datePickerTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
+  datePickerCancelButton: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.SECONDARY },
+  datePickerDoneButton: { fontSize: SIZES.FONT.MEDIUM, color: "#009DFF", fontWeight: '600' },
+  datePickerIOS: { backgroundColor: COLORS.SURFACE },
 });
 
 export default CreateCustomerContractScreen;

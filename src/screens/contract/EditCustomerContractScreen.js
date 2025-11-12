@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, KeyboardAvoidingView, Platform, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, KeyboardAvoidingView, Platform, Modal, FlatList, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
@@ -9,7 +10,7 @@ import customerContractService from '../../services/customerContractService';
 import customerManagementService from '../../services/customerManagementService';
 import motorbikeService from '../../services/motorbikeService';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ChevronDown, Calendar } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Calendar, Camera, X } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
@@ -19,6 +20,13 @@ const STATUS_OPTIONS = [
   { value: 'PROCESSING', label: 'Processing' },
   { value: 'DELIVERED', label: 'Delivered' },
   { value: 'COMPLETED', label: 'Completed' },
+];
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: 'ID_CARD', label: 'Căn cước công dân' },
+  { value: 'PASSPORT', label: 'Hộ chiếu' },
+  { value: 'DRIVER_LICENSE', label: 'Bằng lái xe' },
+  { value: 'OTHER', label: 'Khác' },
 ];
 
 const EditCustomerContractScreen = ({ navigation, route }) => {
@@ -36,6 +44,7 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showSignDatePicker, setShowSignDatePicker] = useState(false);
   const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
+  const [showDocumentTypeModal, setShowDocumentTypeModal] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '', content: '', finalPrice: '', signDate: null, deliveryDate: null,
@@ -43,6 +52,9 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
   });
   const [errors, setErrors] = useState({});
   const [contract, setContract] = useState(null);
+  const [documentType, setDocumentType] = useState('');
+  const [documentImages, setDocumentImages] = useState([]);
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
 
   useEffect(() => {
     loadContractDetail();
@@ -147,6 +159,90 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
   const getStatusName = () => {
     const status = STATUS_OPTIONS.find(opt => opt.value === formData.status);
     return status ? status.label : 'Select Status';
+  };
+
+  const getDocumentTypeName = () => {
+    const docType = DOCUMENT_TYPE_OPTIONS.find(opt => opt.value === documentType);
+    return docType ? docType.label : 'Select Document Type';
+  };
+
+  const requestImagePickerPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permission Required', 'We need camera roll permissions to upload images');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSelectDocumentImages = async () => {
+    if (!documentType) {
+      showError('Document Type Required', 'Please select a document type first');
+      return;
+    }
+
+    const hasPermission = await requestImagePickerPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newImages = result.assets.map(asset => ({
+          uri: asset.uri,
+          type: 'image/jpeg',
+          name: asset.fileName || `document_${Date.now()}_${Math.random().toString(36).slice(2, 11)}.jpg`,
+        }));
+        setDocumentImages(prev => [...prev, ...newImages]);
+      }
+    } catch (error) {
+      console.error('Error selecting document images:', error);
+      showError('Error', 'Failed to select images');
+    }
+  };
+
+  const handleRemoveDocumentImage = (index) => {
+    setDocumentImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadDocuments = async () => {
+    if (!documentType) {
+      showError('Error', 'Please select a document type');
+      return;
+    }
+
+    if (documentImages.length === 0) {
+      showError('Error', 'Please select at least one image');
+      return;
+    }
+
+    setUploadingDocuments(true);
+    try {
+      const response = await customerContractService.uploadContractDocument(
+        contractId,
+        documentType,
+        documentImages
+      );
+
+      if (response.success) {
+        showSuccess('Success', response.message || 'Document images uploaded successfully');
+        setDocumentImages([]);
+        setDocumentType('');
+        // Reload contract to show new documents
+        await loadContractDetail();
+      } else {
+        showError('Error', response.error || 'Failed to upload document images');
+      }
+    } catch (error) {
+      console.error('Error uploading documents:', error);
+      showError('Error', 'Failed to upload document images');
+    } finally {
+      setUploadingDocuments(false);
+    }
   };
 
   const handleDateChange = (event, selectedDate, field) => {
@@ -342,6 +438,67 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
                 <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
               </TouchableOpacity>
             </View>
+
+            {/* Document Upload Section */}
+            <View style={styles.formGroup}>
+              <Text style={styles.sectionTitle}>Upload Contract Documents</Text>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Document Type</Text>
+                <TouchableOpacity style={styles.dropdown} onPress={() => setShowDocumentTypeModal(true)}>
+                  <Text style={[styles.dropdownText, !documentType && styles.dropdownPlaceholder]}>
+                    {getDocumentTypeName()}
+                  </Text>
+                  <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
+                </TouchableOpacity>
+              </View>
+
+              {documentType && (
+                <>
+                  <TouchableOpacity style={styles.imagePickerButton} onPress={handleSelectDocumentImages}>
+                    <Camera color={COLORS.PRIMARY} size={20} />
+                    <Text style={styles.imagePickerButtonText}>Select Images</Text>
+                  </TouchableOpacity>
+
+                  {documentImages.length > 0 && (
+                    <View style={styles.imagesContainer}>
+                      {documentImages.map((image, index) => (
+                        <View key={index} style={styles.imageItem}>
+                          <Image source={{ uri: image.uri }} style={styles.previewImage} />
+                          <TouchableOpacity
+                            style={styles.removeImageButton}
+                            onPress={() => handleRemoveDocumentImage(index)}
+                          >
+                            <X color={COLORS.TEXT.WHITE} size={16} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {documentImages.length > 0 && (
+                    <TouchableOpacity
+                      style={[styles.uploadButton, uploadingDocuments && styles.uploadButtonDisabled]}
+                      onPress={handleUploadDocuments}
+                      disabled={uploadingDocuments}
+                    >
+                      <LinearGradient
+                        colors={['#10B981', '#10B981']}
+                        style={styles.uploadButtonGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      >
+                        {uploadingDocuments ? (
+                          <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                        ) : (
+                          <Text style={styles.uploadButtonText}>Upload Documents</Text>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -371,6 +528,39 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )} ListEmptyComponent={<View style={styles.emptyModal}><Text style={styles.emptyModalText}>No status found</Text></View>} />
         </View></View>
+      </Modal>
+
+      <Modal visible={showDocumentTypeModal} transparent animationType="slide" onRequestClose={() => setShowDocumentTypeModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Document Type</Text>
+              <TouchableOpacity onPress={() => setShowDocumentTypeModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={DOCUMENT_TYPE_OPTIONS}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setDocumentType(item.value);
+                    setShowDocumentTypeModal(false);
+                  }}
+                >
+                  <Text style={styles.modalItemTitle}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyModal}>
+                  <Text style={styles.emptyModalText}>No document types found</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
       </Modal>
 
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
@@ -430,6 +620,16 @@ const styles = StyleSheet.create({
   modalItemTitle: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.XSMALL },
   emptyModal: { padding: SIZES.PADDING.XXXLARGE, alignItems: 'center' },
   emptyModalText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.SECONDARY },
+  imagePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, borderWidth: 1, borderColor: COLORS.PRIMARY, borderStyle: 'dashed', gap: SIZES.PADDING.SMALL },
+  imagePickerButtonText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.PRIMARY, fontWeight: '600' },
+  imagesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.PADDING.SMALL, marginTop: SIZES.PADDING.MEDIUM },
+  imageItem: { position: 'relative', width: 100, height: 100, borderRadius: SIZES.RADIUS.MEDIUM, overflow: 'hidden' },
+  previewImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  removeImageButton: { position: 'absolute', top: 4, right: 4, backgroundColor: COLORS.ERROR, borderRadius: SIZES.RADIUS.ROUND, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' },
+  uploadButton: { marginTop: SIZES.PADDING.MEDIUM, borderRadius: SIZES.RADIUS.LARGE, overflow: 'hidden' },
+  uploadButtonDisabled: { opacity: 0.6 },
+  uploadButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: SIZES.PADDING.MEDIUM },
+  uploadButtonText: { fontSize: SIZES.FONT.MEDIUM, fontWeight: 'bold', color: COLORS.TEXT.WHITE },
 });
 
 export default EditCustomerContractScreen;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image, Modal, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
@@ -8,9 +8,11 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerContractService from '../../services/customerContractService';
 import installmentContractService from '../../services/installmentContractService';
 import emailService from '../../services/emailService';
-import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail } from 'lucide-react-native';
+import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail, X } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CustomerContractDetailScreen = ({ navigation, route }) => {
   const { contractId, selectedInstallmentPlan } = route.params || {};
@@ -20,6 +22,8 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   const [hasInstallmentContract, setHasInstallmentContract] = useState(false);
   const [linkedInstallmentContractId, setLinkedInstallmentContractId] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     loadContractDetail();
@@ -240,6 +244,16 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleImagePress = (imageUrl, documentType) => {
+    setSelectedImage({ uri: imageUrl, documentType });
+    setShowImageModal(true);
+  };
+
+  const closeImageModal = () => {
+    setShowImageModal(false);
+    setSelectedImage(null);
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -247,6 +261,9 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   if (!contract) {
     return null;
   }
+
+  // Check if contract type is FULL
+  const isFullPayment = contract.contractPaidType?.toUpperCase() === 'FULL';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -434,12 +451,24 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           {contract.contractDocuments && contract.contractDocuments.length > 0 && (
             <View style={styles.infoCard}>
               <Text style={styles.sectionTitle}>Contract Documents</Text>
-              {contract.contractDocuments.map((doc, index) => (
-                <View key={doc.id || index} style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>{doc.documentType || `Document ${index + 1}`}:</Text>
-                  <Text style={styles.infoValue} numberOfLines={1}>{doc.imageUrl || 'N/A'}</Text>
-                </View>
-              ))}
+              <View style={styles.documentsContainer}>
+                {contract.contractDocuments.map((doc, index) => (
+                  <TouchableOpacity
+                    key={doc.id || index}
+                    style={styles.documentItem}
+                    onPress={() => handleImagePress(doc.imageUrl, doc.documentType)}
+                  >
+                    <Image
+                      source={{ uri: doc.imageUrl }}
+                      style={styles.documentImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.documentTypeText} numberOfLines={2}>
+                      {doc.documentType || `Document ${index + 1}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
         </View>
@@ -472,7 +501,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        {!hasInstallmentContract && (
+        {!hasInstallmentContract && !isFullPayment && (
           <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
             <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <CreditCard color={COLORS.TEXT.WHITE} size={20} />
@@ -480,7 +509,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         )}
-        {hasInstallmentContract && (
+        {hasInstallmentContract && !isFullPayment && (
           <TouchableOpacity style={styles.showInstallmentButton} onPress={handleShowInstallmentContract}>
             <LinearGradient colors={COLORS.GRADIENT.INFO} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <FileText color={COLORS.TEXT.WHITE} size={20} />
@@ -488,7 +517,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         )}
-        {hasInstallmentContract && (
+        {hasInstallmentContract && !isFullPayment && (
           <TouchableOpacity style={styles.manageInstallmentButton} onPress={handleManageInstallmentPayments}>
             <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <CreditCard color={COLORS.TEXT.WHITE} size={20} />
@@ -497,6 +526,35 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Image Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeImageModal}
+      >
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity
+            style={styles.imageModalCloseButton}
+            onPress={closeImageModal}
+          >
+            <X color={COLORS.TEXT.WHITE} size={24} />
+          </TouchableOpacity>
+          {selectedImage && (
+            <>
+              {selectedImage.documentType && (
+                <Text style={styles.imageModalTitle}>{selectedImage.documentType}</Text>
+              )}
+              <Image
+                source={{ uri: selectedImage.uri }}
+                style={styles.imageModalImage}
+                resizeMode="contain"
+              />
+            </>
+          )}
+        </View>
+      </Modal>
 
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
     </SafeAreaView>
@@ -670,6 +728,61 @@ const styles = StyleSheet.create({
   },
   sendEmailButtonDisabled: {
     opacity: 0.6,
+  },
+  documentsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.SMALL,
+  },
+  documentItem: {
+    width: (SCREEN_WIDTH - SIZES.PADDING.LARGE * 2 - SIZES.PADDING.MEDIUM * 2) / 3,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  documentImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+  },
+  documentTypeText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: SIZES.PADDING.XSMALL,
+    textAlign: 'center',
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: SIZES.PADDING.XXXLARGE,
+    right: SIZES.PADDING.LARGE,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: SIZES.RADIUS.ROUND,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalTitle: {
+    position: 'absolute',
+    top: SIZES.PADDING.XXXLARGE,
+    left: SIZES.PADDING.LARGE,
+    right: SIZES.PADDING.LARGE,
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    textAlign: 'center',
+    zIndex: 1,
+  },
+  imageModalImage: {
+    width: SCREEN_WIDTH,
+    height: '80%',
   },
 });
 
