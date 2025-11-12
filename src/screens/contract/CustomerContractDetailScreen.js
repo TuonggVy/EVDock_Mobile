@@ -7,7 +7,8 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerContractService from '../../services/customerContractService';
 import installmentContractService from '../../services/installmentContractService';
-import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText } from 'lucide-react-native';
+import emailService from '../../services/emailService';
+import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
@@ -18,6 +19,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   const [contract, setContract] = useState(null);
   const [hasInstallmentContract, setHasInstallmentContract] = useState(false);
   const [linkedInstallmentContractId, setLinkedInstallmentContractId] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     loadContractDetail();
@@ -214,6 +216,28 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       return;
     }
     navigation.navigate('InstallmentContractManagement', { customerContractId: contractId });
+  };
+
+  const handleSendContractEmail = async () => {
+    if (!contractId) {
+      showError('Error', 'Contract ID is missing');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const response = await emailService.sendCustomerContractEmail(contractId);
+      if (response.success) {
+        showSuccess('Success', response.message || 'Contract email sent successfully to customer');
+      } else {
+        showError('Error', response.error || 'Failed to send contract email');
+      }
+    } catch (error) {
+      console.error('Error sending contract email:', error);
+      showError('Error', 'Failed to send contract email');
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   if (loading) {
@@ -422,6 +446,18 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.sendEmailButton, sendingEmail && styles.sendEmailButtonDisabled]} 
+          onPress={handleSendContractEmail}
+          disabled={sendingEmail}
+        >
+          <LinearGradient colors={['#10B981', '#10B981']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Mail color={COLORS.TEXT.WHITE} size={20} />
+            <Text style={styles.buttonText}>
+              {sendingEmail ? 'Sending...' : 'Send Contract Email'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
             <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
@@ -625,6 +661,15 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+  },
+  sendEmailButton: {
+    width: '100%',
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  sendEmailButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

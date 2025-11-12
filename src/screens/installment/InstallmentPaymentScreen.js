@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, S
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
-import { ArrowLeft, Plus, Eye, Pencil, Trash2, MoreVertical, Home, FileText } from 'lucide-react-native';
+import { ArrowLeft, Plus, Eye, Pencil, Trash2, MoreVertical, Home, FileText, Mail } from 'lucide-react-native';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import installmentContractService from '../../services/installmentContractService';
+import emailService from '../../services/emailService';
 import LoadingScreen from '../../components/common/LoadingScreen';
 import { formatPrice } from '../../utils/promotionUtils';
 
@@ -18,6 +19,7 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
@@ -76,6 +78,28 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
       showError('Error', 'Failed to generate interest payments');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSendInstallmentScheduleEmail = async () => {
+    if (!installmentContractId) {
+      showError('Error', 'Installment contract ID is missing');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const response = await emailService.sendInstallmentScheduleEmail(installmentContractId);
+      if (response.success) {
+        showSuccess('Success', response.message || 'Installment schedule email sent successfully to customer');
+      } else {
+        showError('Error', response.error || 'Failed to send installment schedule email');
+      }
+    } catch (error) {
+      console.error('Error sending installment schedule email:', error);
+      showError('Error', 'Failed to send installment schedule email');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -320,6 +344,20 @@ const InstallmentPaymentScreen = ({ navigation, route }) => {
               </Text>
             </LinearGradient>
           </TouchableOpacity>
+          {payments.length > 0 && (
+            <TouchableOpacity 
+              style={[styles.sendEmailButton, sendingEmail && styles.sendEmailButtonDisabled]} 
+              onPress={handleSendInstallmentScheduleEmail}
+              disabled={sendingEmail}
+            >
+              <LinearGradient colors={['#10B981', '#10B981']} style={styles.generateButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Mail color={COLORS.TEXT.WHITE} size={20} />
+                <Text style={styles.generateButtonText}>
+                  {sendingEmail ? 'Sending...' : 'Send Schedule Email'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         {payments.length === 0 ? (
@@ -453,12 +491,20 @@ const styles = StyleSheet.create({
     padding: SIZES.PADDING.LARGE,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER.PRIMARY,
+    gap: SIZES.PADDING.SMALL,
   },
   generateButton: {
     borderRadius: SIZES.RADIUS.LARGE,
     overflow: 'hidden',
   },
   generateButtonDisabled: {
+    opacity: 0.6,
+  },
+  sendEmailButton: {
+    borderRadius: SIZES.RADIUS.LARGE,
+    overflow: 'hidden',
+  },
+  sendEmailButtonDisabled: {
     opacity: 0.6,
   },
   generateButtonGradient: {
