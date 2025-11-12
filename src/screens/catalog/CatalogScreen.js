@@ -75,7 +75,6 @@ const normalizeVersions = (arr = []) => {
 const CatalogScreen = ({ navigation, route }) => {
   const { mode, currentCompareVehicles = [] } = route.params || {};
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('available'); // 'available' or 'preorder'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('all');
   const [vehicles, setVehicles] = useState([]);
@@ -93,7 +92,7 @@ const CatalogScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     if (!loading) loadVehicles();
-  }, [searchQuery, selectedVersion, loading, activeTab]);
+  }, [searchQuery, selectedVersion, loading]);
 
   const loadData = async () => {
     try {
@@ -235,8 +234,9 @@ const CatalogScreen = ({ navigation, route }) => {
       setAvailableVehicles(uniqueAvailable);
       setPreorderVehicles(uniquePreorder);
       
-      // Set current vehicles based on active tab
-      setVehicles(activeTab === 'available' ? uniqueAvailable : uniquePreorder);
+      // Combine all vehicles (available + preorder) into one list
+      const allVehicles = [...uniqueAvailable, ...uniquePreorder];
+      setVehicles(allVehicles);
       
       setVersions(normalizeVersions(versionsList));
     } catch (error) {
@@ -251,13 +251,9 @@ const CatalogScreen = ({ navigation, route }) => {
       
       // Check if user is Dealer Staff and has agencyId
       if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
-        // For Dealer Staff, vehicles are already loaded from stock API
-        // Just update the current vehicles based on active tab
-        if (activeTab === 'available') {
-          setVehicles(availableVehicles);
-        } else {
-          setVehicles(preorderVehicles);
-        }
+        // For Dealer Staff, combine available and preorder vehicles
+        const allVehicles = [...availableVehicles, ...preorderVehicles];
+        setVehicles(allVehicles);
       } else {
         // Fallback to dealer catalog storage for other roles
         const res = await dealerCatalogStorageService.filterVehicles({
@@ -281,16 +277,13 @@ const CatalogScreen = ({ navigation, route }) => {
     loadData();
   }, []);
 
-  // Update vehicles when tab changes
+  // Update vehicles when available/preorder lists change
   useEffect(() => {
     if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
-      if (activeTab === 'available') {
-        setVehicles(availableVehicles);
-      } else {
-        setVehicles(preorderVehicles);
-      }
+      const allVehicles = [...availableVehicles, ...preorderVehicles];
+      setVehicles(allVehicles);
     }
-  }, [activeTab, availableVehicles, preorderVehicles, user]);
+  }, [availableVehicles, preorderVehicles, user]);
 
   const filteredVehicles = useMemo(() => {
     const q = (searchQuery || '').toLowerCase();
@@ -319,7 +312,7 @@ const CatalogScreen = ({ navigation, route }) => {
   const renderVehicleCard = ({ item: vehicle }) => {
     const stockStatus = getStockStatus(vehicle);
     const isAlreadySelected = mode === 'compare' && currentCompareVehicles.some(v => v.id === vehicle.id);
-    const isPreorder = activeTab === 'preorder';
+    const isPreorder = !vehicle.inStock && vehicle.quantity === 0;
     
     // Determine image source: use placeholder for preorder vehicles without image
     const getImageSource = () => {
@@ -345,12 +338,12 @@ const CatalogScreen = ({ navigation, route }) => {
             style={styles.cardImage}
             resizeMode="cover"
           />
-          {!vehicle.inStock && !isPreorder && (
+          {!vehicle.inStock && vehicle.quantity > 0 && (
             <View style={styles.outOfStockOverlay}>
               <Text style={styles.outOfStockText}>Out of Stock</Text>
             </View>
           )}
-          {!vehicle.inStock && isPreorder && (
+          {isPreorder && (
             <View style={styles.preorderOverlay}>
               <Text style={styles.preorderText}>Pre-order</Text>
             </View>
@@ -441,40 +434,6 @@ const CatalogScreen = ({ navigation, route }) => {
           returnKeyType="search"
         />
       </View>
-
-      {/* Tab Navigation - Only show for Dealer Staff */}
-      {user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'available' && styles.activeTabButton
-            ]}
-            onPress={() => setActiveTab('available')}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'available' && styles.activeTabText
-            ]}>
-              Available ({availableVehicles.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'preorder' && styles.activeTabButton
-            ]}
-            onPress={() => setActiveTab('preorder')}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'preorder' && styles.activeTabText
-            ]}>
-              Pre-order ({preorderVehicles.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       <View style={styles.versionWrapper}>
         <ScrollView
@@ -711,6 +670,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   
+  preorderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   preorderText: {
     color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.SMALL,
