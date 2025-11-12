@@ -89,6 +89,14 @@ export const API_ENDPOINTS = {
     SEND_CUSTOMER_CONTRACT: (customerContractId) => `/email/customer-contract/${customerContractId}`,
     SEND_INSTALLMENT_SCHEDULE: (installmentContractId) => `/email/customer/installment-schedule/${installmentContractId}`,
   },
+
+  // Dashboard
+  DASHBOARD: {
+    TOTAL_CUSTOMER: (agencyId) => `/dashboard/total/customer/${agencyId}`,
+    CHART_CUSTOMER_CONTRACT: (agencyId) => `/dashboard/chart/customer-contract/${agencyId}`,
+    TOTAL_REVENUE: (agencyId) => `/dashboard/total/revenue/${agencyId}`,
+    LIST_STAFF_REVENUE: (agencyId) => `/dashboard/list/staff/revenue/${agencyId}`,
+  },
 };
 
 // HTTP Headers

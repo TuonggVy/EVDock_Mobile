@@ -165,6 +165,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       icon: <SquareChartGantt color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('AgencyBatchManagement'),
     },
+    {
+      title: 'Reports',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <ChartColumnIncreasing color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerDashboard'),
+    },
   ];
 
   // Filter category cards based on search query
