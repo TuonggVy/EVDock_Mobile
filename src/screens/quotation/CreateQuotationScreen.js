@@ -16,7 +16,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS, SIZES } from '../../constants';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import { vehicleService } from '../../services/vehicleService';
 import { formatPrice } from '../../utils/promotionUtils';
 import { quotationService } from '../../services/quotationService';
@@ -75,6 +75,9 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [availablePromotions, setAvailablePromotions] = useState([]);
   const [selectedPromotionId, setSelectedPromotionId] = useState(null);
+  const [hasStockAtAgency, setHasStockAtAgency] = useState(true); // Track if vehicle has stock at agency
+  const [isBasePriceManual, setIsBasePriceManual] = useState(false); // Track if basePrice was manually edited
+  const [isFinalPriceManual, setIsFinalPriceManual] = useState(false); // Track if finalPrice was manually edited
 
   const { alertConfig, hideAlert, showSuccess, showError, showInfo } = useCustomAlert();
 
@@ -178,10 +181,75 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     calculatePricing();
   }, [selectedColor, selectedColorId, selectedPromotionId, availablePromotions.length]);
 
+  // Auto-adjust quotation type or clear color when quotation type changes
+  useEffect(() => {
+    // If switching to AT_STORE or ORDER, check if selected color has stock
+    if (quotationType === 'AT_STORE' || quotationType === 'ORDER') {
+      if (selectedColorId) {
+        const quantity = colorStockMap.get(selectedColorId) || 0;
+        if (quantity === 0) {
+          // Selected color doesn't have stock, switch to PRE_ORDER
+          setQuotationType('PRE_ORDER');
+        }
+      }
+    }
+    // If switching to PRE_ORDER, no need to clear color - allow any color
+  }, [quotationType, selectedColorId, colorStockMap]);
+
   useEffect(() => {
     loadMotorbikeColorData();
     loadAllColors(); // Load all colors from API to get color codes
-  }, [vehicle]);
+    checkVehicleStock(); // Check if vehicle has stock at agency
+  }, [vehicle, user]);
+
+  // Check if vehicle has stock at agency
+  const checkVehicleStock = async () => {
+    // For Dealer Staff, check actual stock from API
+    if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId && vehicle?.id) {
+      try {
+        const agencyId = parseInt(user.agencyId);
+        const stockResponse = await agencyStockService.getAgencyStocks(agencyId, {
+          motorbikeId: parseInt(vehicle.id),
+          limit: 1000
+        });
+
+        if (stockResponse.success && stockResponse.data && stockResponse.data.length > 0) {
+          // Check if there's any stock with quantity > 0
+          const hasStock = stockResponse.data.some(stock => (stock.quantity || 0) > 0);
+          setHasStockAtAgency(hasStock);
+          
+          if (!hasStock) {
+            // No stock at all, only allow PRE_ORDER
+            setQuotationType('PRE_ORDER');
+          }
+          // If has stock, allow all types - don't auto-change quotation type
+        } else {
+          // No stock found
+          setHasStockAtAgency(false);
+          setQuotationType('PRE_ORDER');
+        }
+      } catch (error) {
+        console.error('Error checking vehicle stock:', error);
+        // On error, check vehicle properties as fallback
+        const hasStock = vehicle?.inStock !== false && (vehicle?.quantity || 0) > 0;
+        setHasStockAtAgency(hasStock);
+        
+        if (!hasStock) {
+          setQuotationType('PRE_ORDER');
+        }
+      }
+    } else {
+      // For other roles, use vehicle.inStock and quantity properties
+      const hasStock = vehicle?.inStock !== false && (vehicle?.quantity || 0) > 0;
+      setHasStockAtAgency(hasStock);
+      
+      if (!hasStock) {
+        // No stock at all, only allow PRE_ORDER
+        setQuotationType('PRE_ORDER');
+      }
+      // If has stock, allow all types - don't auto-change quotation type
+    }
+  };
 
   // Load all colors from API to build color code map
   const loadAllColors = async () => {
@@ -255,29 +323,45 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       await Promise.all(stockPromises);
       setColorStockMap(stockMap);
       
-      // Auto-select first in-stock color
-      // Case 1: If no color selected yet, select first in-stock color
-      // Case 2: If current selection is out of stock, switch to first in-stock color
-      if (availableColors.length > 0) {
-        const currentQuantity = selectedColorId ? (stockMap.get(selectedColorId) || 0) : 0;
+      // Auto-select color based on availability
+      // Priority: First in-stock color (for AT_STORE/ORDER), otherwise first color (for PRE_ORDER)
+      if (availableColors.length > 0 && !selectedColorId) {
+        // Find first in-stock color
+        const firstInStockColor = availableColors.find(colorItem => {
+          const cId = colorItem.color?.id || colorItem.id;
+          return (stockMap.get(cId) || 0) > 0;
+        });
         
-        if (!selectedColorId || currentQuantity === 0) {
-          // Find first in-stock color
-          const firstInStockColor = availableColors.find(colorItem => {
-            const cId = colorItem.color?.id || colorItem.id;
-            return (stockMap.get(cId) || 0) > 0;
-          });
+        if (firstInStockColor) {
+          // Found in-stock color, select it and set to AT_STORE
+          const colorType = firstInStockColor.color?.colorType || firstInStockColor.colorType;
+          const colorId = firstInStockColor.color?.id || firstInStockColor.id;
+          setSelectedColor(colorType);
+          setSelectedColorId(colorId);
           
-          if (firstInStockColor) {
-            const colorType = firstInStockColor.color?.colorType || firstInStockColor.colorType;
-            const colorId = firstInStockColor.color?.id || firstInStockColor.id;
-            setSelectedColor(colorType);
-            setSelectedColorId(colorId);
-            
-            // Update image
-            if (firstInStockColor.imageUrl) {
-              setCurrentVehicleImage({ uri: firstInStockColor.imageUrl });
-            }
+          // Set quotation type to AT_STORE if vehicle has stock
+          if (hasStockAtAgency && quotationType === 'PRE_ORDER') {
+            setQuotationType('AT_STORE');
+          }
+          
+          // Update image
+          if (firstInStockColor.imageUrl) {
+            setCurrentVehicleImage({ uri: firstInStockColor.imageUrl });
+          }
+        } else {
+          // No in-stock color, select first color and set to PRE_ORDER
+          const firstColor = availableColors[0];
+          const colorType = firstColor.color?.colorType || firstColor.colorType;
+          const colorId = firstColor.color?.id || firstColor.id;
+          setSelectedColor(colorType);
+          setSelectedColorId(colorId);
+          
+          // Set quotation type to PRE_ORDER
+          setQuotationType('PRE_ORDER');
+          
+          // Update image
+          if (firstColor.imageUrl) {
+            setCurrentVehicleImage({ uri: firstColor.imageUrl });
           }
         }
       }
@@ -351,7 +435,8 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   };
 
   const calculatePricing = () => {
-    let basePrice = Number(vehicle?.price) || 0;
+    // Use manual basePrice if it was manually edited, otherwise use vehicle price
+    let basePrice = isBasePriceManual ? pricing.basePrice : (Number(vehicle?.price) || 0);
     let colorPrice = 0;
     let promotionDiscount = 0;
 
@@ -370,13 +455,23 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       }
     }
 
-    // Calculate final price per unit after promotion
-    const finalPricePerUnit = pricePerUnit - promotionDiscount;
+    // If finalPrice was manually edited, use it; otherwise calculate from basePrice and discount
+    let finalPricePerUnit;
+    if (isFinalPriceManual) {
+      finalPricePerUnit = pricing.finalPricePerUnit;
+      // Recalculate promotion discount based on manual final price
+      promotionDiscount = pricePerUnit - finalPricePerUnit;
+      if (promotionDiscount < 0) promotionDiscount = 0;
+    } else {
+      // Calculate final price per unit after promotion
+      finalPricePerUnit = pricePerUnit - promotionDiscount;
+    }
 
     // Calculate total price (fixed quantity of 1)
     const totalPrice = finalPricePerUnit;
 
-    setPricing({
+    setPricing(prev => ({
+      ...prev,
       basePrice,
       colorPrice,
       quantityDiscount: 0,
@@ -384,7 +479,65 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       totalPrice,
       pricePerUnit,
       finalPricePerUnit,
-    });
+    }));
+  };
+
+  // Handle base price change
+  const handleBasePriceChange = (value) => {
+    const numValue = parseFloat(value) || 0;
+    setIsBasePriceManual(true);
+    
+    // Recalculate pricing based on new base price
+    let promotionDiscount = 0;
+    const pricePerUnit = numValue;
+    
+    // Calculate discount from selected promotion
+    if (selectedPromotionId && availablePromotions.length > 0) {
+      const selectedPromo = availablePromotions.find(p => p.stockPromotionId === selectedPromotionId);
+      if (selectedPromo && selectedPromo.stockPromotion) {
+        promotionDiscount = calculateDiscount(selectedPromo.stockPromotion, pricePerUnit);
+      }
+    }
+    
+    // If final price was manually edited, keep it; otherwise recalculate
+    let finalPricePerUnit;
+    if (isFinalPriceManual) {
+      finalPricePerUnit = pricing.finalPricePerUnit;
+      // Recalculate promotion discount based on manual final price
+      promotionDiscount = pricePerUnit - finalPricePerUnit;
+      if (promotionDiscount < 0) promotionDiscount = 0;
+    } else {
+      finalPricePerUnit = pricePerUnit - promotionDiscount;
+    }
+    
+    setPricing(prev => ({
+      ...prev,
+      basePrice: numValue,
+      pricePerUnit,
+      promotionDiscount,
+      finalPricePerUnit,
+      totalPrice: finalPricePerUnit,
+    }));
+  };
+
+  // Handle final price change
+  const handleFinalPriceChange = (value) => {
+    const numValue = parseFloat(value) || 0;
+    setIsFinalPriceManual(true);
+    
+    // Recalculate promotion discount based on manual final price
+    const basePrice = isBasePriceManual ? pricing.basePrice : (Number(vehicle?.price) || 0);
+    const pricePerUnit = basePrice;
+    let promotionDiscount = pricePerUnit - numValue;
+    if (promotionDiscount < 0) promotionDiscount = 0;
+    
+    setPricing(prev => ({
+      ...prev,
+      finalPricePerUnit: numValue,
+      totalPrice: numValue,
+      promotionDiscount,
+      pricePerUnit,
+    }));
   };
 
   // Handle customer form input change
@@ -592,10 +745,19 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       return;
     }
 
-    // Validate colorId
+    // Validate colorId - required for all quotation types
     if (!selectedColorId) {
-      showError('Missing Information', 'Color information cannot be retrieved. Please select color again.');
+      showError('Missing Information', 'Please select a color.');
       return;
+    }
+    
+    // Validate color stock for AT_STORE and ORDER
+    if (quotationType === 'AT_STORE' || quotationType === 'ORDER') {
+      const quantity = colorStockMap.get(selectedColorId) || 0;
+      if (quantity === 0) {
+        showError('Invalid Selection', 'Selected color is not in stock. Please select Pre-order type or choose a color with stock.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -613,7 +775,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         validUntil: validUntilDate.toISOString(), // User selected date
         customerId: customerId,
         motorbikeId: parseInt(vehicle.id),
-        colorId: selectedColorId,
+        colorId: selectedColorId, // Color is required for all quotation types
         dealerStaffId: parseInt(user.id),
         agencyId: parseInt(user.agencyId),
       };
@@ -782,19 +944,34 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   };
 
   const handleColorChange = (color) => {
-    // Check if color is in stock before allowing selection
     const colorItem = availableColors.find(c => 
       (c.color?.colorType || c.colorType) === color
     );
-    if (colorItem) {
-      const colorId = colorItem.color?.id || colorItem.id;
-      const quantity = colorStockMap.get(colorId) || 0;
-      if (quantity === 0) {
-        showError('Out of Stock', 'This color is currently out of stock. Please select another color.');
-        return;
+    
+    if (!colorItem) return;
+    
+    const colorId = colorItem.color?.id || colorItem.id;
+    const quantity = colorStockMap.get(colorId) || 0;
+    const hasStock = quantity > 0;
+    
+    // Set selected color
+    setSelectedColor(color);
+    setSelectedColorId(colorId);
+    
+    // Auto-adjust quotation type based on color stock
+    // If color has stock and current type is PRE_ORDER, switch to AT_STORE
+    // If color doesn't have stock and current type is AT_STORE/ORDER, switch to PRE_ORDER
+    if (hasStock) {
+      if (quotationType === 'PRE_ORDER') {
+        setQuotationType('AT_STORE');
+      }
+    } else {
+      // Color doesn't have stock, must use PRE_ORDER
+      if (quotationType !== 'PRE_ORDER') {
+        setQuotationType('PRE_ORDER');
       }
     }
-    setSelectedColor(color);
+    
     loadMotorbikeColorData(color);
   };
 
@@ -851,17 +1028,35 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       return null;
     }
 
+    const isPreorderType = quotationType === 'PRE_ORDER';
+    const isStoreOrOrder = quotationType === 'AT_STORE' || quotationType === 'ORDER';
+
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Color</Text>
+        {isStoreOrOrder && (
+          <Text style={styles.sectionSubtitle}>
+            Only colors available in stock can be selected for At Store/Order quotations.
+          </Text>
+        )}
+        {isPreorderType && (
+          <Text style={styles.sectionSubtitle}>
+            All colors can be selected for Pre-order quotations.
+          </Text>
+        )}
         <View style={styles.colorsContainer}>
           {availableColors.map((colorItem, index) => {
             const colorId = colorItem.color?.id || colorItem.id;
             const colorType = colorItem.color?.colorType || colorItem.colorType || '';
             const colorCode = getColorFromObject(colorItem);
             const quantity = colorStockMap.get(colorId) || 0;
-            const isOutOfStock = quantity === 0;
+            const hasStock = quantity > 0;
             const isSelected = selectedColor === colorType;
+            
+            // Disable logic:
+            // - If AT_STORE/ORDER: only enable colors with stock
+            // - If PRE_ORDER: enable all colors
+            const isDisabled = isStoreOrOrder && !hasStock;
             
             // Debug log (can be removed later)
             if (index === 0) {
@@ -877,63 +1072,106 @@ const CreateQuotationScreen = ({ navigation, route }) => {
                     styles.colorOption,
                     { backgroundColor: colorCode },
                     isSelected && styles.selectedColorOption,
-                    isOutOfStock && styles.colorOptionDisabled,
+                    isDisabled && styles.colorOptionDisabled,
                   ]}
                   onPress={() => {
-                    if (!isOutOfStock) {
+                    if (!isDisabled) {
                       handleColorChange(colorType);
                     }
                   }}
-                  disabled={isOutOfStock}
-                  activeOpacity={isOutOfStock ? 0.5 : 0.8}
+                  disabled={isDisabled}
+                  activeOpacity={isDisabled ? 0.5 : 0.8}
                 >
-                  {isSelected && !isOutOfStock && (
+                  {isSelected && !isDisabled && (
                     <View style={styles.colorCheckmark}>
                       <Check color="#FFFFFF" size={14} />
                     </View>
                   )}
-                  {isOutOfStock && (
+                  {isDisabled && (
                     <View style={styles.outOfStockOverlay}>
                       <Text style={styles.outOfStockText}>✕</Text>
                     </View>
                   )}
                 </TouchableOpacity>
-                {isOutOfStock && (
-                  <Text style={styles.outOfStockLabel}>Out of Stock</Text>
+                {isDisabled && (
+                  <Text style={styles.outOfStockLabel}>Not in Stock</Text>
+                )}
+                {!isDisabled && !hasStock && isPreorderType && (
+                  <Text style={styles.preorderLabel}>Pre-order</Text>
                 )}
               </View>
             );
           })}
         </View>
-        <Text style={styles.selectedColorText}>Selected: {selectedColor}</Text>
+        <Text style={styles.selectedColorText}>
+          Selected: {selectedColor || 'None'}
+          {selectedColorId && (colorStockMap.get(selectedColorId) || 0) > 0 && (
+            <Text style={styles.stockInfoText}> (In Stock)</Text>
+          )}
+          {selectedColorId && (colorStockMap.get(selectedColorId) || 0) === 0 && (
+            <Text style={styles.preorderInfoText}> (Pre-order)</Text>
+          )}
+        </Text>
       </View>
     );
   };
 
-  const renderQuotationTypeSelection = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Quotation Type</Text>
-      <View style={styles.typeContainer}>
-        {['AT_STORE', 'ORDER', 'PRE_ORDER'].map((type) => (
-          <TouchableOpacity
-            key={type}
-            style={[
-              styles.typeOption,
-              quotationType === type && styles.typeOptionSelected,
-            ]}
-            onPress={() => setQuotationType(type)}
-          >
-            <Text style={[
-              styles.typeText,
-              quotationType === type && styles.typeTextSelected,
-            ]}>
-              {type === 'AT_STORE' ? 'At Store' : type === 'ORDER' ? 'Order' : 'Pre-Order'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+  const renderQuotationTypeSelection = () => {
+    // If vehicle doesn't have stock at agency, only allow PRE_ORDER
+    // If vehicle has stock at agency, allow all types (AT_STORE/ORDER for colors with stock, PRE_ORDER for colors without stock)
+    const isPreorderOnly = !hasStockAtAgency;
+    const isStockAvailable = hasStockAtAgency;
+    
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Quotation Type</Text>
+        {isPreorderOnly && (
+          <Text style={styles.sectionSubtitle}>
+            This vehicle is not available at the agency. Only Pre-order is available.
+          </Text>
+        )}
+        {isStockAvailable && (
+          <Text style={styles.sectionSubtitle}>
+            Select At Store/Order for colors in stock, or Pre-order for colors not in stock.
+          </Text>
+        )}
+        <View style={styles.typeContainer}>
+          {['AT_STORE', 'ORDER', 'PRE_ORDER'].map((type) => {
+            // Only disable AT_STORE/ORDER if vehicle doesn't have stock at all
+            // If vehicle has stock, all types are available (but color selection will be restricted)
+            const isDisabled = isPreorderOnly && type !== 'PRE_ORDER';
+            const isSelected = quotationType === type;
+            
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.typeOption,
+                  isSelected && styles.typeOptionSelected,
+                  isDisabled && styles.typeOptionDisabled,
+                ]}
+                onPress={() => {
+                  if (!isDisabled) {
+                    setQuotationType(type);
+                  }
+                }}
+                disabled={isDisabled}
+                activeOpacity={isDisabled ? 0.5 : 0.8}
+              >
+                <Text style={[
+                  styles.typeText,
+                  isSelected && styles.typeTextSelected,
+                  isDisabled && styles.typeTextDisabled,
+                ]}>
+                  {type === 'AT_STORE' ? 'At Store' : type === 'ORDER' ? 'Order' : 'Pre-Order'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderValidUntilSelection = () => (
     <View style={styles.section}>
@@ -1212,10 +1450,20 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pricing</Text>
         <View style={styles.pricingContainer}>
-          {/* Base Price */}
-          <View style={styles.pricingRow}>
+          {/* Base Price - Editable */}
+          <View style={styles.pricingInputRow}>
             <Text style={styles.pricingLabel}>Base Price:</Text>
-            <Text style={styles.pricingValue}>{formatPrice(pricing.basePrice)}</Text>
+            <View style={styles.pricingInputContainer}>
+              <TextInput
+                style={styles.pricingInput}
+                value={pricing.basePrice.toString()}
+                onChangeText={handleBasePriceChange}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+              />
+              <Text style={styles.pricingCurrency}>VND</Text>
+            </View>
           </View>
           
           {/* Discount Section */}
@@ -1233,7 +1481,23 @@ const CreateQuotationScreen = ({ navigation, route }) => {
           {/* Divider */}
           <View style={styles.pricingDivider} />
           
-          {/* Final Total */}
+          {/* Final Price - Editable */}
+          <View style={styles.pricingInputRow}>
+            <Text style={styles.totalLabel}>Final Price:</Text>
+            <View style={styles.pricingInputContainer}>
+              <TextInput
+                style={[styles.pricingInput, styles.finalPriceInput]}
+                value={pricing.finalPricePerUnit.toString()}
+                onChangeText={handleFinalPriceChange}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+              />
+              <Text style={[styles.pricingCurrency, styles.finalPriceCurrency]}>VND</Text>
+            </View>
+          </View>
+          
+          {/* Total (same as final price) */}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total:</Text>
             <Text style={styles.totalValue}>{formatPrice(pricing.totalPrice)}</Text>
@@ -1493,6 +1757,22 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontStyle: 'italic',
   },
+  preorderLabel: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: '#009DFF',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  stockInfoText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.SUCCESS || '#4CAF50',
+    fontWeight: '600',
+  },
+  preorderInfoText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#009DFF',
+    fontWeight: '600',
+  },
   colorOptionWrapper: {
     alignItems: 'center',
     marginRight: SIZES.PADDING.SMALL,
@@ -1549,6 +1829,13 @@ const styles = StyleSheet.create({
   typeTextSelected: {
     color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
+  },
+  typeOptionDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#E0E0E0',
+  },
+  typeTextDisabled: {
+    color: COLORS.TEXT.SECONDARY,
   },
   inputGroup: {
     marginBottom: SIZES.PADDING.MEDIUM,
@@ -1714,6 +2001,44 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.SMALL,
+  },
+  pricingInputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SIZES.PADDING.SMALL,
+  },
+  pricingInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  pricingInput: {
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    borderRadius: SIZES.RADIUS.SMALL,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    fontSize: SIZES.FONT.SMALL,
+    color: '#000000',
+    backgroundColor: '#F5F5F5',
+    minWidth: 120,
+    textAlign: 'right',
+  },
+  finalPriceInput: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    minWidth: 140,
+  },
+  pricingCurrency: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#000000',
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  finalPriceCurrency: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
   },
   pricingLabel: {
     fontSize: SIZES.FONT.SMALL,
