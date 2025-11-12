@@ -295,7 +295,7 @@ const VehicleDetailScreen = ({ route, navigation }) => {
                     : currentVehicleImage
                 }
                 style={styles.vehicleImage}
-                resizeMode="contain"
+                resizeMode="cover"
               />
               {isChangingColor && (
                 <View style={styles.loadingOverlay}>
@@ -555,9 +555,7 @@ const VehicleDetailScreen = ({ route, navigation }) => {
                 style={[
                   styles.actionButton,
                   styles.primaryButton,
-                  !vehicle.inStock && styles.disabledButton,
                 ]}
-                disabled={!vehicle.inStock}
                 onPress={() =>
                   navigation.navigate('CreateQuotation', { vehicle })
                 }
@@ -566,10 +564,9 @@ const VehicleDetailScreen = ({ route, navigation }) => {
                   style={[
                     styles.actionButtonText,
                     styles.primaryButtonText,
-                    !vehicle.inStock && styles.disabledButtonText,
                   ]}
                 >
-                  {vehicle.inStock ? 'Create Quotation' : 'Out of Stock'}
+                  Create Quotation
                 </Text>
               </TouchableOpacity>
             )}
@@ -652,7 +649,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   vehicleImage: {
-    width: width,
+    width: '100%',
     height: '100%',
   },
   loadingOverlay: {

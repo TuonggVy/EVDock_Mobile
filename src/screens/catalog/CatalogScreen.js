@@ -30,6 +30,7 @@ const GAP = 12;
 const H_PADDING = SIZES.PADDING.LARGE;
 const NUM_COLS = 2;
 const CARD_WIDTH = (width - H_PADDING * 2 - GAP) / NUM_COLS;
+const PLACEHOLDER_IMAGE_URL = 'https://static.vecteezy.com/system/resources/previews/048/092/168/non_2x/gallery-icon-sign-isolated-on-white-free-vector.jpg';
 
 // Icon mapping for version chips
 const getVersionIcon = (iconName) => {
@@ -74,9 +75,12 @@ const normalizeVersions = (arr = []) => {
 const CatalogScreen = ({ navigation, route }) => {
   const { mode, currentCompareVehicles = [] } = route.params || {};
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('available'); // 'available' or 'preorder'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('all');
   const [vehicles, setVehicles] = useState([]);
+  const [availableVehicles, setAvailableVehicles] = useState([]); // Vehicles with stock
+  const [preorderVehicles, setPreorderVehicles] = useState([]); // Vehicles without stock
   const [versions, setVersions] = useState([
     { id: 'all', name: 'All Versions', icon: 'car' }, // fallback ban đầu
   ]);
@@ -89,7 +93,7 @@ const CatalogScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     if (!loading) loadVehicles();
-  }, [searchQuery, selectedVersion, loading]);
+  }, [searchQuery, selectedVersion, loading, activeTab]);
 
   const loadData = async () => {
     try {
@@ -105,7 +109,10 @@ const CatalogScreen = ({ navigation, route }) => {
           dealerCatalogStorageService.getVersions(),
         ]);
 
-        setVehicles(uniqueById((catalog?.data) || []));
+        const catalogVehicles = uniqueById((catalog?.data) || []);
+        setAvailableVehicles(catalogVehicles);
+        setPreorderVehicles([]); // For non-Dealer Staff, no pre-order tab
+        setVehicles(catalogVehicles);
         setVersions(normalizeVersions(versionsFromCatalog));
       }
     } catch (e) {
@@ -139,7 +146,15 @@ const CatalogScreen = ({ navigation, route }) => {
       const stocks = stocksResponse.data || [];
       const motorbikes = motorbikesResponse.data || [];
 
-      // Group stocks by motorbike and aggregate quantities
+      // Get set of motorbike IDs that have stock
+      const motorbikesWithStock = new Set();
+      stocks.forEach(stock => {
+        if (stock.motorbikeId) {
+          motorbikesWithStock.add(stock.motorbikeId);
+        }
+      });
+
+      // Group stocks by motorbike and aggregate quantities (for Available tab)
       const motorbikeMap = new Map();
       
       stocks.forEach(stock => {
@@ -177,15 +192,32 @@ const CatalogScreen = ({ navigation, route }) => {
         }
       });
 
-      // Convert map to array and set inStock flag
-      const catalogVehicles = Array.from(motorbikeMap.values()).map(vehicle => ({
+      // Convert map to array and set inStock flag (Available vehicles)
+      const availableCatalogVehicles = Array.from(motorbikeMap.values()).map(vehicle => ({
         ...vehicle,
         inStock: vehicle.quantity > 0,
       }));
 
-      // Extract unique versions
+      // Create Pre-order vehicles (motorbikes without stock)
+      const preorderCatalogVehicles = motorbikes
+        .filter(motorbike => !motorbikesWithStock.has(motorbike.id))
+        .map(motorbike => ({
+          id: motorbike.id,
+          name: motorbike.name,
+          model: motorbike.model || motorbike.name,
+          version: motorbike.version || 'N/A',
+          price: motorbike.price || 0,
+          currency: 'VND',
+          image: motorbike.images?.[0]?.imageUrl || null,
+          stockCount: 0,
+          quantity: 0,
+          colorStocks: {},
+          inStock: false,
+        }));
+
+      // Combine versions from both available and preorder vehicles
       const versionSet = new Set();
-      catalogVehicles.forEach(v => {
+      [...availableCatalogVehicles, ...preorderCatalogVehicles].forEach(v => {
         if (v.version && v.version !== 'N/A') {
           versionSet.add(String(v.version));
         }
@@ -197,7 +229,15 @@ const CatalogScreen = ({ navigation, route }) => {
         icon: 'sparkles' 
       }));
 
-      setVehicles(uniqueById(catalogVehicles));
+      const uniqueAvailable = uniqueById(availableCatalogVehicles);
+      const uniquePreorder = uniqueById(preorderCatalogVehicles);
+      
+      setAvailableVehicles(uniqueAvailable);
+      setPreorderVehicles(uniquePreorder);
+      
+      // Set current vehicles based on active tab
+      setVehicles(activeTab === 'available' ? uniqueAvailable : uniquePreorder);
+      
       setVersions(normalizeVersions(versionsList));
     } catch (error) {
       console.error('Error loading catalog from stock API:', error);
@@ -211,24 +251,24 @@ const CatalogScreen = ({ navigation, route }) => {
       
       // Check if user is Dealer Staff and has agencyId
       if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
-        // For Dealer Staff, we already have all vehicles loaded from stock API
-        // Just apply client-side filtering
-        const filtered = vehicles.filter(v => {
-          const q = (searchQuery || '').toLowerCase();
-          const matchesSearch = 
-            v.name?.toLowerCase().includes(q) || 
-            v.model?.toLowerCase().includes(q);
-          const matchesVersion = selectedVersion === 'all' || v.version === selectedVersion;
-          return matchesSearch && matchesVersion;
-        });
-        // Note: The filteredVehicles useMemo will handle the actual filtering
+        // For Dealer Staff, vehicles are already loaded from stock API
+        // Just update the current vehicles based on active tab
+        if (activeTab === 'available') {
+          setVehicles(availableVehicles);
+        } else {
+          setVehicles(preorderVehicles);
+        }
       } else {
         // Fallback to dealer catalog storage for other roles
         const res = await dealerCatalogStorageService.filterVehicles({
           version: selectedVersion,
           search: searchQuery,
         });
-        if (res?.success) setVehicles(uniqueById(res.data));
+        if (res?.success) {
+          const catalogVehicles = uniqueById(res.data);
+          setAvailableVehicles(catalogVehicles);
+          setVehicles(catalogVehicles);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -240,6 +280,17 @@ const CatalogScreen = ({ navigation, route }) => {
   const onRefresh = useCallback(() => {
     loadData();
   }, []);
+
+  // Update vehicles when tab changes
+  useEffect(() => {
+    if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+      if (activeTab === 'available') {
+        setVehicles(availableVehicles);
+      } else {
+        setVehicles(preorderVehicles);
+      }
+    }
+  }, [activeTab, availableVehicles, preorderVehicles, user]);
 
   const filteredVehicles = useMemo(() => {
     const q = (searchQuery || '').toLowerCase();
@@ -268,6 +319,15 @@ const CatalogScreen = ({ navigation, route }) => {
   const renderVehicleCard = ({ item: vehicle }) => {
     const stockStatus = getStockStatus(vehicle);
     const isAlreadySelected = mode === 'compare' && currentCompareVehicles.some(v => v.id === vehicle.id);
+    const isPreorder = activeTab === 'preorder';
+    
+    // Determine image source: use placeholder for preorder vehicles without image
+    const getImageSource = () => {
+      if (isPreorder && (!vehicle.image || vehicle.image === null || vehicle.image === '')) {
+        return { uri: PLACEHOLDER_IMAGE_URL };
+      }
+      return typeof vehicle.image === 'string' ? { uri: vehicle.image } : vehicle.image;
+    };
     
     return (
       <TouchableOpacity
@@ -281,13 +341,18 @@ const CatalogScreen = ({ navigation, route }) => {
       >
         <View style={styles.imageWrap}>
           <Image
-            source={typeof vehicle.image === 'string' ? { uri: vehicle.image } : vehicle.image}
+            source={getImageSource()}
             style={styles.cardImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
-          {!vehicle.inStock && (
+          {!vehicle.inStock && !isPreorder && (
             <View style={styles.outOfStockOverlay}>
               <Text style={styles.outOfStockText}>Out of Stock</Text>
+            </View>
+          )}
+          {!vehicle.inStock && isPreorder && (
+            <View style={styles.preorderOverlay}>
+              <Text style={styles.preorderText}>Pre-order</Text>
             </View>
           )}
           {isAlreadySelected && (
@@ -376,6 +441,40 @@ const CatalogScreen = ({ navigation, route }) => {
           returnKeyType="search"
         />
       </View>
+
+      {/* Tab Navigation - Only show for Dealer Staff */}
+      {user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === 'available' && styles.activeTabButton
+            ]}
+            onPress={() => setActiveTab('available')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'available' && styles.activeTabText
+            ]}>
+              Available ({availableVehicles.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === 'preorder' && styles.activeTabButton
+            ]}
+            onPress={() => setActiveTab('preorder')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'preorder' && styles.activeTabText
+            ]}>
+              Pre-order ({preorderVehicles.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.versionWrapper}>
         <ScrollView
@@ -493,6 +592,37 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
 
+  // Tab styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.XSMALL,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.XSMALL,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  activeTabButton: {
+    backgroundColor: '#009DFF',
+  },
+  tabText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+  },
+  activeTabText: {
+    color: COLORS.TEXT.WHITE,
+  },
+
   versionWrapper: {
     marginTop: SIZES.PADDING.MEDIUM,
   },
@@ -576,6 +706,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outOfStockText: {
+    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '700',
+  },
+  
+  preorderText: {
     color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '700',

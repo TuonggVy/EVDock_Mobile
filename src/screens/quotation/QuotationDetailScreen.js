@@ -683,6 +683,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     const isDraft = status === 'DRAFT';
     const depositStatus = depositInfo?.status?.toUpperCase();
     const isDepositHolding = depositStatus === 'HOLDING';
+    const isDepositApplied = depositStatus === 'APPLIED';
     const isDepositPending = depositStatus === 'PENDING';
     
     // Render buttons based on type
@@ -696,8 +697,8 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         return null;
       }
 
-      // If deposit status is HOLDING, show Create Customer Contract button
-      if (depositInfo && isDepositHolding) {
+      // If deposit status is HOLDING or APPLIED, show Create Customer Contract button
+      if (depositInfo && (isDepositHolding || isDepositApplied)) {
         return (
           <TouchableOpacity
             style={styles.contractButton}
