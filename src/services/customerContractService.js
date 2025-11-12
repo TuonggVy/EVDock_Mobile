@@ -1,4 +1,5 @@
 import api from './api/axiosInstance';
+import { Platform } from 'react-native';
 
 const ENDPOINTS = {
   BASE: '/customer-contract',
@@ -6,6 +7,7 @@ const ENDPOINTS = {
   DETAIL: (customerContractId) => `/customer-contract/detail/${customerContractId}`,
   UPDATE: (customerContractId) => `/customer-contract/${customerContractId}`,
   DELETE: (customerContractId) => `/customer-contract/${customerContractId}`,
+  UPLOAD_DOCUMENT: (contractId) => `/images/customer-contract-document/${contractId}`,
 };
 
 class CustomerContractService {
@@ -127,6 +129,64 @@ class CustomerContractService {
         success: false,
         error: errorMessage,
         message: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Upload contract document images
+   * @param {number} contractId - Contract ID
+   * @param {string} documentType - Document type (e.g., "ID_CARD", "PASSPORT", etc.)
+   * @param {Array} images - Array of image objects with { uri, type, name }
+   * @returns {Promise<Object>} Upload result with image URLs
+   */
+  async uploadContractDocument(contractId, documentType, images) {
+    try {
+      const formData = new FormData();
+      
+      // Append documentType
+      formData.append('documentType', documentType);
+      
+      // Append images
+      images.forEach((image, index) => {
+        // Get the correct URI format for the platform
+        let imageUri = image.uri;
+        if (Platform.OS === 'ios' && imageUri.startsWith('file://')) {
+          imageUri = imageUri.replace('file://', '');
+        } else if (Platform.OS === 'android' && !imageUri.startsWith('file://')) {
+          imageUri = `file://${imageUri}`;
+        }
+        
+        const fileData = {
+          uri: imageUri,
+          type: image.type || 'image/jpeg',
+          name: image.name || `document_${index}_${Date.now()}.jpg`,
+        };
+        
+        formData.append('documentImages', fileData);
+      });
+
+      const response = await api.post(
+        ENDPOINTS.UPLOAD_DOCUMENT(contractId),
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data?.data || [],
+        message: response.data?.message || 'Document images uploaded successfully',
+      };
+    } catch (error) {
+      console.error('Error uploading contract document:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to upload document images',
+        message: 'Failed to upload document images',
       };
     }
   }
