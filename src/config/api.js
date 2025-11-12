@@ -83,6 +83,12 @@ export const API_ENDPOINTS = {
     UPDATE: (depositId) => `/deposit/${depositId}`,
     DELETE: (depositId) => `/deposit/${depositId}`,
   },
+
+  // Email
+  EMAIL: {
+    SEND_CUSTOMER_CONTRACT: (customerContractId) => `/email/customer-contract/${customerContractId}`,
+    SEND_INSTALLMENT_SCHEDULE: (installmentContractId) => `/email/customer/installment-schedule/${installmentContractId}`,
+  },
 };
 
 // HTTP Headers
