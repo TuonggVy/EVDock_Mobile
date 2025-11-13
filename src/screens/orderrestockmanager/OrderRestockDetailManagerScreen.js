@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Platform,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
@@ -192,7 +193,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
       </SafeAreaView>
     );
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.MEDIUM,
-    // paddingBottom: 160,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,

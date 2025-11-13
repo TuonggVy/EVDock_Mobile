@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
@@ -298,7 +299,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color="#009DFF" />
         </View>
       </SafeAreaView>
     );
@@ -407,11 +408,9 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
             fontSize: SIZES.FONT.MEDIUM 
           })}
         </View>
-      </ScrollView>
 
-      {/* Fixed Actions Bar */}
-      <View style={styles.fixedActionsContainer}>
-        <View style={styles.actionsRow}>
+        {/* Actions Section */}
+        <View style={styles.actionsSection}>
           {order.status === 'PENDING' && !order.creditChecked && (
             <TouchableOpacity
               style={[styles.actionButton, styles.checkCreditButton]}
@@ -441,7 +440,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </ScrollView>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -500,7 +499,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.LARGE,
-    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
@@ -580,33 +578,17 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  fixedActionsContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    padding: SIZES.PADDING.MEDIUM,
-    paddingBottom: Platform.OS === 'ios' ? SIZES.PADDING.LARGE : SIZES.PADDING.MEDIUM,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  actionsRow: {
-    flexDirection: 'row',
+  actionsSection: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
     gap: SIZES.PADDING.MEDIUM,
-    flexWrap: 'wrap',
   },
   actionButton: {
-    flex: 1,
     borderRadius: SIZES.RADIUS.MEDIUM,
     padding: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
   },
   nextStatusButton: {
     backgroundColor: ACCENT_COLOR,
