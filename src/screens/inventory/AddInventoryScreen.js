@@ -48,7 +48,7 @@ const AddInventoryScreen = ({ navigation }) => {
 
   const loadMotorbikes = async () => {
     try {
-      const response = await motorbikeService.getAllMotorbikes();
+      const response = await motorbikeService.getAllMotorbikes({ limit: 1000 });
       if (response.success) {
         setMotorbikes(response.data || []);
       }
@@ -205,12 +205,15 @@ const AddInventoryScreen = ({ navigation }) => {
                 keyboardType="numeric"
               />
             </View>
-
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
-              <Text style={styles.saveButtonText}>Add Inventory</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
+        
+        {/* Fixed Button at Bottom */}
+        <View style={styles.fixedButtonContainer}>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
+            <Text style={styles.saveButtonText}>Add Inventory</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
       <CustomAlert
@@ -270,9 +273,10 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: SIZES.PADDING.LARGE,
+    paddingBottom: 100, // Extra padding for fixed button
   },
   formSection: {
-    paddingBottom: SIZES.PADDING.XXLARGE,
+    paddingBottom: SIZES.PADDING.MEDIUM,
   },
   sectionTitle: {
     fontSize: SIZES.FONT.XLARGE,
@@ -342,12 +346,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.BORDER.PRIMARY,
   },
+  fixedButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.SURFACE,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.MEDIUM,
+    paddingBottom: Platform.OS === 'ios' ? SIZES.PADDING.MEDIUM : SIZES.PADDING.LARGE,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BORDER.PRIMARY,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
   saveButton: {
     backgroundColor: '#009DFF',
     borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginTop: SIZES.PADDING.XLARGE,
   },
   saveButtonText: {
     fontSize: SIZES.FONT.LARGE,
