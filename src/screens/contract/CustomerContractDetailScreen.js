@@ -8,7 +8,7 @@ import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerContractService from '../../services/customerContractService';
 import installmentContractService from '../../services/installmentContractService';
 import emailService from '../../services/emailService';
-import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail, X } from 'lucide-react-native';
+import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail, X, MoreVertical, Home } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
@@ -24,6 +24,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     loadContractDetail();
@@ -264,6 +265,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
 
   // Check if contract type is FULL
   const isFullPayment = contract.contractPaidType?.toUpperCase() === 'FULL';
+  const isDebtContract = !isFullPayment;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -275,7 +277,13 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           <View style={styles.headerTitle}>
             <Text style={styles.title}>Customer Contract Details</Text>
           </View>
-          <View style={styles.headerSpacer} />
+          {isDebtContract ? (
+            <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
+              <MoreVertical color={COLORS.TEXT.WHITE} size={24} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
       </View>
 
@@ -509,23 +517,71 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </LinearGradient>
           </TouchableOpacity>
         )}
-        {hasInstallmentContract && !isFullPayment && (
-          <TouchableOpacity style={styles.showInstallmentButton} onPress={handleShowInstallmentContract}>
-            <LinearGradient colors={COLORS.GRADIENT.INFO} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <FileText color={COLORS.TEXT.WHITE} size={20} />
-              <Text style={styles.buttonText}>Show Installment Contract</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-        {hasInstallmentContract && !isFullPayment && (
-          <TouchableOpacity style={styles.manageInstallmentButton} onPress={handleManageInstallmentPayments}>
-            <LinearGradient colors={COLORS.GRADIENT.GREEN} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <CreditCard color={COLORS.TEXT.WHITE} size={20} />
-              <Text style={styles.buttonText}>Manage Installment Payments</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
       </View>
+
+      {/* Popup Menu */}
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            {hasInstallmentContract && (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    handleShowInstallmentContract();
+                  }}
+                >
+                  <FileText color={COLORS.TEXT.PRIMARY} size={20} />
+                  <Text style={styles.menuItemText}>Show Installment Contract</Text>
+                </TouchableOpacity>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    handleManageInstallmentPayments();
+                  }}
+                >
+                  <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
+                  <Text style={styles.menuItemText}>Manage Installment Payments</Text>
+                </TouchableOpacity>
+                <View style={styles.menuDivider} />
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                navigation.navigate('CustomerContractManagement');
+              }}
+            >
+              <FileText color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Customer Contracts</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                navigation.navigate('Main', { screen: 'Home' });
+              }}
+            >
+              <Home color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Home</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Image Modal */}
       <Modal
@@ -596,6 +652,50 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: SIZES.PADDING.XXXLARGE + 60,
+    paddingRight: SIZES.PADDING.LARGE,
+  },
+  menuContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.SMALL,
+    minWidth: 200,
+    shadowColor: COLORS.SHADOW,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  menuItemText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '500',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.PRIMARY,
+    marginVertical: SIZES.PADDING.XSMALL,
   },
   scrollView: {
     flex: 1,
@@ -680,16 +780,6 @@ const styles = StyleSheet.create({
     gap: SIZES.PADDING.SMALL,
   },
   installmentButton: {
-    width: '100%',
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-  },
-  showInstallmentButton: {
-    width: '100%',
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-  },
-  manageInstallmentButton: {
     width: '100%',
     borderRadius: SIZES.RADIUS.LARGE,
     overflow: 'hidden',
