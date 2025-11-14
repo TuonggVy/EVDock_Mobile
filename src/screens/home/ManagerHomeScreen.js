@@ -136,6 +136,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('InstallmentPlanManagement'),
     },
     {
+      title: 'Quotations',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerQuotation'),
+    },
+    {
       title: 'Customer Debt',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <WalletCards color="#A1D9FF" size={60} />,
