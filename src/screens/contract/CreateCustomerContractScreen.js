@@ -233,6 +233,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
     if (!date) return '';
     try {
       const d = new Date(date);
+      if (Number.isNaN(d.getTime())) return '';
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
@@ -242,12 +243,24 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
     }
   };
 
+  const getSignDateValue = () => {
+    if (!formData.signDate) return new Date();
+    const parsedDate = formData.signDate instanceof Date ? formData.signDate : new Date(formData.signDate);
+    return Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  };
+
   const handleDateChange = (event, selectedDate, field) => {
     if (Platform.OS === 'android') {
+      if (event?.type === 'dismissed') {
+        setShowSignDatePicker(false);
+        return;
+      }
       setShowSignDatePicker(false);
     }
+
     if (selectedDate) {
-      handleInputChange(field, selectedDate);
+      const isoString = selectedDate.toISOString();
+      handleInputChange(field, isoString);
       if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
@@ -456,7 +469,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
               </View>
               <DateTimePicker
-                value={formData.signDate || new Date()}
+                value={getSignDateValue()}
                 mode="date"
                 display="spinner"
                 onChange={(event, date) => handleDateChange(event, date, 'signDate')}
@@ -469,7 +482,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
       ) : (
         showSignDatePicker && (
           <DateTimePicker
-            value={formData.signDate || new Date()}
+            value={getSignDateValue()}
             mode="date"
             display="default"
             onChange={(event, date) => handleDateChange(event, date, 'signDate')}

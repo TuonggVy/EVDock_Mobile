@@ -734,7 +734,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               {!depositInfo && (
                 <TouchableOpacity
                   style={styles.fullPaymentButton}
-                  onPress={() => Alert.alert('Full Payment', 'Full payment feature is under development')}
+                  onPress={handleContractView}
                 >
                   <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
                 </TouchableOpacity>

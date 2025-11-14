@@ -380,6 +380,12 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
                   <Text style={styles.infoValue}>{contract.customer.address}</Text>
                 </View>
               )}
+              {contract.customer.credentialId && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>ID Card:</Text>
+                  <Text style={styles.infoValue}>{contract.customer.credentialId}</Text>
+                </View>
+              )}
             </View>
           )}
 
