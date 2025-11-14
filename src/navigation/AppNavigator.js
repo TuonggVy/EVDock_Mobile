@@ -20,6 +20,8 @@ import VehicleDetailScreen from '../screens/vehicle/VehicleDetailScreen';
 import CompareScreen from '../screens/compare/CompareScreen';
 import CreateQuotationScreen from '../screens/quotation/CreateQuotationScreen';
 import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
+import DealerManagerQuotationScreen from '../screens/quotation/DealerManagerQuotationScreen';
+import DealerManagerQuotationDetailScreen from '../screens/quotation/DealerManagerQuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
 import EditQuotationScreen from '../screens/quotation/EditQuotationScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
@@ -221,6 +223,16 @@ const AppNavigator = () => {
         <Stack.Screen 
           name="QuotationDetail" 
           component={QuotationDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="DealerManagerQuotation" 
+          component={DealerManagerQuotationScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="DealerManagerQuotationDetail" 
+          component={DealerManagerQuotationDetailScreen} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 
