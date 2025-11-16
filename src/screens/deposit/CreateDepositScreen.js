@@ -5,10 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -353,7 +355,7 @@ const CreateDepositScreen = ({ navigation, route }) => {
 
           {/* Hold Day */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Hold Date *</Text>
+            <Text style={styles.sectionTitle}>Valid Until *</Text>
             <TouchableOpacity
               style={[styles.dateInput, errors.holdDay && styles.inputError]}
               onPress={() => setShowDatePicker(true)}
@@ -385,16 +387,30 @@ const CreateDepositScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Date Picker */}
-        {showDatePicker && (
-          <DateTimePicker
-            value={formData.holdDay}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleDateChange}
-            minimumDate={new Date()}
-          />
-        )}
+        {/* Date Picker Modal (consistent with EditCustomerContractScreen) */}
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={formData.holdDay}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    textColor="#000"
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
         <CustomAlert
           visible={alertConfig.visible}
@@ -563,6 +579,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
+  datePickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  datePickerContainer: { backgroundColor: COLORS.SURFACE, borderRadius: SIZES.RADIUS.LARGE, padding: SIZES.PADDING.LARGE, width: '90%' },
 });
 
 export default CreateDepositScreen;

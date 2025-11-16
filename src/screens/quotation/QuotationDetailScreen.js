@@ -20,10 +20,13 @@ import { formatPaymentAmount, getPaymentInstructions } from '../../utils/payment
 import installmentStorageService from '../../services/storage/installmentStorageService';
 import { quotationService } from '../../services/quotationService';
 import motorbikeService from '../../services/motorbikeService';
+import customerContractService from '../../services/customerContractService';
+import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Pencil } from 'lucide-react-native';
 
 const QuotationDetailScreen = ({ navigation, route }) => {
   const { quotation, onQuotationUpdate } = route.params;
+  const { user } = useAuth();
   
   // Local state for detail data
   const [quotationDetail, setQuotationDetail] = useState(null);
@@ -44,6 +47,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   const [installmentMonths, setInstallmentMonths] = useState(12);
   const [paymentData, setPaymentData] = useState(null);
   const [depositInfo, setDepositInfo] = useState(null);
+  const [hasCustomerContract, setHasCustomerContract] = useState(false);
 
   // Payment hook
   const { 
@@ -93,6 +97,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
           setDepositInfo(detail.deposit);
         }
         
+        // Check if quotation already has a customer contract
+        try {
+          await checkExistingCustomerContract(detail);
+        } catch (e) {
+          // Silent fail for contract check to avoid blocking UI
+        }
+        
         // Load motorbike details including configurations
         if (detail.motorbikeId) {
           loadMotorbikeDetails(detail.motorbikeId, detail.colorId);
@@ -105,6 +116,40 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       Alert.alert('Error', 'Failed to load quotation details. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkExistingCustomerContract = async (detail) => {
+    const quoteId = detail?.id || quotation?.id || detail?.quotationId || quotation?.quotationId;
+    if (!quoteId) {
+      setHasCustomerContract(false);
+      return;
+    }
+
+    // 1) If backend returns customerContractId in quotation detail, verify via detail endpoint
+    const customerContractId = detail?.customerContractId || detail?.contractId || detail?.customerContract?.id;
+    if (customerContractId) {
+      const resp = await customerContractService.getCustomerContractDetail(Number(customerContractId));
+      if (resp.success) {
+        const contract = resp.data;
+        const contractQuotationId = contract?.quotationId;
+        setHasCustomerContract(Boolean(contractQuotationId && Number(contractQuotationId) === Number(quoteId)));
+        return;
+      }
+    }
+
+    // 2) Fallback: list contracts by agency and find by quotationId
+    const agencyId = user?.agencyId ? Number(user.agencyId) : null;
+    if (!agencyId) {
+      setHasCustomerContract(false);
+      return;
+    }
+    const listResp = await customerContractService.getCustomerContracts(agencyId, { page: 1, limit: 1000 });
+    if (listResp.success && Array.isArray(listResp.data)) {
+      const exists = listResp.data.some(c => Number(c?.quotationId) === Number(quoteId));
+      setHasCustomerContract(exists);
+    } else {
+      setHasCustomerContract(false);
     }
   };
 
@@ -714,7 +759,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         case 'AT_STORE':
           return (
             <>
-              {!depositInfo && (
+              {!hasCustomerContract && !depositInfo && (
                 <TouchableOpacity
                   style={styles.depositButton}
                   onPress={() => {
@@ -732,7 +777,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                   <Text style={styles.depositButtonText}>Deposit</Text>
                 </TouchableOpacity>
               )}
-              {!depositInfo && (
+              {!hasCustomerContract && !depositInfo && (
                 <TouchableOpacity
                   style={styles.fullPaymentButton}
                   onPress={handleContractView}
@@ -746,7 +791,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         case 'ORDER':
         case 'PRE_ORDER':
           return (
-            !depositInfo && (
+            !hasCustomerContract && !depositInfo && (
               <TouchableOpacity
                 style={styles.depositButton}
                 onPress={() => {
