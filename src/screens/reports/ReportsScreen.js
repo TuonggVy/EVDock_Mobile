@@ -13,10 +13,9 @@ import {
   FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES } from '../../constants';
-import { ArrowLeft, Calendar } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import reportService from '../../services/reportService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,18 +36,11 @@ const ReportsScreen = ({ navigation }) => {
 
   // Chart Data
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [quarterRevenueData, setQuarterRevenueData] = useState([]);
   const [top10Motorbikes, setTop10Motorbikes] = useState([]);
-
-  // Quarter/Year selection for quarter revenue
-  const [selectedQuarter, setSelectedQuarter] = useState(1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [yearInput, setYearInput] = useState(new Date().getFullYear().toString());
-  const [showYearPicker, setShowYearPicker] = useState(false);
 
   useEffect(() => {
     loadReports();
-  }, [selectedQuarter, selectedYear]);
+  }, []);
 
   const loadReports = async () => {
     try {
@@ -58,7 +50,6 @@ const ReportsScreen = ({ navigation }) => {
       // Fetch all reports in parallel
       const [
         totalRevenueRes,
-        quarterRevenueRes,
         agenciesRes,
         warehousesRes,
         motorbikesRes,
@@ -66,7 +57,6 @@ const ReportsScreen = ({ navigation }) => {
         top10Res,
       ] = await Promise.all([
         reportService.getTotalContractRevenue(agencyId),
-        reportService.getQuarterRevenue(selectedQuarter, selectedYear, agencyId),
         reportService.getTotalAgencies(),
         reportService.getTotalWarehouses(),
         reportService.getTotalMotorbikes(),
@@ -97,19 +87,6 @@ const ReportsScreen = ({ navigation }) => {
       // Set total revenue (for line chart - we'll create a simple line chart with this value)
       setTotalRevenue(totalRevenueRes?.data?.totalContractRevenue || 0);
 
-      // Set quarter revenue data
-      const quarterDataRaw =
-        quarterRevenueRes?.data?.quarterContractChartData ??
-        quarterRevenueRes?.data ??
-        [];
-      const normalizedQuarterData = Array.isArray(quarterDataRaw)
-        ? quarterDataRaw.map((d) => ({
-            month: Number(d.month),
-            totalRevenue: Number(d.totalRevenue) || 0,
-          }))
-        : [];
-      setQuarterRevenueData(normalizedQuarterData);
-
       // Set top 10 motorbikes
       const top10Data = top10Res?.data || [];
       setTop10Motorbikes(top10Data);
@@ -134,8 +111,7 @@ const ReportsScreen = ({ navigation }) => {
   const handleYearChange = () => {
     const year = parseInt(yearInput);
     if (year >= 2000 && year <= 2100) {
-      setSelectedYear(year);
-      setShowYearPicker(false);
+      // no-op: quarter chart removed
     } else {
       Alert.alert(
         'Error',
@@ -155,33 +131,7 @@ const ReportsScreen = ({ navigation }) => {
     return `$${value.toLocaleString()}`;
   };
 
-  // Prepare line chart data (showing revenue over time - simplified with current value)
-  const lineChartData = totalRevenue > 0 ? [
-    { value: totalRevenue * 0.7, label: 'T1' },
-    { value: totalRevenue * 0.85, label: 'T2' },
-    { value: totalRevenue * 0.95, label: 'T3' },
-    { value: totalRevenue, label: 'Current' },
-  ] : [];
-
-  // Prepare grouped bar chart data (quarter revenue by month)
-  const groupedBarChartData = quarterRevenueData.map((item, index) => {
-    const colors = [
-      '#4ABFF4',
-      '#79C3DB',
-      '#28B2B3',
-      '#4ADDBA',
-      '#91E3E3',
-      COLORS.PRIMARY,
-      COLORS.SECONDARY,
-      COLORS.SUCCESS,
-    ];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return {
-      value: item.totalRevenue || 0,
-      label: monthNames[item.month - 1] || `M${item.month}`,
-      frontColor: colors[index % colors.length],
-    };
-  });
+  // Quarter chart removed
 
   const renderMotorbikeItem = ({ item, index }) => (
     <View style={styles.tableRow}>
@@ -282,190 +232,18 @@ const ReportsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Total Contract Revenue - Line Chart */}
+        {/* Total Contract Revenue - Card */}
         <View style={styles.chartContainer}>
           <Text style={styles.sectionTitle}>Total Contract Revenue</Text>
           <View style={styles.chartCardDark}>
             <Text style={styles.chartValueLight}>{formatRevenue(totalRevenue)}</Text>
-            {lineChartData.length > 0 ? (
-              <View style={styles.chartScrollContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={true}
-                  contentContainerStyle={styles.chartScrollContent}
-                  style={styles.chartScrollView}
-                >
-                  <LineChart
-                    data={lineChartData}
-                    width={Math.max(CHART_WIDTH, lineChartData.length * 80)}
-                    height={200}
-                    color="#FF6B35"
-                    thickness={3}
-                    dataPointsColor="#FF6B35"
-                    dataPointsRadius={6}
-                    rulesColor="rgba(255, 255, 255, 0.2)"
-                    textColor="#FFFFFF"
-                    textFontSize={12}
-                    spacing={60}
-                    initialSpacing={20}
-                    noOfSections={4}
-                    maxValue={totalRevenue * 1.2}
-                    yAxisColor="rgba(255, 255, 255, 0.3)"
-                    xAxisColor="rgba(255, 255, 255, 0.3)"
-                    yAxisLabelWidth={60}
-                    yAxisTextStyle={{ color: '#FFFFFF', fontSize: 12 }}
-                    xAxisLabelTextStyle={{ color: '#FFFFFF', fontSize: 10 }}
-                    curved
-                    areaChart
-                    startFillColor="#FF6B35"
-                    endFillColor={`#FF6B3540`}
-                  />
-                </ScrollView>
-              </View>
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyChartTextLight}>No data</Text>
-              </View>
-            )}
+            <Text style={{ color: '#FFFFFF', opacity: 0.7 }}>
+              As of {new Date().toLocaleDateString()}
+            </Text>
           </View>
         </View>
 
-        {/* Quarter Revenue - Grouped Bar Chart */}
-        <View style={styles.chartContainer}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.sectionTitle}>Quarterly Revenue</Text>
-          </View>
-          <View style={styles.controlsContainer}>
-            <View style={styles.quarterSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.quarterButton,
-                  selectedQuarter === 1 && styles.quarterButtonActive,
-                ]}
-                onPress={() => setSelectedQuarter(1)}
-              >
-                <Text
-                  style={[
-                    styles.quarterButtonText,
-                    selectedQuarter === 1 && styles.quarterButtonTextActive,
-                  ]}
-                >
-                  Q1
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.quarterButton,
-                  selectedQuarter === 2 && styles.quarterButtonActive,
-                ]}
-                onPress={() => setSelectedQuarter(2)}
-              >
-                <Text
-                  style={[
-                    styles.quarterButtonText,
-                    selectedQuarter === 2 && styles.quarterButtonTextActive,
-                  ]}
-                >
-                  Q2
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.quarterButton,
-                  selectedQuarter === 3 && styles.quarterButtonActive,
-                ]}
-                onPress={() => setSelectedQuarter(3)}
-              >
-                <Text
-                  style={[
-                    styles.quarterButtonText,
-                    selectedQuarter === 3 && styles.quarterButtonTextActive,
-                  ]}
-                >
-                  Q3
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.quarterButton,
-                  selectedQuarter === 4 && styles.quarterButtonActive,
-                ]}
-                onPress={() => setSelectedQuarter(4)}
-              >
-                <Text
-                  style={[
-                    styles.quarterButtonText,
-                    selectedQuarter === 4 && styles.quarterButtonTextActive,
-                  ]}
-                >
-                  Q4
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.yearSelectorContainer}>
-              <TouchableOpacity
-                style={styles.yearButton}
-                onPress={() => setShowYearPicker(!showYearPicker)}
-              >
-                <Calendar size={16} color={COLORS.TEXT.WHITE} />
-                <Text style={styles.yearButtonText}>{selectedYear}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {showYearPicker && (
-            <View style={styles.yearPickerContainer}>
-              <TextInput
-                style={styles.yearInput}
-                value={yearInput}
-                onChangeText={setYearInput}
-                keyboardType="numeric"
-                placeholder="Enter year"
-                placeholderTextColor={COLORS.TEXT.SECONDARY}
-              />
-              <TouchableOpacity
-                style={styles.yearConfirmButton}
-                onPress={handleYearChange}
-              >
-                <Text style={styles.yearConfirmButtonText}>Confirm</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.yearCancelButton}
-                onPress={() => {
-                  setShowYearPicker(false);
-                  setYearInput(selectedYear.toString());
-                }}
-              >
-                <Text style={styles.yearCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          <View style={styles.chartCardDark}>
-            {groupedBarChartData.length > 0 ? (
-              <BarChart
-                showFractionalValue
-                showYAxisIndices
-                noOfSections={4}
-                maxValue={
-                  Math.max(...groupedBarChartData.map((item) => item.value)) * 1.2 || 400
-                }
-                data={groupedBarChartData}
-                isAnimated
-                yAxisTextStyle={{ color: '#FFFFFF', fontSize: 12 }}
-                xAxisLabelTextStyle={{ color: '#FFFFFF', fontSize: 11 }}
-                yAxisColor="rgba(255, 255, 255, 0.3)"
-                xAxisColor="rgba(255, 255, 255, 0.3)"
-                rulesColor="rgba(255, 255, 255, 0.2)"
-                textColor="#FFFFFF"
-                textFontSize={12}
-              />
-            ) : (
-              <View style={styles.emptyChart}>
-                <Text style={styles.emptyChartTextLight}>No data</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        {/* Quarter Revenue chart removed as requested */}
 
         {/* Top 10 Motorbikes - Table */}
         <View style={styles.chartContainer}>
