@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, SafeAreaView, ActivityIndicator } from 'react-native';
-import { ArrowLeft, PlusCircle, Trash2, RefreshCw, Pencil } from 'lucide-react-native';
+import { ArrowLeft, PlusCircle, Trash2, RefreshCw, Pencil, CheckCircle } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -110,32 +110,43 @@ const ContractFullPaymentScreen = ({ navigation, route }) => {
     setAmount('');
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.itemRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.itemTitle}>Period {item.period}</Text>
-        <Text style={styles.itemSub}>Amount: {new Intl.NumberFormat('vi-VN').format(item.amount)} VNĐ</Text>
-        <Text style={styles.itemSub}>Created: {new Date(item.createAt).toLocaleDateString('vi-VN')}</Text>
-        <Text style={styles.itemSub}>PaidAt: {item.paidAt ? new Date(item.paidAt).toLocaleString('vi-VN') : '—'}</Text>
+  const renderItem = ({ item }) => {
+    const isPaid = !!item.paidAt;
+    return (
+      <View style={styles.itemRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.itemTitle}>Period {item.period}</Text>
+          <Text style={styles.itemSub}>Amount: {new Intl.NumberFormat('vi-VN').format(item.amount)} VNĐ</Text>
+          <Text style={styles.itemSub}>Created: {new Date(item.createAt).toLocaleDateString('vi-VN')}</Text>
+          <Text style={styles.itemSub}>PaidAt: {isPaid ? new Date(item.paidAt).toLocaleDateString('vi-VN') : '—'}</Text>
+        </View>
+        {isPaid ? (
+          <View style={styles.paidBadge}>
+            <CheckCircle color="#fff" size={18} />
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
+              <Pencil color="#fff" size={18} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() =>
+                showConfirm(
+                  'Delete Payment',
+                  'Are you sure you want to delete this payment period?',
+                  () => handleDelete(item.id),
+                  () => {}
+                )
+              }
+            >
+              <Trash2 color="#fff" size={18} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
-      <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
-        <Pencil color="#fff" size={18} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={() =>
-          showConfirm(
-            'Delete Payment',
-            'Are you sure you want to delete this payment period?',
-            () => handleDelete(item.id),
-            () => {}
-          )
-        }
-      >
-        <Trash2 color="#fff" size={18} />
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -256,6 +267,7 @@ const styles = StyleSheet.create({
   itemSub: { color: COLORS.TEXT.SECONDARY, fontSize: SIZES.FONT.SMALL },
   deleteBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.ERROR, justifyContent: 'center', alignItems: 'center', marginLeft: SIZES.PADDING.SMALL },
   editBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#009DFF", justifyContent: 'center', alignItems: 'center', marginLeft: SIZES.PADDING.SMALL },
+  paidBadge: { width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.SUCCESS, justifyContent: 'center', alignItems: 'center', marginLeft: SIZES.PADDING.SMALL },
   emptyBox: { alignItems: 'center', padding: SIZES.PADDING.LARGE },
   emptyText: { color: COLORS.TEXT.SECONDARY },
   cancelBtn: { paddingHorizontal: SIZES.PADDING.MEDIUM, justifyContent: 'center', alignItems: 'center', borderRadius: SIZES.RADIUS.LARGE, backgroundColor: '#6B7280' },
