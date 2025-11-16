@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Platform,
+  TextInput,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -26,6 +27,9 @@ const EditQuotationScreen = ({ navigation, route }) => {
   const [validUntil, setValidUntil] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [quotationData, setQuotationData] = useState(null);
+  const [basePrice, setBasePrice] = useState('');
+  const [promotionPrice, setPromotionPrice] = useState('');
+  const [finalPrice, setFinalPrice] = useState('');
 
   useEffect(() => {
     loadQuotationDetail();
@@ -50,6 +54,15 @@ const EditQuotationScreen = ({ navigation, route }) => {
         if (detail.validUntil) {
           setValidUntil(new Date(detail.validUntil));
         }
+        if (detail.basePrice !== undefined && detail.basePrice !== null) {
+          setBasePrice(String(detail.basePrice));
+        }
+        if (detail.promotionPrice !== undefined && detail.promotionPrice !== null) {
+          setPromotionPrice(String(detail.promotionPrice));
+        }
+        if (detail.finalPrice !== undefined && detail.finalPrice !== null) {
+          setFinalPrice(String(detail.finalPrice));
+        }
       } else {
         showError('Error', 'Failed to load quotation details');
       }
@@ -60,6 +73,16 @@ const EditQuotationScreen = ({ navigation, route }) => {
       setLoading(false);
     }
   };
+
+  // Auto-calculate finalPrice = basePrice - promotionPrice
+  useEffect(() => {
+    const base = basePrice === '' ? 0 : Number(basePrice);
+    const promo = promotionPrice === '' ? 0 : Number(promotionPrice);
+    if (!Number.isNaN(base) && !Number.isNaN(promo)) {
+      const computed = Math.max(0, base - promo);
+      setFinalPrice(String(computed));
+    }
+  }, [basePrice, promotionPrice]);
 
   const formatDateForDisplay = (date) => {
     if (!date) return '';
@@ -88,9 +111,25 @@ const EditQuotationScreen = ({ navigation, route }) => {
       const validUntilDate = new Date(validUntil);
       validUntilDate.setHours(23, 59, 59, 0);
       
+      // parse numeric fields safely
+      const parsedBasePrice = basePrice === '' ? undefined : Number(basePrice);
+      const parsedPromotionPrice = promotionPrice === '' ? undefined : Number(promotionPrice);
+      const parsedFinalPrice = finalPrice === '' ? undefined : Number(finalPrice);
+      
+      if (
+        (parsedBasePrice !== undefined && Number.isNaN(parsedBasePrice)) ||
+        (parsedPromotionPrice !== undefined && Number.isNaN(parsedPromotionPrice)) ||
+        (parsedFinalPrice !== undefined && Number.isNaN(parsedFinalPrice))
+      ) {
+        throw new Error('Price fields must be numbers');
+      }
+
       const updateData = {
         type: quotationType,
         status: status,
+        basePrice: parsedBasePrice,
+        promotionPrice: parsedPromotionPrice,
+        finalPrice: parsedFinalPrice,
         validUntil: validUntilDate.toISOString(),
       };
 
@@ -256,6 +295,48 @@ const EditQuotationScreen = ({ navigation, route }) => {
               locale="vi-VN"
             />
           )}
+        </View>
+
+        {/* Giá */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Pricing</Text>
+          <View style={styles.priceRow}>
+            <View style={styles.priceField}>
+              <Text style={styles.priceLabel}>Base Price</Text>
+              <TextInput
+                value={basePrice}
+                onChangeText={setBasePrice}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                style={styles.priceInput}
+              />
+            </View>
+            <View style={styles.priceField}>
+              <Text style={styles.priceLabel}>Promotion Price</Text>
+              <TextInput
+                value={promotionPrice}
+                onChangeText={setPromotionPrice}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                style={styles.priceInput}
+              />
+            </View>
+          </View>
+          <View style={styles.priceRow}>
+            <View style={styles.priceFieldFull}>
+              <Text style={styles.priceLabel}>Final Price</Text>
+              <TextInput
+                value={finalPrice}
+                editable={false}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                style={styles.priceInput}
+              />
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -441,6 +522,32 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: SIZES.PADDING.MEDIUM,
     fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  priceField: {
+    flex: 1,
+  },
+  priceFieldFull: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.WHITE,
+    marginBottom: SIZES.PADDING.XSMALL,
+    fontWeight: '600',
+  },
+  priceInput: {
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+    borderRadius: SIZES.RADIUS.MEDIUM,
     color: COLORS.TEXT.WHITE,
   },
 });

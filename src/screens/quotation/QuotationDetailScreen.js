@@ -681,6 +681,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     const type = quote.type?.toUpperCase();
     const status = quote.status?.toUpperCase();
     const isDraft = status === 'DRAFT';
+    const isAccepted = status === 'ACCEPTED';
     const depositStatus = depositInfo?.status?.toUpperCase();
     const isDepositHolding = depositStatus === 'HOLDING';
     const isDepositApplied = depositStatus === 'APPLIED';
@@ -778,15 +779,24 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     };
     
     const buttons = renderButtonsByType();
+    const extraPrintButton = isAccepted ? (
+      <TouchableOpacity
+        style={styles.printButton}
+        onPress={handlePrint}
+      >
+        <Text style={styles.printButtonText}>Print Quotation</Text>
+      </TouchableOpacity>
+    ) : null;
     
     // If no buttons to show, don't render the action buttons container
-    if (!buttons) {
+    if (!buttons && !extraPrintButton) {
       return null;
     }
     
     return (
       <View style={styles.actionButtons}>
         {buttons}
+        {extraPrintButton}
       </View>
     );
   };
@@ -1400,6 +1410,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    gap: SIZES.PADDING.SMALL,
   },
   shareButton: {
     flex: 1,
@@ -1407,7 +1418,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginRight: SIZES.PADDING.SMALL,
   },
   shareButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1418,16 +1428,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderWidth: 1,
-    borderColor: COLORS.PRIMARY,
+    borderColor: "#FFFFFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   printButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#FFFFFF",
   },
   paymentButton: {
     flex: 1,
@@ -1435,7 +1444,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   paymentButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1448,7 +1456,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   contractButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1461,7 +1468,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginRight: SIZES.PADDING.SMALL,
   },
   depositButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1474,7 +1480,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   fullPaymentButtonText: {
     fontSize: SIZES.FONT.MEDIUM,

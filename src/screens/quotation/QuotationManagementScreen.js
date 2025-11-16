@@ -342,6 +342,7 @@ const QuotationManagementScreen = ({ navigation }) => {
     { key: 'ACCEPTED', label: 'Accepted', count: quotationsByTab.filter(q => q.status === 'ACCEPTED').length },
     { key: 'REJECTED', label: 'Rejected', count: quotationsByTab.filter(q => q.status === 'REJECTED').length },
     { key: 'EXPIRED', label: 'Expired', count: quotationsByTab.filter(q => q.status === 'EXPIRED').length },
+    { key: 'REVERSED', label: 'Reversed', count: quotationsByTab.filter(q => q.status === 'REVERSED').length },
   ];
 
   const renderQuotationCard = ({ item: quotation }) => {
