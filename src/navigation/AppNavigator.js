@@ -111,6 +111,7 @@ import EditBatchScreen from '../screens/batches/EditBatchScreen';
 import BatchDetailScreen from '../screens/batches/BatchDetailScreen';
 import ReportsScreen from '../screens/reports/ReportsScreen';
 import DealerManagerDashboardScreen from '../screens/dashboard/DealerManagerDashboardScreen';
+import ContractFullPaymentScreen from '../screens/contract/ContractFullPaymentScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -608,6 +609,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="CustomerContractDetail" 
               component={CustomerContractDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="ContractFullPayment" 
+              component={ContractFullPaymentScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 
