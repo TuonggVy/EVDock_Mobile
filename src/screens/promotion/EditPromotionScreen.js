@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ArrowLeft, Calendar, Check, X } from 'lucide-react-native';
@@ -114,16 +115,28 @@ const EditPromotionScreen = ({ navigation, route }) => {
     return `${day}/${month}/${year}`;
   };
 
-  const handleStartDateChange = (_, selectedDate) => {
-    setShowStartDatePicker(false);
+  const handleStartDateChange = (event, selectedDate) => {
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowStartDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setSelectedStartDate(selectedDate);
       setFormData((prev) => ({ ...prev, startAt: formatDateISO(selectedDate) }));
     }
   };
 
-  const handleEndDateChange = (_, selectedDate) => {
-    setShowEndDatePicker(false);
+  const handleEndDateChange = (event, selectedDate) => {
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowEndDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setSelectedEndDate(selectedDate);
       setFormData((prev) => ({ ...prev, endAt: formatDateISO(selectedDate) }));
@@ -306,14 +319,6 @@ const EditPromotionScreen = ({ navigation, route }) => {
                 <Text style={styles.dateText}>{formatDateForDisplay(formData.startAt)}</Text>
                 <Calendar size={18} color={COLORS.TEXT.PRIMARY} />
               </TouchableOpacity>
-              {showStartDatePicker && (
-                <DateTimePicker
-                  value={selectedStartDate || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleStartDateChange}
-                />
-              )}
             </View>
 
             <View style={styles.inputGroup}>
@@ -324,14 +329,6 @@ const EditPromotionScreen = ({ navigation, route }) => {
                 <Text style={styles.dateText}>{formatDateForDisplay(formData.endAt)}</Text>
                 <Calendar size={18} color={COLORS.TEXT.PRIMARY} />
               </TouchableOpacity>
-              {showEndDatePicker && (
-                <DateTimePicker
-                  value={selectedEndDate || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleEndDateChange}
-                />
-              )}
             </View>
           </View>
 
@@ -469,6 +466,59 @@ const EditPromotionScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Date Picker Modals */}
+      {showStartDatePicker && (
+        <Modal
+          visible={showStartDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowStartDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowStartDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={selectedStartDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleStartDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {showEndDatePicker && (
+        <Modal
+          visible={showEndDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEndDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowEndDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={selectedEndDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEndDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -611,6 +661,18 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
   selectInput: {
     flexDirection: 'row',

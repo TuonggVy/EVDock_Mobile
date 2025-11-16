@@ -9,6 +9,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -321,14 +323,30 @@ const CreateCustomerScreen = ({ navigation }) => {
 
       {/* Date Picker */}
       {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          maximumDate={new Date()} // Cannot select future dates
-          locale="vi-VN"
-        />
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={selectedDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    maximumDate={new Date()} // Cannot select future dates
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
 
       <CustomAlert
@@ -494,6 +512,18 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 

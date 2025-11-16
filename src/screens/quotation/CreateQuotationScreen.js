@@ -104,7 +104,13 @@ const CreateQuotationScreen = ({ navigation, route }) => {
 
   // Handle date change from DateTimePicker
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setValidUntil(selectedDate);
     }
@@ -1191,14 +1197,30 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       </View>
       
       {showDatePicker && (
-        <DateTimePicker
-          value={validUntil}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-          locale="vi-VN"
-        />
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={validUntil || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
     </View>
   );

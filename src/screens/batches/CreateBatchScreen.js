@@ -11,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   KeyboardAvoidingView,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -106,7 +107,13 @@ const CreateBatchScreen = ({ navigation }) => {
   };
 
   const handleDateChange = (event, selectedDate) => {
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
     setShowDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setFormData(prev => ({ ...prev, dueDate: selectedDate }));
       if (errors.dueDate) {
@@ -331,15 +338,6 @@ const CreateBatchScreen = ({ navigation }) => {
                   <Calendar size={20} color={COLORS.TEXT.SECONDARY} />
                 </TouchableOpacity>
                 {errors.dueDate && <Text style={styles.errorText}>{errors.dueDate}</Text>}
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={formData.dueDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                  />
-                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -489,6 +487,33 @@ const CreateBatchScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Due Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={formData.dueDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
@@ -651,6 +676,18 @@ const styles = StyleSheet.create({
   modalItemText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 
