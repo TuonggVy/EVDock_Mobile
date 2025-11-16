@@ -76,18 +76,39 @@ const ReportsScreen = ({ navigation }) => {
 
       // Set KPI data
       setKpiData({
-        totalAgencies: agenciesRes?.data?.totalAgencies || agenciesRes?.data || 0,
-        totalWarehouses: warehousesRes?.data?.totalWarehouses || warehousesRes?.data || 0,
-        totalMotorbikes: motorbikesRes?.data?.totalMotorbikes || motorbikesRes?.data || 0,
-        totalApBatches: apBatchesRes?.data?.totalApBatches || apBatchesRes?.data || 0,
+        totalAgencies:
+          typeof (agenciesRes?.data?.totalAgencies ?? agenciesRes?.data) === 'number'
+            ? (agenciesRes?.data?.totalAgencies ?? agenciesRes?.data)
+            : 0,
+        totalWarehouses:
+          typeof (warehousesRes?.data?.totalWarehouses ?? warehousesRes?.data) === 'number'
+            ? (warehousesRes?.data?.totalWarehouses ?? warehousesRes?.data)
+            : 0,
+        totalMotorbikes:
+          typeof (motorbikesRes?.data?.totalMotorbikes ?? motorbikesRes?.data) === 'number'
+            ? (motorbikesRes?.data?.totalMotorbikes ?? motorbikesRes?.data)
+            : 0,
+        totalApBatches:
+          typeof (apBatchesRes?.data?.totalApBatches ?? apBatchesRes?.data) === 'number'
+            ? (apBatchesRes?.data?.totalApBatches ?? apBatchesRes?.data)
+            : 0,
       });
 
       // Set total revenue (for line chart - we'll create a simple line chart with this value)
       setTotalRevenue(totalRevenueRes?.data?.totalContractRevenue || 0);
 
       // Set quarter revenue data
-      const quarterData = quarterRevenueRes?.data?.quarterContractChartData || [];
-      setQuarterRevenueData(quarterData);
+      const quarterDataRaw =
+        quarterRevenueRes?.data?.quarterContractChartData ??
+        quarterRevenueRes?.data ??
+        [];
+      const normalizedQuarterData = Array.isArray(quarterDataRaw)
+        ? quarterDataRaw.map((d) => ({
+            month: Number(d.month),
+            totalRevenue: Number(d.totalRevenue) || 0,
+          }))
+        : [];
+      setQuarterRevenueData(normalizedQuarterData);
 
       // Set top 10 motorbikes
       const top10Data = top10Res?.data || [];
