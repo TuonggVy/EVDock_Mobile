@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   TextInput,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -94,7 +96,13 @@ const EditQuotationScreen = ({ navigation, route }) => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setValidUntil(selectedDate);
     }
@@ -284,17 +292,6 @@ const EditQuotationScreen = ({ navigation, route }) => {
             </Text>
             <Calendar color="#FFFFFF" size={18} />
           </TouchableOpacity>
-          
-          {showDatePicker && (
-            <DateTimePicker
-              value={validUntil}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
-              minimumDate={new Date()}
-              locale="vi-VN"
-            />
-          )}
         </View>
 
         {/* Giá */}
@@ -339,6 +336,34 @@ const EditQuotationScreen = ({ navigation, route }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={validUntil || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
 
       {/* Action Buttons */}
       <View style={styles.footer}>
@@ -549,6 +574,18 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER.PRIMARY,
     borderRadius: SIZES.RADIUS.MEDIUM,
     color: COLORS.TEXT.WHITE,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 

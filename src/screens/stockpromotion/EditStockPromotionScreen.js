@@ -10,6 +10,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ArrowLeft, Calendar } from 'lucide-react-native';
@@ -93,54 +95,47 @@ const EditStockPromotionScreen = ({ navigation, route }) => {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    // Only show date (no time)
+    return `${day}/${month}/${year}`;
   };
 
   const handleStartDateChange = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      let dateWithTime = selectedDate;
-      if (Platform.OS === 'android') {
-        const now = new Date();
-        dateWithTime = new Date(selectedDate);
-        dateWithTime.setHours(now.getHours());
-        dateWithTime.setMinutes(now.getMinutes());
-        dateWithTime.setSeconds(0);
-        dateWithTime.setMilliseconds(0);
-      }
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowStartDatePicker(Platform.OS === 'ios');
 
-      setStartDate(dateWithTime);
-      const formattedDate = formatDateForAPI(dateWithTime);
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
+    if (selectedDate) {
+      // Use the selected date as-is (no extra time handling)
+      setStartDate(selectedDate);
+      const formattedDate = formatDateForAPI(selectedDate);
       setFormData((prev) => ({ ...prev, startAt: formattedDate }));
 
-      if (dateWithTime > endDate) {
-        setEndDate(dateWithTime);
+      if (selectedDate > endDate) {
+        setEndDate(selectedDate);
         setFormData((prev) => ({ ...prev, endAt: formattedDate }));
       }
     }
   };
 
   const handleEndDateChange = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      let dateWithTime = selectedDate;
-      if (Platform.OS === 'android') {
-        const now = new Date();
-        dateWithTime = new Date(selectedDate);
-        dateWithTime.setHours(now.getHours());
-        dateWithTime.setMinutes(now.getMinutes());
-        dateWithTime.setSeconds(0);
-        dateWithTime.setMilliseconds(0);
-      }
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowEndDatePicker(Platform.OS === 'ios');
 
-      if (dateWithTime < startDate) {
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
+    if (selectedDate) {
+      // Use the selected date as-is (no extra time handling)
+      if (selectedDate < startDate) {
         showError('Error', 'End date must be after start date');
         return;
       }
-      setEndDate(dateWithTime);
-      const formattedDate = formatDateForAPI(dateWithTime);
+      setEndDate(selectedDate);
+      const formattedDate = formatDateForAPI(selectedDate);
       setFormData((prev) => ({ ...prev, endAt: formattedDate }));
     }
   };
@@ -410,6 +405,60 @@ const EditStockPromotionScreen = ({ navigation, route }) => {
         )}
       </KeyboardAvoidingView>
 
+      {/* Date Picker Modals */}
+      {showStartDatePicker && (
+        <Modal
+          visible={showStartDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowStartDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowStartDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={startDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleStartDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {showEndDatePicker && (
+        <Modal
+          visible={showEndDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEndDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowEndDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={endDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEndDateChange}
+                    minimumDate={startDate}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -572,6 +621,18 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     marginTop: SIZES.PADDING.SMALL,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 

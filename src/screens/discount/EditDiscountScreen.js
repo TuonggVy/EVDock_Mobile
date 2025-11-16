@@ -11,6 +11,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   ActivityIndicator,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -107,7 +108,13 @@ const EditDiscountScreen = ({ navigation, route }) => {
 
   // Date picker handlers
   const handleStartDateChange = (event, selectedDate) => {
-    setShowStartDatePicker(false);
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowStartDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       setStartDate(selectedDate);
       const formattedDate = formatDate(selectedDate);
@@ -122,7 +129,13 @@ const EditDiscountScreen = ({ navigation, route }) => {
   };
 
   const handleEndDateChange = (event, selectedDate) => {
-    setShowEndDatePicker(false);
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowEndDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
       // Ensure end date is not before start date
       if (selectedDate < startDate) {
@@ -463,24 +476,56 @@ const EditDiscountScreen = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      {/* Date Pickers */}
+      {/* Date Pickers - Modal style */}
       {showStartDatePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleStartDateChange}
-        />
+        <Modal
+          visible={showStartDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowStartDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowStartDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={startDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleStartDateChange}
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
       
       {showEndDatePicker && (
-        <DateTimePicker
-          value={endDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleEndDateChange}
-          minimumDate={startDate}
-        />
+        <Modal
+          visible={showEndDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEndDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowEndDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={endDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEndDateChange}
+                    minimumDate={startDate}
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
 
       <CustomAlert
@@ -752,6 +797,18 @@ const styles = StyleSheet.create({
   },
   dateIcon: {
     fontSize: SIZES.FONT.MEDIUM,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 

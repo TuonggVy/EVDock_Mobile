@@ -79,18 +79,25 @@ const CustomerContractManagementScreen = ({ navigation }) => {
       
       if (response.success) {
         const sortedContracts = (response.data || []).sort((a, b) => {
-          // Sort by creation date first (createAt, createdAt, created_at), then by id (larger id = newer), then by signDate
-          const dateA = new Date(a.createAt || a.createdAt || a.created_at || a.signDate || 0);
-          const dateB = new Date(b.createAt || b.createdAt || b.created_at || b.signDate || 0);
+          // Get primary date source for each contract:
+          // Prefer explicit creation date fields, then signDate. Avoid using fallbacks like 0 that create 1970-01-01.
+          const rawDateA = a.createAt || a.createdAt || a.created_at || a.signDate;
+          const rawDateB = b.createAt || b.createdAt || b.created_at || b.signDate;
+
+          const dateA = rawDateA ? new Date(rawDateA) : null;
+          const dateB = rawDateB ? new Date(rawDateB) : null;
+
+          const timeA = dateA && !isNaN(dateA.getTime()) ? dateA.getTime() : 0;
+          const timeB = dateB && !isNaN(dateB.getTime()) ? dateB.getTime() : 0;
           
           // If dates are valid and different, sort by date
-          if (dateA.getTime() > 0 && dateB.getTime() > 0 && dateA.getTime() !== dateB.getTime()) {
-            return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+          if (timeA > 0 && timeB > 0 && timeA !== timeB) {
+            return timeB - timeA; // Descending order (newest first)
           }
           
           // If dates are same or invalid, sort by id (larger id = newer contract)
-          const idA = parseInt(a.id) || 0;
-          const idB = parseInt(b.id) || 0;
+          const idA = parseInt(a.id, 10) || 0;
+          const idB = parseInt(b.id, 10) || 0;
           return idB - idA; // Descending order (larger id = newer)
         });
         setContracts(sortedContracts);

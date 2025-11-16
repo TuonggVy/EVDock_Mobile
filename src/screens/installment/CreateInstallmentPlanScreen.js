@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Modal,
+  Platform,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SIZES } from '../../constants';
@@ -86,78 +96,39 @@ const CreateInstallmentPlanScreen = () => {
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) return '';
-      return d.toLocaleString('en-US', {
+      // Display only date (no time), localized
+      return d.toLocaleDateString('vi-VN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }).replace(',', '');
+      });
     } catch {
       return '';
     }
   };
 
-  const handleDateChange = (event, selectedDate, field) => {
-    if (Platform.OS === 'android') {
-      if (field === 'startAt') {
-        setShowStartDatePicker(false);
-      } else {
-        setShowEndDatePicker(false);
-      }
+  const handleStartDateChange = (event, selectedDate) => {
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowStartDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
     }
-    if (event.type === 'set' && selectedDate) {
-      updateField(field, selectedDate);
-    } else if (event.type === 'dismissed') {
-      // User cancelled
-      if (field === 'startAt') {
-        setShowStartDatePicker(false);
-      } else {
-        setShowEndDatePicker(false);
-      }
+
+    if (selectedDate) {
+      updateField('startAt', selectedDate);
     }
   };
 
-  const openNativeDatePicker = async (fieldKey) => {
-    if (Platform.OS === 'android') {
-      try {
-        const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
-        const current = form[fieldKey] ? new Date(form[fieldKey]) : new Date();
-        DateTimePickerAndroid.open({
-          value: current,
-          mode: 'date',
-          onChange: (event, selectedDate) => {
-            if (event.type === 'set' && selectedDate) {
-              // After selecting date, open time picker
-              DateTimePickerAndroid.open({
-                value: selectedDate,
-                mode: 'time',
-                onChange: (_e2, selectedTime) => {
-                  const finalDate = selectedTime || selectedDate;
-                  updateField(fieldKey, finalDate);
-                },
-              });
-            } else if (event.type === 'dismissed') {
-              if (fieldKey === 'startAt') {
-                setShowStartDatePicker(false);
-              } else {
-                setShowEndDatePicker(false);
-              }
-            }
-          },
-        });
-      } catch (e) {
-        console.error('Date picker error:', e);
-        showError('Error', 'Date picker is unavailable. Please enter date manually.');
-      }
-    } else {
-      // iOS - show picker
-      if (fieldKey === 'startAt') {
-        setShowStartDatePicker(true);
-      } else {
-        setShowEndDatePicker(true);
-      }
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
+    if (selectedDate) {
+      updateField('endAt', selectedDate);
     }
   };
 
@@ -345,7 +316,7 @@ const CreateInstallmentPlanScreen = () => {
           </Text>
           <TouchableOpacity
             style={[styles.inputWrapper, errors.startAt && styles.inputError]}
-            onPress={() => openNativeDatePicker('startAt')}
+            onPress={() => setShowStartDatePicker(true)}
           >
             <Text style={[styles.dateInputText, !form.startAt && styles.placeholderText]}>
               {form.startAt ? formatDateDisplay(form.startAt) : 'Select start date'}
@@ -353,14 +324,6 @@ const CreateInstallmentPlanScreen = () => {
             <Calendar size={18} color={COLORS.TEXT.SECONDARY} />
           </TouchableOpacity>
           {errors.startAt && <Text style={styles.errorText}>{errors.startAt}</Text>}
-          {Platform.OS === 'ios' && showStartDatePicker && (
-            <DateTimePicker
-              value={form.startAt || new Date()}
-              mode="datetime"
-              display="spinner"
-              onChange={(event, date) => handleDateChange(event, date, 'startAt')}
-            />
-          )}
         </View>
 
         {/* End Date */}
@@ -370,7 +333,7 @@ const CreateInstallmentPlanScreen = () => {
           </Text>
           <TouchableOpacity
             style={[styles.inputWrapper, errors.endAt && styles.inputError]}
-            onPress={() => openNativeDatePicker('endAt')}
+            onPress={() => setShowEndDatePicker(true)}
           >
             <Text style={[styles.dateInputText, !form.endAt && styles.placeholderText]}>
               {form.endAt ? formatDateDisplay(form.endAt) : 'Select end date'}
@@ -378,14 +341,6 @@ const CreateInstallmentPlanScreen = () => {
             <Calendar size={18} color={COLORS.TEXT.SECONDARY} />
           </TouchableOpacity>
           {errors.endAt && <Text style={styles.errorText}>{errors.endAt}</Text>}
-          {Platform.OS === 'ios' && showEndDatePicker && (
-            <DateTimePicker
-              value={form.endAt || new Date()}
-              mode="datetime"
-              display="spinner"
-              onChange={(event, date) => handleDateChange(event, date, 'endAt')}
-            />
-          )}
         </View>
 
         {/* Status */}
@@ -465,6 +420,59 @@ const CreateInstallmentPlanScreen = () => {
         type={alertConfig.type}
         onClose={hideAlert}
       />
+
+      {/* Date Picker Modals */}
+      {showStartDatePicker && (
+        <Modal
+          transparent
+          visible={showStartDatePicker}
+          animationType="fade"
+          onRequestClose={() => setShowStartDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowStartDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={form.startAt ? new Date(form.startAt) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleStartDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {showEndDatePicker && (
+        <Modal
+          transparent
+          visible={showEndDatePicker}
+          animationType="fade"
+          onRequestClose={() => setShowEndDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowEndDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={form.endAt ? new Date(form.endAt) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEndDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -611,6 +619,18 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
     fontSize: SIZES.FONT.MEDIUM,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
 });
 

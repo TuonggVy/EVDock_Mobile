@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Alert,
+  Modal,
+  Platform,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -36,6 +48,8 @@ const InstallmentPlanDetailScreen = () => {
   const [loading, setLoading] = useState(!!installmentId);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -72,35 +86,39 @@ const InstallmentPlanDetailScreen = () => {
     try {
       const d = new Date(value);
       if (isNaN(d.getTime())) return value;
-      return d.toISOString().slice(0, 19);
+      // Display only date (no time)
+      return d.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
     } catch {
       return value;
     }
   };
 
-  const openNativeDatePicker = async (fieldKey) => {
-    try {
-      const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
-      const current = form[fieldKey] ? new Date(form[fieldKey]) : new Date();
-      DateTimePickerAndroid.open({
-        value: current,
-        mode: 'date',
-        onChange: (event, selectedDate) => {
-          if (event.type === 'set' && selectedDate) {
-            // Ask time after selecting date
-            DateTimePickerAndroid.open({
-              value: selectedDate,
-              mode: 'time',
-              onChange: (_e2, selectedTime) => {
-                const finalDate = selectedTime || selectedDate;
-                updateField(fieldKey, new Date(finalDate).toISOString());
-              },
-            });
-          }
-        },
-      });
-    } catch (e) {
-      Alert.alert('Picker unavailable', 'Please enter ISO date-time manually (YYYY-MM-DDTHH:mm:ss)');
+  const handleStartDateChange = (event, selectedDate) => {
+    // Keep picker open on iOS (close via tapping outside modal), auto-close on Android
+    setShowStartDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
+    if (selectedDate) {
+      updateField('startAt', new Date(selectedDate).toISOString());
+    }
+  };
+
+  const handleEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(Platform.OS === 'ios');
+
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
+    if (selectedDate) {
+      updateField('endAt', new Date(selectedDate).toISOString());
     }
   };
 
@@ -195,7 +213,11 @@ const InstallmentPlanDetailScreen = () => {
 
         {/* Start date picker */}
         <View style={styles.field}>
-          <TouchableOpacity activeOpacity={0.9} disabled={viewOnly} onPress={() => openNativeDatePicker('startAt')}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            disabled={viewOnly}
+            onPress={() => !viewOnly && setShowStartDatePicker(true)}
+          >
             <Text style={styles.label}>Start Date</Text>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -206,10 +228,14 @@ const InstallmentPlanDetailScreen = () => {
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 editable={false}
                 showSoftInputOnFocus={false}
-                onFocus={() => { if (!viewOnly) openNativeDatePicker('startAt'); }}
-                onPressIn={() => { if (!viewOnly) openNativeDatePicker('startAt'); }}
+                onFocus={() => { if (!viewOnly) setShowStartDatePicker(true); }}
+                onPressIn={() => { if (!viewOnly) setShowStartDatePicker(true); }}
               />
-              <TouchableOpacity style={styles.calendarButton} disabled={viewOnly} onPress={() => openNativeDatePicker('startAt')}>
+              <TouchableOpacity
+                style={styles.calendarButton}
+                disabled={viewOnly}
+                onPress={() => !viewOnly && setShowStartDatePicker(true)}
+              >
                 <Calendar size={18} />
               </TouchableOpacity>
             </View>
@@ -218,7 +244,11 @@ const InstallmentPlanDetailScreen = () => {
 
         {/* End date picker */}
         <View style={styles.field}>
-          <TouchableOpacity activeOpacity={0.9} disabled={viewOnly} onPress={() => openNativeDatePicker('endAt')}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            disabled={viewOnly}
+            onPress={() => !viewOnly && setShowEndDatePicker(true)}
+          >
             <Text style={styles.label}>End Date</Text>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -229,10 +259,14 @@ const InstallmentPlanDetailScreen = () => {
                 placeholderTextColor={COLORS.TEXT.SECONDARY}
                 editable={false}
                 showSoftInputOnFocus={false}
-                onFocus={() => { if (!viewOnly) openNativeDatePicker('endAt'); }}
-                onPressIn={() => { if (!viewOnly) openNativeDatePicker('endAt'); }}
+                onFocus={() => { if (!viewOnly) setShowEndDatePicker(true); }}
+                onPressIn={() => { if (!viewOnly) setShowEndDatePicker(true); }}
               />
-              <TouchableOpacity style={styles.calendarButton} disabled={viewOnly} onPress={() => openNativeDatePicker('endAt')}>
+              <TouchableOpacity
+                style={styles.calendarButton}
+                disabled={viewOnly}
+                onPress={() => !viewOnly && setShowEndDatePicker(true)}
+              >
                 <Calendar size={18} />
               </TouchableOpacity>
             </View>
@@ -303,6 +337,59 @@ const InstallmentPlanDetailScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Date Picker Modals */}
+      {showStartDatePicker && (
+        <Modal
+          transparent
+          visible={showStartDatePicker}
+          animationType="fade"
+          onRequestClose={() => setShowStartDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowStartDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={form.startAt ? new Date(form.startAt) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleStartDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {showEndDatePicker && (
+        <Modal
+          transparent
+          visible={showEndDatePicker}
+          animationType="fade"
+          onRequestClose={() => setShowEndDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowEndDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={form.endAt ? new Date(form.endAt) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEndDateChange}
+                    locale="vi-VN"
+                    textColor="#000"
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -340,6 +427,18 @@ const styles = StyleSheet.create({
   deleteButtonRow: { paddingVertical: 12, borderRadius: SIZES.RADIUS.LARGE, alignItems: 'center' },
   saveText: { color: COLORS.TEXT.WHITE, fontWeight: '700' },
   deleteTextRow: { color: COLORS.TEXT.WHITE, fontWeight: '700' },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
+  },
 });
 
 export default InstallmentPlanDetailScreen;
