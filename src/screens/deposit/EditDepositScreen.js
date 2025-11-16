@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -424,7 +425,7 @@ const EditDepositScreen = ({ navigation, route }) => {
 
           {/* Hold Day */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Hold Date *</Text>
+            <Text style={styles.sectionTitle}>Valid Until *</Text>
             <TouchableOpacity
               style={[styles.input, errors.holdDay && styles.inputError]}
               onPress={() => setShowDatePicker(true)}
@@ -520,15 +521,29 @@ const EditDepositScreen = ({ navigation, route }) => {
           </View>
         </Modal>
 
-        {/* Date Picker */}
-        {showDatePicker && (
-          <DateTimePicker
-            value={formData.holdDay}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleDateChange}
-          />
-        )}
+        {/* Date Picker Modal (consistent with EditCustomerContractScreen) */}
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={formData.holdDay}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    textColor="#000"
+                    onChange={handleDateChange}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
         <CustomAlert
           visible={alertConfig.visible}
@@ -757,6 +772,8 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     fontWeight: 'bold',
   },
+  datePickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  datePickerContainer: { backgroundColor: COLORS.SURFACE, borderRadius: SIZES.RADIUS.LARGE, padding: SIZES.PADDING.LARGE, width: '90%' },
 });
 
 export default EditDepositScreen;
