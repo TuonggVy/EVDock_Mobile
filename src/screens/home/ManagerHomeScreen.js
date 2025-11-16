@@ -106,6 +106,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('Catalog'),
     },
     {
+      title: 'Customer Contracts',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('CustomerContractManagement'),
+    },
+    {
       title: 'Stock Promotion Management',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <Gift color="#A1D9FF" size={50} />,
@@ -118,18 +124,6 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('OrderManagement'),
     },
     {
-      title: 'Retail Pricing',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <CircleDollarSign color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('RetailPricing'),
-    },
-    {
-      title: 'Deposits',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <CreditCard color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('DepositManagement'),
-    },
-    {
       title: 'Installment Plan',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <NotepadText color="#A1D9FF" size={60} />,
@@ -140,18 +134,6 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <NotepadText color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('DealerManagerQuotation'),
-    },
-    {
-      title: 'Customer Debt',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <WalletCards color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('CustomerDebtManagement'),
-    },
-    {
-      title: 'Manufacturer Debt',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <Building2 color="#A1D9FF" size={60}  />,
-      onPress: () => navigation.navigate('ManufacturerDebtManagement'),
     },
     {
       title: 'Dealer Staff',
