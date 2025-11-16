@@ -274,16 +274,12 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <ArrowLeft color={COLORS.TEXT.WHITE} size={24} />
           </TouchableOpacity>
-          <View style={styles.headerTitle}>
+        <View style={styles.headerTitle}>
             <Text style={styles.title}>Customer Contract Details</Text>
           </View>
-          {isDebtContract ? (
-            <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
-              <MoreVertical color={COLORS.TEXT.WHITE} size={24} />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerSpacer} />
-          )}
+          <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
+            <MoreVertical color={COLORS.TEXT.WHITE} size={24} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -538,6 +534,18 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
           onPress={() => setShowMenu(false)}
         >
           <View style={styles.menuContainer}>
+            {/* Full Payment entry - always available, passes customerContractId */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                navigation.navigate('ContractFullPayment', { customerContractId: contractId });
+              }}
+            >
+              <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Full Payment</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
             {hasInstallmentContract && (
               <>
                 <TouchableOpacity

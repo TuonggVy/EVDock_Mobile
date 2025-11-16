@@ -145,6 +145,12 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       icon: <ReceiptText color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('CustomerContractManagement'),
     },
+    {
+      title: 'Contract Full Payment',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotebookPen color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('ContractFullPayment'),
+    },
   ];
 
   // Filter category cards based on search query
