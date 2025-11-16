@@ -295,7 +295,7 @@ const EditDepositScreen = ({ navigation, route }) => {
   const getStatusText = (status) => {
     switch (status?.toUpperCase()) {
       case 'PENDING': return 'Pending';
-      case 'HOLDING': return 'Holding';
+      case 'PUNISH': return 'Punish';
       case 'APPLIED': return 'Applied';
       case 'EXPIRED': return 'Expired';
       default: return 'Pending';
@@ -305,7 +305,7 @@ const EditDepositScreen = ({ navigation, route }) => {
   const getStatusColor = (status) => {
     switch (status?.toUpperCase()) {
       case 'PENDING': return COLORS.WARNING;
-      case 'HOLDING': return COLORS.SUCCESS;
+      case 'PUNISH': return COLORS.ERROR;
       case 'APPLIED': return COLORS.PRIMARY;
       case 'EXPIRED': return COLORS.ERROR;
       default: return COLORS.TEXT.SECONDARY;
@@ -490,7 +490,7 @@ const EditDepositScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
               </View>
               <View style={styles.statusOptions}>
-                {['PENDING', 'HOLDING', 'APPLIED', 'EXPIRED'].map((status) => (
+                {['PENDING', 'PUNISH', 'APPLIED', 'EXPIRED'].map((status) => (
                   <TouchableOpacity
                     key={status}
                     style={[
