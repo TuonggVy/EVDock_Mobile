@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SIZES } from '../../constants';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import { useAuth } from '../../contexts/AuthContext';
 import customerContractService from '../../services/customerContractService';
 import CustomAlert from '../../components/common/CustomAlert';
@@ -219,6 +219,8 @@ const CustomerContractManagementScreen = ({ navigation }) => {
     contract.contractType?.toUpperCase() === 'DEBT'
   ).length;
 
+  const isDealerManager = user?.role === USER_ROLES.DEALER_MANAGER;
+
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerTop}>
@@ -226,9 +228,11 @@ const CustomerContractManagementScreen = ({ navigation }) => {
           <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Customer Contracts</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('CreateCustomerContract')}>
-          <Plus color={COLORS.TEXT.WHITE} size={18} />
-        </TouchableOpacity>
+        {!isDealerManager && (
+          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('CreateCustomerContract')}>
+            <Plus color={COLORS.TEXT.WHITE} size={18} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Search Bar */}
@@ -371,20 +375,22 @@ const CustomerContractManagementScreen = ({ navigation }) => {
         </View>
       </TouchableOpacity>
 
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => navigation.navigate('EditCustomerContract', { contractId: item.id })}
-        >
-          <Pencil size={16} color={COLORS.TEXT.WHITE} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteContract(item.id)}
-        >
-          <Trash2 size={16} color={COLORS.TEXT.WHITE} />
-        </TouchableOpacity>
-      </View>
+      {!isDealerManager && (
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => navigation.navigate('EditCustomerContract', { contractId: item.id })}
+          >
+            <Pencil size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteContract(item.id)}
+          >
+            <Trash2 size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 

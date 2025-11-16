@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image, Modal, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SIZES } from '../../constants';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import customerContractService from '../../services/customerContractService';
 import installmentContractService from '../../services/installmentContractService';
 import emailService from '../../services/emailService';
+import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Pencil, Trash2, NotepadText, CreditCard, FileText, Mail, X, MoreVertical, Home } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
@@ -17,6 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CustomerContractDetailScreen = ({ navigation, route }) => {
   const { contractId, selectedInstallmentPlan } = route.params || {};
   const { alertConfig, hideAlert, showSuccess, showError, showDeleteConfirm } = useCustomAlert();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState(null);
   const [hasInstallmentContract, setHasInstallmentContract] = useState(false);
@@ -25,6 +27,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const isDealerManager = user?.role === USER_ROLES.DEALER_MANAGER;
 
   useEffect(() => {
     loadContractDetail();
@@ -277,9 +280,11 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
         <View style={styles.headerTitle}>
             <Text style={styles.title}>Customer Contract Details</Text>
           </View>
-          <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
-            <MoreVertical color={COLORS.TEXT.WHITE} size={24} />
-          </TouchableOpacity>
+          {!isDealerManager && (
+            <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
+              <MoreVertical color={COLORS.TEXT.WHITE} size={24} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -485,33 +490,37 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.sendEmailButton, sendingEmail && styles.sendEmailButtonDisabled]} 
-          onPress={handleSendContractEmail}
-          disabled={sendingEmail}
-        >
-          <LinearGradient colors={['#10B981', '#10B981']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Mail color={COLORS.TEXT.WHITE} size={20} />
-            <Text style={styles.buttonText}>
-              {sendingEmail ? 'Sending...' : 'Send Contract Email'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Pencil color={COLORS.TEXT.WHITE} size={20} />
-              <Text style={styles.buttonText}>Edit Contract</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-            <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Trash2 color={COLORS.TEXT.WHITE} size={20} />
-              <Text style={styles.buttonText}>Delete Contract</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-        {!hasInstallmentContract && !isFullPayment && (
+        {!isDealerManager && (
+          <>
+            <TouchableOpacity 
+              style={[styles.sendEmailButton, sendingEmail && styles.sendEmailButtonDisabled]} 
+              onPress={handleSendContractEmail}
+              disabled={sendingEmail}
+            >
+              <LinearGradient colors={['#10B981', '#10B981']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Mail color={COLORS.TEXT.WHITE} size={20} />
+                <Text style={styles.buttonText}>
+                  {sendingEmail ? 'Sending...' : 'Send Contract Email'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+                <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Pencil color={COLORS.TEXT.WHITE} size={20} />
+                  <Text style={styles.buttonText}>Edit Contract</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <LinearGradient colors={[COLORS.ERROR, COLORS.ERROR]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Trash2 color={COLORS.TEXT.WHITE} size={20} />
+                  <Text style={styles.buttonText}>Delete Contract</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+        {!isDealerManager && !hasInstallmentContract && !isFullPayment && (
           <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
             <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <CreditCard color={COLORS.TEXT.WHITE} size={20} />
@@ -521,81 +530,83 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
         )}
       </View>
 
-      {/* Popup Menu */}
-      <Modal
-        visible={showMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowMenu(false)}
-      >
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMenu(false)}
+      {/* Popup Menu - hidden for Dealer Manager */}
+      {!isDealerManager && (
+        <Modal
+          visible={showMenu}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowMenu(false)}
         >
-          <View style={styles.menuContainer}>
-            {/* Full Payment entry - always available, passes customerContractId */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowMenu(false);
-                navigation.navigate('ContractFullPayment', { customerContractId: contractId });
-              }}
-            >
-              <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
-              <Text style={styles.menuItemText}>Full Payment</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            {hasInstallmentContract && (
-              <>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowMenu(false);
-                    handleShowInstallmentContract();
-                  }}
-                >
-                  <FileText color={COLORS.TEXT.PRIMARY} size={20} />
-                  <Text style={styles.menuItemText}>Show Installment Contract</Text>
-                </TouchableOpacity>
-                <View style={styles.menuDivider} />
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowMenu(false);
-                    handleManageInstallmentPayments();
-                  }}
-                >
-                  <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
-                  <Text style={styles.menuItemText}>Manage Installment Payments</Text>
-                </TouchableOpacity>
-                <View style={styles.menuDivider} />
-              </>
-            )}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowMenu(false);
-                navigation.navigate('CustomerContractManagement');
-              }}
-            >
-              <FileText color={COLORS.TEXT.PRIMARY} size={20} />
-              <Text style={styles.menuItemText}>Customer Contracts</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowMenu(false);
-                navigation.navigate('Main', { screen: 'Home' });
-              }}
-            >
-              <Home color={COLORS.TEXT.PRIMARY} size={20} />
-              <Text style={styles.menuItemText}>Home</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          <TouchableOpacity
+            style={styles.menuOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMenu(false)}
+          >
+            <View style={styles.menuContainer}>
+              {/* Full Payment entry - always available, passes customerContractId */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('ContractFullPayment', { customerContractId: contractId });
+                }}
+              >
+                <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
+                <Text style={styles.menuItemText}>Full Payment</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              {hasInstallmentContract && (
+                <>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setShowMenu(false);
+                      handleShowInstallmentContract();
+                    }}
+                  >
+                    <FileText color={COLORS.TEXT.PRIMARY} size={20} />
+                    <Text style={styles.menuItemText}>Show Installment Contract</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuDivider} />
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setShowMenu(false);
+                      handleManageInstallmentPayments();
+                    }}
+                  >
+                    <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
+                    <Text style={styles.menuItemText}>Manage Installment Payments</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuDivider} />
+                </>
+              )}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('CustomerContractManagement');
+                }}
+              >
+                <FileText color={COLORS.TEXT.PRIMARY} size={20} />
+                <Text style={styles.menuItemText}>Customer Contracts</Text>
+              </TouchableOpacity>
+              <View style={styles.menuDivider} />
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('Main', { screen: 'Home' });
+                }}
+              >
+                <Home color={COLORS.TEXT.PRIMARY} size={20} />
+                <Text style={styles.menuItemText}>Home</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Image Modal */}
       <Modal

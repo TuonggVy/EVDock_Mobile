@@ -98,8 +98,8 @@ const CatalogScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
-      // Check if user is Dealer Staff and has agencyId
-      if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+      // For Dealer Staff and Dealer Manager with agencyId, load from stock API
+      if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
         await loadCatalogFromStockAPI();
       } else {
         // Fallback to dealer catalog storage for other roles
@@ -249,8 +249,8 @@ const CatalogScreen = ({ navigation, route }) => {
     try {
       setRefreshing(true);
       
-      // Check if user is Dealer Staff and has agencyId
-      if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+      // For Dealer Staff and Dealer Manager with agencyId, combine available and preorder vehicles
+      if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
         // For Dealer Staff, combine available and preorder vehicles
         const allVehicles = [...availableVehicles, ...preorderVehicles];
         setVehicles(allVehicles);
@@ -279,7 +279,7 @@ const CatalogScreen = ({ navigation, route }) => {
 
   // Update vehicles when available/preorder lists change
   useEffect(() => {
-    if (user?.role === USER_ROLES.DEALER_STAFF && user?.agencyId) {
+    if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
       const allVehicles = [...availableVehicles, ...preorderVehicles];
       setVehicles(allVehicles);
     }
