@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   BASE_URL: __DEV__ 
     ? 'http://localhost:3000/api' // Development URL
-    : 'https://evm-project.onrender.com', // Production URL
+    : 'https://evm-project-v2-1.onrender.com', // Production URL
   
   TIMEOUT: 10000, // 10 seconds
   
