@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, SafeArea
 import { ArrowLeft, PlusCircle, Trash2, RefreshCw, Pencil } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import CustomAlert from '../../components/common/CustomAlert';
 import ContractFullPaymentService from '../../services/contractFullPaymentService';
 
 const ContractFullPaymentScreen = ({ navigation, route }) => {
-  const { alertConfig, showError, showSuccess, hideAlert } = useCustomAlert();
+  const { alertConfig, showError, showSuccess, hideAlert, showConfirm } = useCustomAlert();
 
   const [contractId, setContractId] = useState(
     route?.params?.customerContractId ? String(route.params.customerContractId) : ''
@@ -120,7 +121,17 @@ const ContractFullPaymentScreen = ({ navigation, route }) => {
       <TouchableOpacity style={styles.editBtn} onPress={() => startEdit(item)}>
         <Pencil color="#fff" size={18} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={() =>
+          showConfirm(
+            'Delete Payment',
+            'Are you sure you want to delete this payment period?',
+            () => handleDelete(item.id),
+            () => {}
+          )
+        }
+      >
         <Trash2 color="#fff" size={18} />
       </TouchableOpacity>
     </View>
@@ -208,6 +219,18 @@ const ContractFullPaymentScreen = ({ navigation, route }) => {
           }
         />
       </View>
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
