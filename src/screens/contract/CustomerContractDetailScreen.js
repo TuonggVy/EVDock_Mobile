@@ -503,7 +503,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-            <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Pencil color={COLORS.TEXT.WHITE} size={20} />
               <Text style={styles.buttonText}>Edit Contract</Text>
             </LinearGradient>
