@@ -9,17 +9,8 @@ import customerManagementService from '../../services/customerManagementService'
 import motorbikeService from '../../services/motorbikeService';
 import { quotationService } from '../../services/quotationService';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ChevronDown, Calendar } from 'lucide-react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { ArrowLeft, Calendar, ChevronDown } from 'lucide-react-native';
 import { formatPrice } from '../../utils/promotionUtils';
-
-const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'PROCESSING', label: 'Processing' },
-  { value: 'DELIVERED', label: 'Delivered' },
-  { value: 'COMPLETED', label: 'Completed' },
-];
 
 const CreateCustomerContractScreen = ({ navigation, route }) => {
   const { user } = useAuth();
@@ -31,8 +22,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showMotorbikeModal, setShowMotorbikeModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showSignDatePicker, setShowSignDatePicker] = useState(false);
+  
   
   // Get quotationId from route params if available
   const routeQuotationId = route?.params?.quotationId;
@@ -40,9 +30,9 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
   const [loadingQuotation, setLoadingQuotation] = useState(false);
   const [formData, setFormData] = useState({
     title: '', content: '', finalPrice: '',
-    contractPaidType: 'FULL', status: 'PENDING',
+    contractPaidType: 'FULL',
     customerId: null, electricMotorbikeId: null, colorId: null,
-    signDate: null, quotationId: null,
+    quotationId: null,
   });
   const [errors, setErrors] = useState({});
 
@@ -177,13 +167,11 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
         content: formData.content.trim(),
         finalPrice: parseFloat(formData.finalPrice),
         contractPaidType: formData.contractPaidType,
-        status: formData.status,
         customerId: parseInt(formData.customerId),
         staffId: user?.id ? parseInt(user.id) : 1,
         agencyId: user?.agencyId ? parseInt(user.agencyId) : 1,
         electricMotorbikeId: parseInt(formData.electricMotorbikeId),
         colorId: parseInt(formData.colorId),
-        ...(formData.signDate && { signDate: new Date(formData.signDate).toISOString() }),
         ...(formData.quotationId && { quotationId: parseInt(formData.quotationId) }),
       };
       const response = await customerContractService.createCustomerContract(contractData);
@@ -224,46 +212,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
     return color ? color.colorType : 'Select Color';
   };
 
-  const getStatusName = () => {
-    const status = STATUS_OPTIONS.find(opt => opt.value === formData.status);
-    return status ? status.label : 'Select Status';
-  };
-
-  const formatDateForDisplay = (date) => {
-    if (!date) return '';
-    try {
-      const d = new Date(date);
-      if (Number.isNaN(d.getTime())) return '';
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch {
-      return '';
-    }
-  };
-
-  const getSignDateValue = () => {
-    if (!formData.signDate) return new Date();
-    const parsedDate = formData.signDate instanceof Date ? formData.signDate : new Date(formData.signDate);
-    return Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-  };
-
-  const handleDateChange = (event, selectedDate, field) => {
-    if (Platform.OS === 'android') {
-      if (event?.type === 'dismissed') {
-        setShowSignDatePicker(false);
-        return;
-      }
-      setShowSignDatePicker(false);
-    }
-
-    if (selectedDate) {
-      const isoString = selectedDate.toISOString();
-      handleInputChange(field, isoString);
-      if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
-    }
-  };
+  
 
   return (
     <SafeAreaView style={styles.container}>
@@ -357,15 +306,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
               {errors.finalPrice && <Text style={styles.errorText}>{errors.finalPrice}</Text>}
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Sign Date</Text>
-              <TouchableOpacity style={styles.dateInput} onPress={() => setShowSignDatePicker(true)}>
-                <Text style={[styles.dateInputText, !formData.signDate && styles.dateInputPlaceholder]}>
-                  {formData.signDate ? formatDateForDisplay(formData.signDate) : 'Select sign date'}
-                </Text>
-                <Calendar color={COLORS.TEXT.SECONDARY} size={20} />
-              </TouchableOpacity>
-            </View>
+            
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Contract Paid Type <Text style={styles.required}>*</Text></Text>
@@ -381,15 +322,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
               </View>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Status</Text>
-              <TouchableOpacity style={styles.dropdown} onPress={() => setShowStatusModal(true)}>
-                <Text style={[styles.dropdownText, !formData.status && styles.dropdownPlaceholder]}>
-                  {getStatusName()}
-                </Text>
-                <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
-              </TouchableOpacity>
-            </View>
+            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -435,60 +368,7 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
         </View></View>
       </Modal>
 
-      <Modal visible={showStatusModal} transparent animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
-        <View style={styles.modalOverlay}><View style={styles.modalContent}>
-          <View style={styles.modalHeader}><Text style={styles.modalTitle}>Select Status</Text><TouchableOpacity onPress={() => setShowStatusModal(false)}><Text style={styles.modalClose}>✕</Text></TouchableOpacity></View>
-          <FlatList data={STATUS_OPTIONS} keyExtractor={(item) => item.value} renderItem={({ item }) => (
-            <TouchableOpacity style={styles.modalItem} onPress={() => { setFormData(prev => ({ ...prev, status: item.value })); setShowStatusModal(false); }}>
-              <Text style={styles.modalItemTitle}>{item.label}</Text>
-            </TouchableOpacity>
-          )} ListEmptyComponent={<View style={styles.emptyModal}><Text style={styles.emptyModalText}>No status found</Text></View>} />
-        </View></View>
-      </Modal>
-
-      {Platform.OS === 'ios' ? (
-        <Modal
-          visible={showSignDatePicker}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowSignDatePicker(false)}
-        >
-          <View style={styles.datePickerModalOverlay}>
-            <View style={styles.datePickerModalContent}>
-              <View style={styles.datePickerHeader}>
-                <TouchableOpacity onPress={() => setShowSignDatePicker(false)}>
-                  <Text style={styles.datePickerCancelButton}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.datePickerTitle}>Select Date</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowSignDatePicker(false);
-                  }}
-                >
-                  <Text style={styles.datePickerDoneButton}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={getSignDateValue()}
-                mode="date"
-                display="spinner"
-                onChange={(event, date) => handleDateChange(event, date, 'signDate')}
-                style={styles.datePickerIOS}
-                textColor={COLORS.TEXT.PRIMARY}
-              />
-            </View>
-          </View>
-        </Modal>
-      ) : (
-        showSignDatePicker && (
-          <DateTimePicker
-            value={getSignDateValue()}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleDateChange(event, date, 'signDate')}
-          />
-        )
-      )}
+      
 
       <CustomAlert visible={alertConfig.visible} title={alertConfig.title} message={alertConfig.message} type={alertConfig.type} onClose={hideAlert} />
     </SafeAreaView>

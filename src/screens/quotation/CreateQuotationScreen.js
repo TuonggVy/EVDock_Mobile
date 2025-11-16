@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Image,
   TextInput,
   SafeAreaView,
@@ -1375,14 +1376,30 @@ const CreateQuotationScreen = ({ navigation, route }) => {
 
         {/* Date Picker */}
         {showCustomerDobPicker && (
-          <DateTimePicker
-            value={customerFormData.dob || new Date()}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleCustomerDobChange}
-            maximumDate={new Date()}
-            locale="vi-VN"
-          />
+          <Modal
+            visible={showCustomerDobPicker}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowCustomerDobPicker(false)}
+          >
+            <TouchableWithoutFeedback onPress={() => setShowCustomerDobPicker(false)}>
+              <View style={styles.datePickerOverlay}>
+                <TouchableWithoutFeedback onPress={() => {}}>
+                  <View style={styles.datePickerContainer}>
+                    <DateTimePicker
+                      value={customerFormData.dob || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleCustomerDobChange}
+                      maximumDate={new Date()}
+                      locale="vi-VN"
+                      textColor="#000"
+                    />
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            </TouchableWithoutFeedback>
+          </Modal>
         )}
       </View>
     );
@@ -2192,6 +2209,18 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '600',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    width: '90%',
   },
   errorText: {
     color: COLORS.ERROR,

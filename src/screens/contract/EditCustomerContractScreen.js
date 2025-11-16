@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, KeyboardAvoidingView, Platform, Modal, FlatList, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, KeyboardAvoidingView, Platform, Modal, FlatList, ActivityIndicator, Image, TouchableWithoutFeedback } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,15 +18,15 @@ const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'PROCESSING', label: 'Processing' },
-  { value: 'DELIVERED', label: 'Delivered' },
   { value: 'COMPLETED', label: 'Completed' },
+  { value: 'REJECTED', label: 'Rejected' },
 ];
 
 const DOCUMENT_TYPE_OPTIONS = [
-  { value: 'ID_CARD', label: 'Căn cước công dân' },
-  { value: 'PASSPORT', label: 'Hộ chiếu' },
-  { value: 'DRIVER_LICENSE', label: 'Bằng lái xe' },
-  { value: 'OTHER', label: 'Khác' },
+  { value: 'ID_CARD', label: 'ID Card' },
+  { value: 'PASSPORT', label: 'Passport' },
+  { value: 'DRIVER_LICENSE', label: 'Driver License' },
+  { value: 'OTHER', label: 'Other' },
 ];
 
 const EditCustomerContractScreen = ({ navigation, route }) => {
@@ -505,18 +505,60 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
 
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitButton, saving && styles.submitButtonDisabled]} onPress={handleSubmit} disabled={saving}>
-          <LinearGradient colors={COLORS.GRADIENT.BLUE} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             {saving ? <ActivityIndicator color="#009DFF" /> : <Text style={styles.submitButtonText}>Update Contract</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
       {showSignDatePicker && (
-        <DateTimePicker value={formData.signDate || new Date()} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'signDate')} />
+        <Modal
+          visible={showSignDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSignDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowSignDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={formData.signDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    textColor="#000"
+                    onChange={(event, date) => handleDateChange(event, date, 'signDate')}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
 
       {showDeliveryDatePicker && (
-        <DateTimePicker value={formData.deliveryDate || new Date()} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'deliveryDate')} />
+        <Modal
+          visible={showDeliveryDatePicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDeliveryDatePicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowDeliveryDatePicker(false)}>
+            <View style={styles.datePickerOverlay}>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={formData.deliveryDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    textColor="#000"
+                    onChange={(event, date) => handleDateChange(event, date, 'deliveryDate')}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
 
       <Modal visible={showStatusModal} transparent animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
@@ -601,11 +643,11 @@ const styles = StyleSheet.create({
   radioGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.PADDING.SMALL },
   radioButton: { flexDirection: 'row', alignItems: 'center', padding: SIZES.PADDING.MEDIUM, backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, flex: 1 },
   radioButtonSmall: { flex: 0, paddingHorizontal: SIZES.PADDING.SMALL, paddingVertical: SIZES.PADDING.SMALL, marginRight: SIZES.PADDING.SMALL },
-  radioButtonActive: { backgroundColor: COLORS.PRIMARY + '20', borderWidth: 1, borderColor: COLORS.PRIMARY },
+  radioButtonActive: { backgroundColor: "#009DFF" + '20', borderWidth: 1, borderColor: "#009DFF" },
   radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.TEXT.SECONDARY, marginRight: SIZES.PADDING.SMALL },
   radioCircleSmall: { width: 16, height: 16, borderRadius: 8, marginRight: SIZES.PADDING.XSMALL },
-  radioCircleActive: { borderColor: COLORS.PRIMARY, backgroundColor: COLORS.PRIMARY },
-  radioLabel: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.PRIMARY },
+  radioCircleActive: { borderColor: "#009DFF", backgroundColor: "#009DFF" },
+  radioLabel: { fontSize: SIZES.FONT.SMALL, color: "#000000" },
   footer: { padding: SIZES.PADDING.LARGE, backgroundColor: COLORS.BACKGROUND.PRIMARY, borderTopWidth: 1, borderTopColor: COLORS.BACKGROUND.SECONDARY },
   submitButton: { borderRadius: SIZES.RADIUS.LARGE, overflow: 'hidden' },
   submitButtonDisabled: { opacity: 0.6 },
@@ -613,10 +655,10 @@ const styles = StyleSheet.create({
   submitButtonText: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.WHITE },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: COLORS.SURFACE, borderTopLeftRadius: SIZES.RADIUS.LARGE, borderTopRightRadius: SIZES.RADIUS.LARGE, maxHeight: '80%', paddingBottom: SIZES.PADDING.LARGE },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BACKGROUND.SECONDARY },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: "#D6D6D6" },
   modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
   modalClose: { fontSize: SIZES.FONT.XXLARGE, color: COLORS.TEXT.SECONDARY },
-  modalItem: { padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: COLORS.BACKGROUND.SECONDARY },
+  modalItem: { padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: "#D6D6D6" },
   modalItemTitle: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.XSMALL },
   emptyModal: { padding: SIZES.PADDING.XXXLARGE, alignItems: 'center' },
   emptyModalText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.SECONDARY },
@@ -630,6 +672,8 @@ const styles = StyleSheet.create({
   uploadButtonDisabled: { opacity: 0.6 },
   uploadButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: SIZES.PADDING.MEDIUM },
   uploadButtonText: { fontSize: SIZES.FONT.MEDIUM, fontWeight: 'bold', color: COLORS.TEXT.WHITE },
+  datePickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  datePickerContainer: { backgroundColor: COLORS.SURFACE, borderRadius: SIZES.RADIUS.LARGE, padding: SIZES.PADDING.LARGE, width: '90%' },
 });
 
 export default EditCustomerContractScreen;
