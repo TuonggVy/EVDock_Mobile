@@ -45,9 +45,14 @@ class ReportService {
    */
   async getQuarterRevenue(quarter, year, agencyId = null) {
     try {
-      const params = { quarter, year };
-      if (agencyId) {
-        params.agencyId = agencyId;
+      // Ensure numeric query params as backend expects numbers
+      const parsedQuarter = Number(quarter);
+      const parsedYear = Number(year);
+      const parsedAgencyId = agencyId != null ? Number(agencyId) : null;
+
+      const params = { quarter: parsedQuarter, year: parsedYear };
+      if (!Number.isNaN(parsedAgencyId) && parsedAgencyId != null) {
+        params.agencyId = parsedAgencyId;
       }
       
       const response = await api.get(REPORT_ENDPOINTS.QUARTER_REVENUE, { params });
