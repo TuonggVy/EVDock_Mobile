@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const api = axios.create({
-  baseURL: "https://evm-project.onrender.com", 
+  baseURL: "https://evm-project-v2-1.onrender.com", 
   timeout: 60000, // 60 seconds timeout
   headers: {
     'Content-Type': 'application/json',
