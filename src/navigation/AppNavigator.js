@@ -9,6 +9,9 @@ import CustomTabBar from '../components/common/CustomTabBar';
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import VerifyCodeScreen from '../screens/auth/VerifyCodeScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import EVMAdminHomeScreen from '../screens/home/EVMAdminHomeScreen';
 import EVMStaffHomeScreen from '../screens/home/EVMStaffHomeScreen';
 import DealerManagerHomeScreen from '../screens/home/ManagerHomeScreen';
@@ -187,6 +190,9 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
         ) : (
           // Main Stack - when user is authenticated, show tab navigator

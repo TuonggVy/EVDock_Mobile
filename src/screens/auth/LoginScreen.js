@@ -8,10 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ImageBackground,
+  TouchableOpacity,
 } from 'react-native';
 import { Button, Input, Image } from '../../components/common';
 import { useAuth } from '../../contexts/AuthContext';
-import { COLORS, SIZES, USER_ROLES, ROLE_DISPLAY_NAMES, IMAGES } from '../../constants';
+import { COLORS, SIZES, IMAGES, SCREEN_NAMES } from '../../constants';
 import { validateEmail } from '../../utils/validators';
 
 const LoginScreen = ({ navigation }) => {
@@ -78,6 +79,12 @@ const LoginScreen = ({ navigation }) => {
     clearError();
   };
 
+  const handleNavigateForgetPassword = () => {
+    navigation.navigate(SCREEN_NAMES.AUTH.FORGOT_PASSWORD, {
+      prefilledEmail: formData.email,
+    });
+  };
+
   return (
     <ImageBackground 
       source={IMAGES.BG_LOGIN} 
@@ -97,13 +104,13 @@ const LoginScreen = ({ navigation }) => {
                 style={styles.logo}
                 resizeMode="contain"
               />
-              <Text style={styles.subtitle}>Đăng nhập vào tài khoản của bạn</Text>
+              <Text style={styles.subtitle}>Sign in to your account</Text>
             </View>
 
             <View style={styles.form}>
             <Input
               label="Email"
-              placeholder="Nhập email của bạn"
+              placeholder="Enter your email"
               value={formData.email}
               onChangeText={(value) => handleInputChange('email', value)}
               keyboardType="email-address"
@@ -112,20 +119,27 @@ const LoginScreen = ({ navigation }) => {
             />
 
             <Input
-              label="Mật khẩu"
-              placeholder="Nhập mật khẩu của bạn"
+              label="Password"
+              placeholder="Enter your password"
               value={formData.password}
               onChangeText={(value) => handleInputChange('password', value)}
               secureTextEntry
               error={formErrors.password}
             />
 
+            <TouchableOpacity 
+              onPress={handleNavigateForgetPassword}
+              style={styles.forgetPasswordLink}
+            >
+              <Text style={styles.forgetPasswordText}>Forgot password?</Text>
+            </TouchableOpacity>
+
             {error && (
               <Text style={styles.errorText}>{error}</Text>
             )}
 
           <Button
-            title="Đăng nhập"
+            title="Sign in"
             onPress={handleLogin}
             loading={isLoading}
             style={styles.loginButton}
@@ -196,6 +210,19 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     textAlign: 'center',
     marginTop: SIZES.PADDING.SMALL,
+  },
+  forgetPasswordLink: {
+    alignSelf: 'flex-end',
+    marginTop: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  forgetPasswordText: {
+    color: COLORS.SURFACE,
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   testAccounts: {
     marginBottom: SIZES.PADDING.XLARGE,
