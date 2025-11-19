@@ -24,6 +24,8 @@ export const SCREEN_NAMES = {
     LOGIN: 'Login',
     REGISTER: 'Register',
     FORGOT_PASSWORD: 'ForgotPassword',
+    VERIFY_CODE: 'VerifyCode',
+    RESET_PASSWORD: 'ResetPassword',
   },
   MAIN: {
     HOME: 'Home',

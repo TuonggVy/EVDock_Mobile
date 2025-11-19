@@ -75,6 +75,58 @@ export const logout = async () => {
 };
 
 /**
+ * Request password reset via email
+ * @param {string} email - User email address
+ * @returns {Promise<Object>} Response with statusCode, message, and data
+ */
+export const forgetPassword = async (email) => {
+  try {
+    const response = await api.post("/auth/forget-password", {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Forget password error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Verify reset code
+ * @param {Object} payload
+ * @param {string|number} payload.code
+ * @param {string} payload.email
+ */
+export const verifyResetCode = async ({ code, email }) => {
+  try {
+    const response = await api.post("/auth/verify", { code, email });
+    return response.data;
+  } catch (error) {
+    console.error("Verify code error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Update password after verification
+ * @param {Object} payload
+ * @param {string} payload.email
+ * @param {string} payload.newPassword
+ */
+export const updatePassword = async ({ email, newPassword }) => {
+  try {
+    const response = await api.patch("/auth/update-password", {
+      email,
+      newPassword,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Update password error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
  * Generic PATCH helper for edit/update operations
  * @param {string} url - Endpoint path (e.g., "/users/123")
  * @param {Object} data - Partial resource to update
