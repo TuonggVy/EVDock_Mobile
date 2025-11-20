@@ -140,7 +140,14 @@ createInventoryItem: async (motorbikeId, warehouseId, quantity) => {
   // Update inventory item
   updateInventoryItem: async (motorbikeId, warehouseId, updateData) => {
     try {
-      const response = await api.patch(`/inventory/${motorbikeId}/${warehouseId}`, updateData);
+      // Ensure stockDate is included in request body as per API documentation
+      // If stockDate is not provided, use current date
+      const requestBody = {
+        quantity: updateData.quantity,
+        stockDate: updateData.stockDate || new Date().toISOString(),
+      };
+
+      const response = await api.patch(`/inventory/${motorbikeId}/${warehouseId}`, requestBody);
       
       const updatedItem = response.data.data;
       const itemWithStatus = updateItemStatus(updatedItem);
