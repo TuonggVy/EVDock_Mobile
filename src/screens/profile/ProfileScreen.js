@@ -241,28 +241,6 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         ))}
 
-        {/* Menu Items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings & Options</Text>
-          <View style={styles.sectionCard}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItem}
-                onPress={item.onPress}
-              >
-                <View style={styles.menuLeft}>
-                  <View style={{ marginRight: SIZES.PADDING.MEDIUM }}>
-                    {getInfoIcon(item.iconName)}
-                  </View>
-                  <Text style={styles.menuTitle}>{item.title}</Text>
-                </View>
-                <ChevronRight size={20} color={COLORS.TEXT.SECONDARY} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Logout Button */}
         <View style={styles.logoutSection}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -271,11 +249,7 @@ const ProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>EVDock Mobile</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
-        </View>
+       
       </ScrollView>
 
       <CustomAlert
@@ -430,24 +404,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'right',
-    flex: 1,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.PRIMARY,
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
     flex: 1,
   },
   logoutSection: {
