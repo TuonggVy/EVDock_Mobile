@@ -116,12 +116,6 @@ const DealerStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('CustomerManagement'),
     },
     {
-      title: 'Promotions',
-      gradient: ['#302F32', '#302F32', '#302F32'], // ['#F59E0B', '#D97706']
-      icon: <Gift color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('PromotionManagement'),
-    },
-    {
       title: 'Installment Plan',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <SquareChartGantt color="#A1D9FF" size={60} />,

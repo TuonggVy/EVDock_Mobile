@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import motorbikeService from '../../services/motorbikeService';
 import customerManagementService from '../../services/customerManagementService';
 import agencyStockService from '../../services/agencyStockService';
+import stockPromotionService from '../../services/stockPromotionService';
 import { ArrowLeft, Calendar, Check } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -76,6 +77,7 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [availablePromotions, setAvailablePromotions] = useState([]);
   const [selectedPromotionId, setSelectedPromotionId] = useState(null);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
   const [hasStockAtAgency, setHasStockAtAgency] = useState(true); // Track if vehicle has stock at agency
   const [isBasePriceManual, setIsBasePriceManual] = useState(false); // Track if basePrice was manually edited
   const [isFinalPriceManual, setIsFinalPriceManual] = useState(false); // Track if finalPrice was manually edited
@@ -132,61 +134,81 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     return discount;
   };
 
-  // Load promotions when color changes
+  const getPromotionData = (promotionItem) => {
+    if (!promotionItem) return null;
+    if (promotionItem.stockPromotion) return promotionItem.stockPromotion;
+    return promotionItem;
+  };
+
+  // Load stock promotions available for Dealer Staff
   useEffect(() => {
-    const loadPromotions = async () => {
-      if (!user?.agencyId || !vehicle?.id || !selectedColorId) {
+    const loadStaffPromotions = async () => {
+      if (!user?.agencyId) {
         setAvailablePromotions([]);
+        setSelectedPromotionId(null);
         return;
       }
-      
+
+      setLoadingPromotions(true);
+
       try {
-        const stockResponse = await agencyStockService.getAgencyStocks(parseInt(user.agencyId), {
-          motorbikeId: parseInt(vehicle.id),
-          colorId: parseInt(selectedColorId),
-          limit: 1000
+        const response = await stockPromotionService.getStaffStockPromotionList(
+          parseInt(user.agencyId),
+          {
+            limit: 20,
+            sort: 'newest',
+          }
+        );
+
+        const now = new Date();
+        const promotions = (response.success ? response.data || [] : []).filter(promoItem => {
+          const promoData = getPromotionData(promoItem);
+          if (!promoData) return false;
+          const startAt = promoData.startAt ? new Date(promoData.startAt) : null;
+          const endAt = promoData.endAt ? new Date(promoData.endAt) : null;
+          const status = promoData.status || promoItem.status;
+          const isStatusActive = status === 'ACTIVE';
+          const isWithinDateRange =
+            (!startAt || now >= startAt) &&
+            (!endAt || now <= endAt);
+
+          return isStatusActive && isWithinDateRange;
         });
 
-        if (stockResponse.success && stockResponse.data && stockResponse.data.length > 0) {
-          const availableStock = stockResponse.data.find(stock => stock.quantity > 0);
-          
-          if (availableStock && availableStock.id) {
-            const stockDetailResponse = await agencyStockService.getAgencyStockDetail(availableStock.id);
-            
-            if (stockDetailResponse.success && stockDetailResponse.data) {
-              const allPromotions = stockDetailResponse.data.agencyStockPromotion || [];
-              const now = new Date();
-              const activePromotions = allPromotions.filter(promoItem => {
-                const promo = promoItem.stockPromotion || {};
-                const validFrom = new Date(promo.startAt);
-                const validTo = new Date(promo.endAt);
-                const isActive = promo.status === 'ACTIVE';
-                const isInDateRange = now >= validFrom && now <= validTo;
-                return isActive && isInDateRange;
-              });
-              
-              setAvailablePromotions(activePromotions);
-              
-              // Auto-select first promotion if available and no promotion selected
-              if (activePromotions.length > 0 && !selectedPromotionId) {
-                setSelectedPromotionId(activePromotions[0].stockPromotionId);
-              }
-            }
+        setAvailablePromotions(promotions);
+
+        setSelectedPromotionId(prevSelected => {
+          if (promotions.length === 0) {
+            return null;
           }
-        }
+
+          const stillExists = prevSelected
+            ? promotions.some(promoItem => (promoItem.stockPromotionId || promoItem.id) === prevSelected)
+            : false;
+
+          if (stillExists) {
+            return prevSelected;
+          }
+
+          const firstPromo = promotions[0];
+          return firstPromo.stockPromotionId || firstPromo.id;
+        });
       } catch (error) {
-        console.error('Error loading promotions:', error);
+        console.error('Error loading staff promotions:', error);
         setAvailablePromotions([]);
+        setSelectedPromotionId(null);
+      } finally {
+        setLoadingPromotions(false);
       }
     };
-    
-    loadPromotions();
-  }, [selectedColor, selectedColorId]);
+
+    loadStaffPromotions();
+  }, [user?.agencyId]);
   
   // Calculate pricing when promotions or selected promotion changes
   useEffect(() => {
     calculatePricing();
-  }, [selectedColor, selectedColorId, selectedPromotionId, availablePromotions.length]);
+  }, [selectedColor, selectedColorId, selectedPromotionId, availablePromotions]);
 
   // Auto-adjust quotation type or clear color when quotation type changes
   useEffect(() => {
@@ -456,9 +478,10 @@ const CreateQuotationScreen = ({ navigation, route }) => {
 
     // Calculate discount from selected promotion
     if (selectedPromotionId && availablePromotions.length > 0) {
-      const selectedPromo = availablePromotions.find(p => p.stockPromotionId === selectedPromotionId);
-      if (selectedPromo && selectedPromo.stockPromotion) {
-        promotionDiscount = calculateDiscount(selectedPromo.stockPromotion, pricePerUnit);
+      const selectedPromo = availablePromotions.find(promoItem => (promoItem.stockPromotionId || promoItem.id) === selectedPromotionId);
+      const promoData = getPromotionData(selectedPromo);
+      if (promoData) {
+        promotionDiscount = calculateDiscount(promoData, pricePerUnit);
       }
     }
 
@@ -500,9 +523,10 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     
     // Calculate discount from selected promotion
     if (selectedPromotionId && availablePromotions.length > 0) {
-      const selectedPromo = availablePromotions.find(p => p.stockPromotionId === selectedPromotionId);
-      if (selectedPromo && selectedPromo.stockPromotion) {
-        promotionDiscount = calculateDiscount(selectedPromo.stockPromotion, pricePerUnit);
+      const selectedPromo = availablePromotions.find(promoItem => (promoItem.stockPromotionId || promoItem.id) === selectedPromotionId);
+      const promoData = getPromotionData(selectedPromo);
+      if (promoData) {
+        promotionDiscount = calculateDiscount(promoData, pricePerUnit);
       }
     }
     
@@ -1441,6 +1465,15 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   };
 
   const renderPromotionSelection = () => {
+    if (loadingPromotions) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select Promotion</Text>
+          <ActivityIndicator color="#009DFF" />
+        </View>
+      );
+    }
+
     if (availablePromotions.length === 0) return null;
     
     return (
@@ -1448,17 +1481,18 @@ const CreateQuotationScreen = ({ navigation, route }) => {
         <Text style={styles.sectionTitle}>Select Promotion</Text>
         <View style={styles.promotionsContainer}>
           {availablePromotions.map((promoItem) => {
-            const promo = promoItem.stockPromotion || {};
-            const isSelected = selectedPromotionId === promoItem.stockPromotionId;
+            const promo = getPromotionData(promoItem) || {};
+            const promotionId = promoItem.stockPromotionId || promoItem.id;
+            const isSelected = selectedPromotionId === promotionId;
             
             return (
               <TouchableOpacity
-                key={promoItem.stockPromotionId}
+                key={promotionId}
                 style={[
                   styles.promotionCard,
                   isSelected && styles.promotionCardSelected
                 ]}
-                onPress={() => setSelectedPromotionId(promoItem.stockPromotionId)}
+                onPress={() => setSelectedPromotionId(promotionId)}
               >
                 <View style={styles.promotionCardHeader}>
                   <View style={styles.promotionCardInfo}>
@@ -2387,7 +2421,7 @@ const styles = StyleSheet.create({
   promotionCardName: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    color: "#000000",
     marginBottom: 4,
   },
   promotionCardDescription: {
