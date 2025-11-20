@@ -49,9 +49,12 @@ const EditInventoryScreen = ({ navigation, route }) => {
 
   const loadMotorbikes = async () => {
     try {
-      const response = await motorbikeService.getAllMotorbikes();
+      // Load all motorbikes with a large limit to ensure all are loaded
+      const response = await motorbikeService.getAllMotorbikes({ limit: 1000 });
       if (response.success) {
         setMotorbikes(response.data || []);
+      } else {
+        console.error('Failed to load motorbikes:', response.error);
       }
     } catch (error) {
       console.error('Error loading motorbikes:', error);
@@ -72,10 +75,15 @@ const EditInventoryScreen = ({ navigation, route }) => {
     }
 
     try {
+      // Include stockDate from existing item to maintain the original stock date
+      // If not available, service will use current date
       const response = await inventoryService.updateInventoryItem(
         item.electricMotorbikeId,
         item.warehouseId,
-        { quantity: quantity }
+        { 
+          quantity: quantity,
+          stockDate: item.stockDate || new Date().toISOString()
+        }
       );
 
       if (response.success) {
@@ -94,8 +102,13 @@ const EditInventoryScreen = ({ navigation, route }) => {
     }
   };
 
-  const selectedMotorbike = motorbikes.find(m => m.id === parseInt(editedItem.motorbikeId));
-  const selectedWarehouse = warehouses.find(w => w.id === parseInt(editedItem.warehouseId));
+  // Ensure proper ID comparison (handle both number and string types)
+  const selectedMotorbike = motorbikes.find(m => 
+    Number(m.id) === Number(editedItem.motorbikeId)
+  );
+  const selectedWarehouse = warehouses.find(w => 
+    Number(w.id) === Number(editedItem.warehouseId)
+  );
 
   return (
     <SafeAreaView style={styles.container}>

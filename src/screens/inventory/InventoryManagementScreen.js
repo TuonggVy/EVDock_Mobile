@@ -92,9 +92,13 @@ const InventoryManagementScreen = ({ navigation }) => {
 
   const loadMotorbikes = async () => {
     try {
-      const response = await motorbikeService.getAllMotorbikes();
+      // Load all motorbikes with a large limit to ensure all are loaded
+      const response = await motorbikeService.getAllMotorbikes({ limit: 1000 });
       if (response.success) {
         setMotorbikes(response.data || []);
+        console.log('Loaded motorbikes count:', (response.data || []).length);
+      } else {
+        console.error('Failed to load motorbikes:', response.error);
       }
     } catch (error) {
       console.error('Error loading motorbikes:', error);
@@ -102,8 +106,13 @@ const InventoryManagementScreen = ({ navigation }) => {
   };
 
   const filteredInventory = inventory.filter(item => {
-    const motorbike = motorbikes.find(m => m.id === item.electricMotorbikeId);
-    const warehouse = warehouses.find(w => w.id === item.warehouseId);
+    // Ensure proper ID comparison (handle both number and string types)
+    const motorbike = motorbikes.find(m => 
+      Number(m.id) === Number(item.electricMotorbikeId)
+    );
+    const warehouse = warehouses.find(w => 
+      Number(w.id) === Number(item.warehouseId)
+    );
     const searchLower = searchQuery.toLowerCase();
     
     // Filter by search query
@@ -193,23 +202,28 @@ const InventoryManagementScreen = ({ navigation }) => {
   };
 
   const getMotorbikeName = (motorbikeId) => {
-    const motorbike = motorbikes.find(m => m.id === motorbikeId);
+    const motorbike = motorbikes.find(m => Number(m.id) === Number(motorbikeId));
     return motorbike?.name || motorbike?.model || 'Unknown Motorbike';
   };
 
   const getWarehouseName = (warehouseId) => {
-    const warehouse = warehouses.find(w => w.id === warehouseId);
+    const warehouse = warehouses.find(w => Number(w.id) === Number(warehouseId));
     return warehouse?.name || 'Unknown Warehouse';
   };
 
   const getWarehouseLocation = (warehouseId) => {
-    const warehouse = warehouses.find(w => w.id === warehouseId);
+    const warehouse = warehouses.find(w => Number(w.id) === Number(warehouseId));
     return warehouse?.location || '';
   };
 
   const renderInventoryCard = (item) => {
-    const motorbike = motorbikes.find(m => m.id === item.electricMotorbikeId);
-    const warehouse = warehouses.find(w => w.id === item.warehouseId);
+    // Ensure proper ID comparison (handle both number and string types)
+    const motorbike = motorbikes.find(m => 
+      Number(m.id) === Number(item.electricMotorbikeId)
+    );
+    const warehouse = warehouses.find(w => 
+      Number(w.id) === Number(item.warehouseId)
+    );
     const statusMeta = getStatusMeta(item.quantity);
 
     return (
