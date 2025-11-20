@@ -37,6 +37,7 @@ const InventoryManagementScreen = ({ navigation }) => {
   const [warehouses, setWarehouses] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
   const [activeTab, setActiveTab] = useState('in_stock'); // 'in_stock' or 'out_of_stock'
+  const [colors, setColors] = useState([]);
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -44,6 +45,7 @@ const InventoryManagementScreen = ({ navigation }) => {
     loadInventory();
     loadWarehouses();
     loadMotorbikes();
+    loadColors();
   }, []);
 
   // Refresh inventory when screen comes into focus
@@ -105,6 +107,30 @@ const InventoryManagementScreen = ({ navigation }) => {
     }
   };
 
+  const loadColors = async () => {
+    try {
+      const response = await motorbikeService.getAllColors();
+      if (response.success) {
+        const rawColors = response.data?.data || response.data || [];
+        const normalized = rawColors
+          .map(color => ({
+            id: color?.id || color?.color?.id,
+            name: color?.colorType || color?.color?.colorType || color?.name || `Color ${color?.id || color?.color?.id}`,
+          }))
+          .filter(color => color.id);
+        setColors(normalized);
+      }
+    } catch (error) {
+      console.error('Error loading colors:', error);
+    }
+  };
+
+  const getColorName = (colorId) => {
+    if (!colorId) return 'N/A';
+    const color = colors.find(c => Number(c.id) === Number(colorId));
+    return color?.name || `Color ${colorId}`;
+  };
+
   const filteredInventory = inventory.filter(item => {
     // Ensure proper ID comparison (handle both number and string types)
     const motorbike = motorbikes.find(m => 
@@ -113,6 +139,7 @@ const InventoryManagementScreen = ({ navigation }) => {
     const warehouse = warehouses.find(w => 
       Number(w.id) === Number(item.warehouseId)
     );
+    const colorName = getColorName(item.colorId);
     const searchLower = searchQuery.toLowerCase();
     
     // Filter by search query
@@ -120,7 +147,8 @@ const InventoryManagementScreen = ({ navigation }) => {
       (motorbike?.name?.toLowerCase().includes(searchLower)) ||
       (motorbike?.model?.toLowerCase().includes(searchLower)) ||
       (warehouse?.name?.toLowerCase().includes(searchLower)) ||
-      (warehouse?.location?.toLowerCase().includes(searchLower))
+      (warehouse?.location?.toLowerCase().includes(searchLower)) ||
+      (colorName?.toLowerCase().includes(searchLower))
     );
     
     // Filter by tab status
@@ -171,14 +199,16 @@ const InventoryManagementScreen = ({ navigation }) => {
         try {
           const response = await inventoryService.deleteInventoryItem(
             item.electricMotorbikeId,
-            item.warehouseId
+            item.warehouseId,
+            item.colorId
           );
           if (response.success) {
             // Remove the item from state immediately
             setInventory(prevInventory => {
               return prevInventory.filter(prevItem => 
                 !(prevItem.electricMotorbikeId === item.electricMotorbikeId &&
-                  prevItem.warehouseId === item.warehouseId)
+                  prevItem.warehouseId === item.warehouseId &&
+                  prevItem.colorId === item.colorId)
               );
             });
             
@@ -227,7 +257,7 @@ const InventoryManagementScreen = ({ navigation }) => {
     const statusMeta = getStatusMeta(item.quantity);
 
     return (
-      <View key={`${item.electricMotorbikeId}-${item.warehouseId}`} style={styles.inventoryCard}>
+      <View key={`${item.electricMotorbikeId}-${item.warehouseId}-${item.colorId}`} style={styles.inventoryCard}>
         <View style={styles.cardHeader}>
           <View style={styles.itemInfo}>
             <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown'}</Text>
@@ -249,6 +279,10 @@ const InventoryManagementScreen = ({ navigation }) => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Warehouse Location:</Text>
             <Text style={styles.detailValue}>{warehouse?.location || 'N/A'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Color:</Text>
+            <Text style={styles.detailValue}>{getColorName(item.colorId)}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Quantity:</Text>

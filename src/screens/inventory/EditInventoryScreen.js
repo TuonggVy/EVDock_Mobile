@@ -27,13 +27,16 @@ const EditInventoryScreen = ({ navigation, route }) => {
     motorbikeId: item.electricMotorbikeId.toString(),
     warehouseId: item.warehouseId.toString(),
     quantity: item.quantity.toString(),
+    colorId: item.colorId ? item.colorId.toString() : '',
   });
+  const [colorName, setColorName] = useState('');
 
   const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
 
   useEffect(() => {
     loadWarehouses();
     loadMotorbikes();
+    loadColorInfo();
   }, []);
 
   const loadWarehouses = async () => {
@@ -61,6 +64,26 @@ const EditInventoryScreen = ({ navigation, route }) => {
     }
   };
 
+  const loadColorInfo = async () => {
+    try {
+      const response = await motorbikeService.getMotorbikeById(item.electricMotorbikeId);
+      const payload = response?.data?.data || response?.data;
+      const colors = Array.isArray(payload?.colors) ? payload.colors : [];
+      const matchedColor = colors.find((c) => {
+        const cId = c?.color?.id || c?.id;
+        return Number(cId) === Number(item.colorId);
+      });
+      if (matchedColor) {
+        setColorName(matchedColor?.color?.colorType || matchedColor?.colorType || matchedColor?.name || '');
+      } else {
+        setColorName('');
+      }
+    } catch (error) {
+      console.error('Error loading color info:', error);
+      setColorName('');
+    }
+  };
+
   const handleSaveItem = async () => {
     if (!editedItem.motorbikeId || !editedItem.warehouseId || !editedItem.quantity) {
       showError('Error', 'Please fill in all required fields');
@@ -74,12 +97,19 @@ const EditInventoryScreen = ({ navigation, route }) => {
       return;
     }
 
+    const colorId = parseInt(editedItem.colorId || item.colorId, 10);
+    if (isNaN(colorId)) {
+      showError('Error', 'Color information is missing. Please reopen this inventory item.');
+      return;
+    }
+
     try {
       // Include stockDate from existing item to maintain the original stock date
       // If not available, service will use current date
       const response = await inventoryService.updateInventoryItem(
         item.electricMotorbikeId,
         item.warehouseId,
+        colorId,
         { 
           quantity: quantity,
           stockDate: item.stockDate || new Date().toISOString()
@@ -139,6 +169,9 @@ const EditInventoryScreen = ({ navigation, route }) => {
 
               <Text style={styles.infoLabel}>Warehouse</Text>
               <Text style={styles.infoValue}>{selectedWarehouse?.name || 'Loading...'}</Text>
+
+              <Text style={styles.infoLabel}>Color</Text>
+              <Text style={styles.infoValue}>{colorName || 'Loading...'}</Text>
             </View>
 
             <View style={styles.inputGroup}>

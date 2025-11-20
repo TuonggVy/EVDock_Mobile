@@ -21,11 +21,14 @@ import motorbikeService from '../../services/motorbikeService';
 const AddInventoryScreen = ({ navigation }) => {
   const [warehouses, setWarehouses] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
+  const [colorOptions, setColorOptions] = useState([]);
+  const [loadingColors, setLoadingColors] = useState(false);
   
   const [newItem, setNewItem] = useState({
     motorbikeId: '',
     warehouseId: '',
     quantity: '',
+    colorId: '',
   });
 
   const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
@@ -34,6 +37,15 @@ const AddInventoryScreen = ({ navigation }) => {
     loadWarehouses();
     loadMotorbikes();
   }, []);
+
+  useEffect(() => {
+    if (newItem.motorbikeId) {
+      fetchMotorbikeColors(newItem.motorbikeId);
+    } else {
+      setColorOptions([]);
+      setNewItem((prev) => ({ ...prev, colorId: '' }));
+    }
+  }, [newItem.motorbikeId]);
 
   const loadWarehouses = async () => {
     try {
@@ -57,8 +69,36 @@ const AddInventoryScreen = ({ navigation }) => {
     }
   };
 
+  const fetchMotorbikeColors = async (motorbikeId) => {
+    try {
+      setLoadingColors(true);
+      const response = await motorbikeService.getMotorbikeById(parseInt(motorbikeId, 10));
+      const payload = response?.data?.data || response?.data;
+      const colors = Array.isArray(payload?.colors) ? payload.colors : [];
+      const mappedColors = colors
+        .map((item) => ({
+          id: item?.color?.id || item?.id,
+          name: item?.color?.colorType || item?.colorType || item?.name || `Color ${item?.color?.id || item?.id}`,
+        }))
+        .filter((c) => c.id);
+      setColorOptions(mappedColors);
+
+      if (mappedColors.length > 0) {
+        setNewItem((prev) => ({ ...prev, colorId: String(mappedColors[0].id) }));
+      } else {
+        setNewItem((prev) => ({ ...prev, colorId: '' }));
+      }
+    } catch (error) {
+      console.error('Error loading motorbike colors:', error);
+      setColorOptions([]);
+      setNewItem((prev) => ({ ...prev, colorId: '' }));
+    } finally {
+      setLoadingColors(false);
+    }
+  };
+
   const handleSaveItem = async () => {
-    if (!newItem.motorbikeId || !newItem.warehouseId || !newItem.quantity) {
+    if (!newItem.motorbikeId || !newItem.warehouseId || !newItem.quantity || !newItem.colorId) {
       showError('Error', 'Please fill in all required fields');
       return;
     }
@@ -78,10 +118,17 @@ const AddInventoryScreen = ({ navigation }) => {
       return;
     }
 
+    const colorId = parseInt(newItem.colorId, 10);
+    if (isNaN(colorId)) {
+      showError('Error', 'Please select a color');
+      return;
+    }
+
     try {
       const response = await inventoryService.createInventoryItem(
         motorbikeId,
         warehouseId,
+        colorId,
         quantity
       );
 
@@ -139,7 +186,7 @@ const AddInventoryScreen = ({ navigation }) => {
                         styles.selectOption,
                         isSelected && styles.selectedOption
                       ]}
-                      onPress={() => setNewItem({ ...newItem, motorbikeId: motorbike.id.toString() })}
+                      onPress={() => setNewItem({ ...newItem, motorbikeId: motorbike.id.toString(), colorId: '' })}
                     >
                       <Text
                         style={[
@@ -153,6 +200,48 @@ const AddInventoryScreen = ({ navigation }) => {
                     </TouchableOpacity>
                   );
                 })}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Color <Text style={styles.required}>*</Text>
+              </Text>
+              <Text style={styles.inputSubLabel}>
+                Select the color variant for this motorbike
+              </Text>
+              <View style={styles.selectContainer}>
+                {loadingColors ? (
+                  <Text style={styles.noOptionsText}>Loading colors...</Text>
+                ) : colorOptions.length > 0 ? (
+                  colorOptions.map((color) => {
+                    const isSelected = newItem.colorId === String(color.id);
+                    return (
+                      <TouchableOpacity
+                        key={color.id}
+                        style={[
+                          styles.selectOption,
+                          isSelected && styles.selectedOption
+                        ]}
+                        onPress={() => setNewItem({ ...newItem, colorId: String(color.id) })}
+                      >
+                        <Text
+                          style={[
+                            styles.selectOptionText,
+                            isSelected && styles.selectedOptionText
+                          ]}
+                        >
+                          {color.name}
+                        </Text>
+                        {isSelected && <Check size={18} color="#009DFF" />}
+                      </TouchableOpacity>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.noOptionsText}>
+                    {newItem.motorbikeId ? 'No colors available for this motorbike' : 'Please select a motorbike first'}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -327,6 +416,11 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+  },
+  noOptionsText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    paddingVertical: SIZES.PADDING.SMALL,
   },
   selectedOptionText: {
     color: '#009DFF',
