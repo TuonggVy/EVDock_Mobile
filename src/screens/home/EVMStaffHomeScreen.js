@@ -243,27 +243,6 @@ const EVMStaffHomeScreen = ({ navigation }) => {
           </View>
 
 
-          {/* Quick Stats */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>530</Text>
-                <Text style={styles.statLabel}>Tổng xe trong kho</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>445</Text>
-                <Text style={styles.statLabel}>Xe có sẵn</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>85</Text>
-                <Text style={styles.statLabel}>Xe đã đặt</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>15</Text>
-                <Text style={styles.statLabel}>Đại lý</Text>
-              </View>
-            </View>
-          </View>
         </ScrollView>
       </View>
       
@@ -524,38 +503,6 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.SECONDARY,
   },
 
-  statsContainer: {
-    marginBottom: SIZES.PADDING.XXXLARGE,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.LARGE,
-    padding: SIZES.PADDING.MEDIUM,
-    width: '48%',
-    marginBottom: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  statNumber: {
-    fontSize: SIZES.FONT.XXLARGE,
-    fontWeight: 'bold',
-    color: COLORS.SECONDARY,
-    marginBottom: SIZES.PADDING.XSMALL,
-  },
-  statLabel: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    textAlign: 'center',
-  },
 });
 
 export default EVMStaffHomeScreen;
