@@ -51,9 +51,9 @@ export const inventoryService = {
   },
 
   // Get inventory detail
-  getInventoryDetail: async (motorbikeId, warehouseId) => {
+  getInventoryDetail: async (motorbikeId, warehouseId, colorId) => {
     try {
-      const response = await api.get(`/inventory/detail/${motorbikeId}/${warehouseId}`);
+      const response = await api.get(`/inventory/detail/${motorbikeId}/${warehouseId}/${colorId}`);
       const data = response.data.data;
       
       return {
@@ -91,54 +91,52 @@ export const inventoryService = {
   },
 
   // Create new inventory item
-  // Create new inventory item
-createInventoryItem: async (motorbikeId, warehouseId, quantity) => {
-  try {
-    const parsedQuantity = parseInt(quantity);
-    if (isNaN(parsedQuantity) || parsedQuantity < 0) {
-      return { success: false, error: 'Số lượng không hợp lệ. Vui lòng nhập số dương.' };
-    }
-
-    const stockDate = new Date().toISOString(); // 👈 thêm dòng này
-
-    const response = await api.post(
-      `/inventory/${motorbikeId}/${warehouseId}`,
-      {
-        quantity: parsedQuantity,
-        stockDate, // 👈 và gửi lên
+  createInventoryItem: async (motorbikeId, warehouseId, colorId, quantity, stockDate) => {
+    try {
+      const parsedQuantity = parseInt(quantity);
+      if (isNaN(parsedQuantity) || parsedQuantity < 0) {
+        return { success: false, error: 'Số lượng không hợp lệ. Vui lòng nhập số dương.' };
       }
-    );
 
-    const createdItem = response.data.data;
-    const itemWithStatus = updateItemStatus(createdItem);
+      const finalStockDate = stockDate || new Date().toISOString();
 
-    return { success: true, data: itemWithStatus, message: response.data.message };
-  } catch (error) {
-    console.error('Error creating inventory item:', error);
-    console.error('Error response:', error.response?.data);
+      const response = await api.post(
+        `/inventory/${motorbikeId}/${warehouseId}/${colorId}`,
+        {
+          quantity: parsedQuantity,
+          stockDate: finalStockDate,
+        }
+      );
 
-    let errorMessage = 'Không thể tạo mục tồn kho';
+      const createdItem = response.data.data;
+      const itemWithStatus = updateItemStatus(createdItem);
 
-    // Parse dạng message mảng { field, error[] }
-    const errData = error.response?.data;
-    if (Array.isArray(errData?.message)) {
-      const first = errData.message[0];
-      if (first?.field && first?.error?.[0]) {
-        errorMessage = `${first.field}: ${first.error[0]}`;
+      return { success: true, data: itemWithStatus, message: response.data.message };
+    } catch (error) {
+      console.error('Error creating inventory item:', error);
+      console.error('Error response:', error.response?.data);
+
+      let errorMessage = 'Không thể tạo mục tồn kho';
+
+      // Parse dạng message mảng { field, error[] }
+      const errData = error.response?.data;
+      if (Array.isArray(errData?.message)) {
+        const first = errData.message[0];
+        if (first?.field && first?.error?.[0]) {
+          errorMessage = `${first.field}: ${first.error[0]}`;
+        }
+      } else if (errData?.message) {
+        errorMessage = errData.message;
+      } else if (typeof errData === 'string') {
+        errorMessage = errData;
       }
-    } else if (errData?.message) {
-      errorMessage = errData.message;
-    } else if (typeof errData === 'string') {
-      errorMessage = errData;
+
+      return { success: false, error: errorMessage };
     }
-
-    return { success: false, error: errorMessage };
-  }
-},
-
+  },
 
   // Update inventory item
-  updateInventoryItem: async (motorbikeId, warehouseId, updateData) => {
+  updateInventoryItem: async (motorbikeId, warehouseId, colorId, updateData) => {
     try {
       // Ensure stockDate is included in request body as per API documentation
       // If stockDate is not provided, use current date
@@ -147,7 +145,7 @@ createInventoryItem: async (motorbikeId, warehouseId, quantity) => {
         stockDate: updateData.stockDate || new Date().toISOString(),
       };
 
-      const response = await api.patch(`/inventory/${motorbikeId}/${warehouseId}`, requestBody);
+      const response = await api.patch(`/inventory/${motorbikeId}/${warehouseId}/${colorId}`, requestBody);
       
       const updatedItem = response.data.data;
       const itemWithStatus = updateItemStatus(updatedItem);
@@ -184,9 +182,9 @@ createInventoryItem: async (motorbikeId, warehouseId, quantity) => {
   },
 
   // Delete inventory item
-  deleteInventoryItem: async (motorbikeId, warehouseId) => {
+  deleteInventoryItem: async (motorbikeId, warehouseId, colorId) => {
     try {
-      const response = await api.delete(`/inventory/${motorbikeId}/${warehouseId}`);
+      const response = await api.delete(`/inventory/${motorbikeId}/${warehouseId}/${colorId}`);
       
       return {
         success: true,
