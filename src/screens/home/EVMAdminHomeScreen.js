@@ -152,12 +152,6 @@ const EVMAdminHomeScreen = ({ navigation }) => {
 
   const allCategoryCards = [
     {
-      title: 'Pricing',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <CircleDollarSign color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('PricingManagement'),
-    },
-    {
       title: 'Agencies',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <Building2 color="#A1D9FF" size={60} />,
