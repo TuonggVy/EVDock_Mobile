@@ -64,6 +64,61 @@ class StockPromotionService {
   }
 
   /**
+   * Get stock promotion list for Dealer Staff
+   * @param {number} agencyId - Agency ID
+   * @param {Object} params - Query parameters (page, limit, valueType, sort)
+   * @returns {Promise<Object>} List of stock promotions available to staff
+   */
+  async getStaffStockPromotionList(agencyId, params = {}) {
+    try {
+      if (!agencyId) {
+        return { success: false, error: 'agencyId is required', data: [] };
+      }
+
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.valueType) queryParams.append('valueType', params.valueType);
+      if (params.sort) queryParams.append('sort', params.sort);
+
+      const url = `${API_BASE_URL}/stock-promotion/list/staff/${agencyId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+      console.log('🔄 [StockPromotionService] Fetching staff stock promotions:', { agencyId, params, url });
+
+      const response = await axiosInstance.get(url);
+
+      console.log('✅ [StockPromotionService] Staff stock promotions fetched:', response.data);
+
+      const normalizedData = (response.data?.data || response.data || []).map(item => ({
+        ...item,
+        valueType: item.value_type || item.valueType,
+      }));
+
+      return {
+        success: true,
+        data: normalizedData,
+        pagination: response.data?.paginationInfo || {},
+        message: response.data?.message || 'Get staff stock promotion list successfully!',
+      };
+    } catch (error) {
+      console.error('❌ [StockPromotionService] Error fetching staff stock promotions:', error);
+      console.error('❌ [StockPromotionService] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to fetch staff stock promotions',
+        data: [],
+        pagination: {},
+      };
+    }
+  }
+
+  /**
    * Get stock promotion detail by ID
    * @param {number} stockPromotionId - Stock Promotion ID
    * @returns {Promise<Object>} Stock promotion detail
