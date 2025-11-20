@@ -100,22 +100,10 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       onPress: () => navigation.navigate('InventoryManagement'),
     },
     {
-      title: 'Allocation',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <Bus color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('AllocationManagement'),
-    },
-    {
       title: 'Warehouse',
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <Warehouse color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('WarehouseManagement'),
-    },
-    {
-      title: 'Pre-order Tasks',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <NotepadText color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('PreOrderTasks'),
     },
     {
       title: 'Price Policy',
