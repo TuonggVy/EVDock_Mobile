@@ -19,7 +19,7 @@ import agencyService from '../../services/agencyService';
 
 const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const { orderId, orderItemId, orderInfo, onStatusUpdate } = route.params || {};
-  const [orderItem, setOrderItem] = useState(null);
+  const [orderItems, setOrderItems] = useState([]); // All orderItems from order
   const [order, setOrder] = useState(orderInfo || null); // Order info from list or params
   const [agencies, setAgencies] = useState([]);
   const [agencyDetail, setAgencyDetail] = useState(null);
@@ -66,49 +66,69 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
-      // API detail requires orderItemId, not orderId
-      if (!orderItemId) {
-        showError('Error', 'Order Item ID not found');
-        navigation.goBack();
-        return;
-      }
-      
-      // Get orderItem detail from API
-      const response = await orderRestockManagerService.getOrderRestockDetail(orderItemId);
-      if (response.success) {
-        const orderItemDetail = response.data;
-        console.log('📦 [OrderRestockDetailManager] OrderItem detail response:', {
-          orderItemId: orderItemDetail.id,
-          orderId: orderItemDetail.orderId,
-          orderKeys: Object.keys(orderItemDetail || {}),
-          fullDetail: orderItemDetail
-        });
-        setOrderItem(orderItemDetail);
-        
-        // If we have orderId but no orderInfo, try to get order info from list
-        if (orderItemDetail.orderId && !order) {
-          await loadOrderInfo(orderItemDetail.orderId);
-        }
-        
-        // Load agency info if needed
-        if (orderItemDetail.orderId && order) {
-          const agencyId = order?.agencyId;
-          if (agencyId) {
-            const existsInList = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-            if (existsInList) {
-              setAgencyDetail(existsInList);
-            } else {
-              const agencyResp = await agencyService.getAgencyById(agencyId);
-              if (agencyResp?.success) {
-                const detailAgency = agencyResp?.data?.data || agencyResp?.data || null;
-                setAgencyDetail(detailAgency);
+      // Use orderInfo from params if available (contains all orderItems)
+      if (orderInfo && orderInfo.id) {
+        setOrder(orderInfo);
+        // Set all orderItems from orderInfo
+        if (Array.isArray(orderInfo.orderItems) && orderInfo.orderItems.length > 0) {
+          // Fetch detailed info for each orderItem to get motorbike name and color name
+          const itemsWithDetails = await Promise.all(
+            orderInfo.orderItems.map(async (item) => {
+              // If item already has nested objects, use it directly
+              if (item.electricMotorbike && item.color) {
+                return item;
               }
+              // Otherwise, fetch detail for this item
+              try {
+                const response = await orderRestockManagerService.getOrderRestockDetail(item.id);
+                if (response.success) {
+                  return response.data; // This will have electricMotorbike and color nested objects
+                }
+                return item; // Fallback to original item if fetch fails
+              } catch (error) {
+                console.error(`Error fetching detail for item ${item.id}:`, error);
+                return item; // Fallback to original item
+              }
+            })
+          );
+          
+          setOrderItems(itemsWithDetails);
+          console.log('📦 [OrderRestockDetailManager] Using orderInfo from params:', {
+            orderId: orderInfo.id,
+            status: orderInfo.status,
+            itemQuantity: orderInfo.itemQuantity,
+            total: orderInfo.total,
+            orderItemsCount: itemsWithDetails.length
+          });
+        } else {
+          // If orderInfo doesn't have orderItems, try to fetch first orderItem to get details
+          if (orderItemId || orderInfo.orderItems?.[0]?.id) {
+            const detailOrderItemId = orderItemId || orderInfo.orderItems?.[0]?.id;
+            const response = await orderRestockManagerService.getOrderRestockDetail(detailOrderItemId);
+            if (response.success) {
+              setOrderItems([response.data]);
             }
           }
         }
+      } else if (orderItemId) {
+        // Fallback: fetch single orderItem if orderInfo not provided
+        const response = await orderRestockManagerService.getOrderRestockDetail(orderItemId);
+        if (response.success) {
+          const orderItemDetail = response.data;
+          setOrderItems([orderItemDetail]);
+          // Try to get order info from orderId
+          if (orderItemDetail.orderId && !order) {
+            console.warn('⚠️ [OrderRestockDetailManager] Order info should be passed from list screen for orderId:', orderItemDetail.orderId);
+          }
+        } else {
+          showError('Error', response.error || 'Unable to load order details');
+          navigation.goBack();
+          return;
+        }
       } else {
-        showError('Error', response.error || 'Unable to load order details');
+        showError('Error', 'Order information not found');
         navigation.goBack();
+        return;
       }
     } catch (error) {
       console.error('Error loading order detail:', error);
@@ -169,25 +189,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
 
   const renderStatusModal = () => null;
 
-  const handlePayment = async () => {
-    if (!orderItem || !orderItem.id) {
-      showError('Error', 'Order item not found.');
-      return;
-    }
-
-    try {
-      const resp = await orderRestockManagerService.payOrderRestock(orderItem.id);
-      if (resp.success) {
-        setOrder(resp.data);
-        showSuccess('Success', 'Order has been paid!');
-        if (onStatusUpdate) onStatusUpdate();
-      } else {
-        showError('Error', resp.error || 'Unable to pay order');
-      }
-    } catch (e) {
-      showError('Error', 'Unable to pay order');
-    }
-  };
 
   if (loading) {
     return (
@@ -199,7 +200,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     );
   }
 
-  if (!orderItem) {
+  if (!order && orderItems.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -229,43 +230,113 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
       >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Information</Text>
-          {renderInfoRow('Order Item ID', `#${orderItem.id}`)}
-          {renderInfoRow('Order ID', `#${orderItem.orderId || 'N/A'}`)}
+          {renderInfoRow('Order ID', `#${order?.id || 'N/A'}`)}
           {order && order.orderAt && renderInfoRow('Order Date', formatDate(order.orderAt))}
-          {renderInfoRow('Quantity', `${orderItem.quantity || 0} units`)}
           {order && order.itemQuantity && renderInfoRow('Item Quantity', `${order.itemQuantity} items`)}
-          {order && renderInfoRow('Order Type', order.orderType === 'FULL' ? 'Full Payment' : 'Deferred Payment')}
+          {order && renderInfoRow('Status', order.status || 'N/A')}
+          {order && order.note && renderInfoRow('Note', order.note)}
+          {order && order.total && renderInfoRow('Order Total', formatPrice(order.total || 0))}
+          {order && order.paidAmount !== undefined && renderInfoRow('Paid Amount', formatPrice(order.paidAmount || 0))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vehicle Information</Text>
-          {renderInfoRow('Vehicle Name', orderItem.electricMotorbike?.name || 'N/A')}
-          {renderInfoRow('Vehicle ID', orderItem.electricMotorbikeId?.toString() || 'N/A')}
-          {renderInfoRow('Color', orderItem.color?.colorType || orderItem.colorId?.toString() || 'N/A')}
-        </View>
+        {/* Order Items List */}
+        {orderItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Order Items ({orderItems.length})</Text>
+            {orderItems.map((item, index) => (
+              <View key={item.id || index} style={styles.orderItemCard}>
+                <Text style={styles.orderItemTitle}>Item #{index + 1}</Text>
+                
+                <View style={styles.orderItemContent}>
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Order Item ID:</Text>
+                    <Text style={styles.orderItemValue}>#{item.id}</Text>
+                  </View>
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Vehicle:</Text>
+                    <Text style={styles.orderItemValue}>
+                      {item.electricMotorbike?.name || 'Loading...'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Color:</Text>
+                    <Text style={styles.orderItemValue}>
+                      {item.color?.colorType || 'Loading...'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Quantity:</Text>
+                    <Text style={styles.orderItemValue}>{item.quantity} units</Text>
+                  </View>
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Base Price:</Text>
+                    <Text style={styles.orderItemValue}>{formatPrice(item.basePrice || 0)}</Text>
+                  </View>
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={styles.orderItemLabel}>Wholesale Price:</Text>
+                    <Text style={styles.orderItemValue}>{formatPrice(item.wholesalePrice || 0)}</Text>
+                  </View>
+                  
+                  {item.discountTotal > 0 && (
+                    <View style={styles.orderItemRow}>
+                      <Text style={styles.orderItemLabel}>Discount Total:</Text>
+                      <Text style={[styles.orderItemValue, { color: COLORS.ERROR }]}>
+                        -{formatPrice(item.discountTotal || 0)}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {item.promotionTotal > 0 && (
+                    <View style={styles.orderItemRow}>
+                      <Text style={styles.orderItemLabel}>Promotion Total:</Text>
+                      <Text style={[styles.orderItemValue, { color: COLORS.SUCCESS }]}>
+                        -{formatPrice(item.promotionTotal || 0)}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.orderItemRow}>
+                    <Text style={[styles.orderItemLabel, { fontWeight: 'bold' }]}>Final Price:</Text>
+                    <Text style={[styles.orderItemValue, { fontWeight: 'bold', color: COLORS.PRIMARY }]}>
+                      {formatPrice(item.finalPrice || 0)}
+                    </Text>
+                  </View>
+                  
+                  {item.pricePolicyId && (
+                    <View style={styles.orderItemRow}>
+                      <Text style={styles.orderItemLabel}>Price Policy ID:</Text>
+                      <Text style={styles.orderItemValue}>#{item.pricePolicyId}</Text>
+                    </View>
+                  )}
+                  
+                  {item.discountId && (
+                    <View style={styles.orderItemRow}>
+                      <Text style={styles.orderItemLabel}>Discount ID:</Text>
+                      <Text style={styles.orderItemValue}>
+                        {item.discountPolicy?.name || `#${item.discountId}`}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {item.promotionId && (
+                    <View style={styles.orderItemRow}>
+                      <Text style={styles.orderItemLabel}>Promotion ID:</Text>
+                      <Text style={styles.orderItemValue}>
+                        {item.promotion?.name || `#${item.promotionId}`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Warehouse Information</Text>
-          {renderInfoRow('Warehouse Name', orderItem.warehouse?.name || 'N/A')}
-          {renderInfoRow('Location', orderItem.warehouse?.location || 'N/A')}
-          {renderInfoRow('Address', orderItem.warehouse?.address || 'N/A')}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Price Information</Text>
-          {renderInfoRow('Base Price', formatPrice(orderItem.basePrice || 0))}
-          {renderInfoRow('Wholesale Price', formatPrice(orderItem.wholesalePrice || 0))}
-          {renderInfoRow('Discount', formatPrice(orderItem.discountTotal || 0))}
-          {renderInfoRow('Promotion', formatPrice(orderItem.promotionTotal || 0))}
-          {renderInfoRow('Final Price', formatPrice(orderItem.finalPrice || 0))}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Policy Information</Text>
-          {renderInfoRow('Price Policy', orderItem.pricePolicyId?.toString() || 'N/A')}
-          {renderInfoRow('Discount', orderItem.discountId ? `#${orderItem.discountId}` : 'N/A')}
-          {renderInfoRow('Promotion', orderItem.promotionId ? `#${orderItem.promotionId}` : 'N/A')}
-        </View>
 
         {order && order.agencyBill && (
           <View style={styles.section}>
@@ -516,6 +587,44 @@ const styles = StyleSheet.create({
   },
   deleteActionButtonText: {
     color: "#FFFFFF",
+  },
+  orderItemCard: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  orderItemTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+    paddingBottom: SIZES.PADDING.SMALL,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
+  },
+  orderItemContent: {
+    gap: SIZES.PADDING.XSMALL,
+  },
+  orderItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  orderItemLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    flex: 1,
+  },
+  orderItemValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
   },
 });
 
