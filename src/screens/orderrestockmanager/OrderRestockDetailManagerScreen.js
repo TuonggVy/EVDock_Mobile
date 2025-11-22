@@ -9,6 +9,8 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
@@ -16,8 +18,10 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import agencyService from '../../services/agencyService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
+  const { user } = useAuth();
   const { orderId, orderItemId, orderInfo, onStatusUpdate } = route.params || {};
   const [orderItems, setOrderItems] = useState([]); // All orderItems from order
   const [order, setOrder] = useState(orderInfo || null); // Order info from list or params
@@ -26,6 +30,9 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -44,12 +51,13 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 [OrderRestockDetailManager] Screen focused, refreshing data...');
       loadAgencies();
       loadOrderDetail();
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, orderId]);
 
   const loadAgencies = async () => {
     try {
@@ -187,7 +195,229 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     </View>
   );
 
+  const handlePayment = () => {
+    if (!order || !order.id) {
+      showError('Error', 'Order information not found');
+      return;
+    }
+
+    // Get max amount (order total or agency bill amount)
+    const maxAmount = order.total || order.agencyBill?.amount || 0;
+    setPaymentAmount(maxAmount > 0 ? String(maxAmount) : '');
+    setShowPaymentModal(true);
+  };
+
+  const processPayment = async () => {
+    if (!order || !order.id) {
+      showError('Error', 'Order information not found');
+      return;
+    }
+
+    // Get orderId as number
+    const orderId = parseInt(order.id, 10);
+    if (!orderId || isNaN(orderId)) {
+      showError('Error', 'Invalid order ID');
+      return;
+    }
+
+    // Validate and get amount as number
+    const amountValue = parseFloat(paymentAmount.replace(/,/g, ''));
+    if (!paymentAmount || isNaN(amountValue) || amountValue <= 0) {
+      showError('Error', 'Please enter a valid payment amount');
+      return;
+    }
+
+    const maxAmount = order.total || order.agencyBill?.amount || 0;
+    if (amountValue > maxAmount) {
+      showError('Error', `Payment amount cannot exceed ${formatPrice(maxAmount)}`);
+      return;
+    }
+
+    const amount = parseInt(amountValue, 10);
+
+    setShowPaymentModal(false);
+    setProcessingPayment(true);
+
+    try {
+      console.log('💳 [Payment] Starting payment process with request body:', {
+        orderId,
+        amount,
+        orderIdType: typeof orderId,
+        amountType: typeof amount
+      });
+
+      const response = await orderRestockManagerService.getVNPayPaymentUrl(orderId, amount);
+      
+      console.log('💳 [Payment] API Response:', {
+        success: response.success,
+        hasPaymentUrl: !!response.paymentUrl,
+        paymentUrl: response.paymentUrl,
+        error: response.error,
+        data: response.data
+      });
+      
+      if (response.success && response.paymentUrl) {
+        const paymentUrl = response.paymentUrl;
+        console.log('💳 [Payment] Attempting to open URL:', paymentUrl);
+        
+        // Check if URL can be opened
+        const canOpen = await Linking.canOpenURL(paymentUrl);
+        console.log('💳 [Payment] Can open URL:', canOpen);
+        
+        if (canOpen) {
+          const opened = await Linking.openURL(paymentUrl);
+          console.log('💳 [Payment] URL opened:', opened);
+          showSuccess('Success', 'Opening payment page...');
+          
+          // Refresh order data after a delay to get updated payment information
+          setTimeout(async () => {
+            console.log('🔄 [Payment] Refreshing order data after payment...');
+            
+            // Try to reload order from list API to get updated paidAmount
+            if (user?.agencyId && orderId) {
+              try {
+                const response = await orderRestockManagerService.getOrderRestockListByAgency(
+                  parseInt(user.agencyId),
+                  { page: 1, limit: 1000 }
+                );
+                if (response.success && response.data) {
+                  const updatedOrder = response.data.find(o => o.id === orderId);
+                  if (updatedOrder) {
+                    console.log('✅ [Payment] Found updated order from API:', {
+                      orderId: updatedOrder.id,
+                      paidAmount: updatedOrder.paidAmount,
+                      agencyBillPaidAmount: updatedOrder.agencyBill?.paidAmount,
+                      orderTotal: updatedOrder.total,
+                      agencyBillAmount: updatedOrder.agencyBill?.amount,
+                      previousPaidAmount: order.paidAmount || order.agencyBill?.paidAmount || 0,
+                      fullOrder: JSON.stringify(updatedOrder, null, 2)
+                    });
+                    
+                    // Check if paidAmount is being accumulated correctly
+                    const previousPaid = order.paidAmount || order.agencyBill?.paidAmount || 0;
+                    const newPaid = updatedOrder.paidAmount || updatedOrder.agencyBill?.paidAmount || 0;
+                    
+                    if (newPaid < previousPaid) {
+                      console.error('⚠️ [Payment] WARNING: New paidAmount is LESS than previous! This suggests Backend is not accumulating payments correctly.', {
+                        previousPaid,
+                        newPaid,
+                        difference: previousPaid - newPaid
+                      });
+                    }
+                    
+                    setOrder(updatedOrder);
+                  }
+                }
+              } catch (error) {
+                console.error('⚠️ [Payment] Error reloading order from list:', error);
+                // Fallback to loadOrderDetail
+                loadOrderDetail();
+              }
+            } else {
+              loadOrderDetail();
+            }
+            
+            if (onStatusUpdate) {
+              onStatusUpdate();
+            }
+          }, 3000);
+        } else {
+          console.error('💳 [Payment] Cannot open URL');
+          showError('Error', 'Cannot open payment URL. Please check your browser settings.');
+        }
+      } else {
+        const errorMsg = response.error || 'Unable to get payment URL';
+        console.error('💳 [Payment] Error:', errorMsg);
+        showError('Error', errorMsg);
+      }
+    } catch (error) {
+      console.error('💳 [Payment] Exception:', error);
+      console.error('💳 [Payment] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      showError('Error', error.response?.data?.message || error.message || 'Unable to process payment');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
   const renderStatusModal = () => null;
+
+  const formatAmountInput = (text) => {
+    // Remove all non-numeric characters except decimal point
+    const numericValue = text.replace(/[^0-9]/g, '');
+    return numericValue;
+  };
+
+  const renderPaymentModal = () => {
+    const maxAmount = order?.total || order?.agencyBill?.amount || 0;
+    
+    return (
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Payment Amount</Text>
+            
+            <View style={styles.modalInfo}>
+              <Text style={styles.modalInfoLabel}>Order Total:</Text>
+              <Text style={styles.modalInfoValue}>{formatPrice(maxAmount)}</Text>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Amount (VND) *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={paymentAmount}
+                onChangeText={(text) => {
+                  const formatted = formatAmountInput(text);
+                  setPaymentAmount(formatted);
+                }}
+                placeholder="Enter payment amount"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+                autoFocus
+              />
+              {paymentAmount && !isNaN(parseFloat(paymentAmount.replace(/,/g, ''))) && (
+                <Text style={styles.amountPreview}>
+                  {formatPrice(parseFloat(paymentAmount.replace(/,/g, '')))}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setShowPaymentModal(false);
+                  setPaymentAmount('');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={processPayment}
+                disabled={processingPayment || !paymentAmount}
+              >
+                {processingPayment ? (
+                  <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>Pay</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
 
   if (loading) {
@@ -236,7 +466,40 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           {order && renderInfoRow('Status', order.status || 'N/A')}
           {order && order.note && renderInfoRow('Note', order.note)}
           {order && order.total && renderInfoRow('Order Total', formatPrice(order.total || 0))}
-          {order && order.paidAmount !== undefined && renderInfoRow('Paid Amount', formatPrice(order.paidAmount || 0))}
+          {(() => {
+            // NOTE: paidAmount should be accumulated total from ALL payments, not just the last payment
+            // ⚠️ BACKEND ISSUE: Currently Backend returns only the last payment amount instead of accumulated total
+            // TODO: Backend needs to fix: paidAmount should be sum of all payment transactions for this order/agencyBill
+            // Frontend just displays what Backend returns - we don't calculate/sum here as it's Backend's responsibility
+            
+            const paidAmount = order.paidAmount || order.agencyBill?.paidAmount || 0;
+            const totalAmount = order.total || order.agencyBill?.amount || 0;
+            
+            console.log('💰 [Display] Paid Amount Calculation:', {
+              orderPaidAmount: order.paidAmount,
+              agencyBillPaidAmount: order.agencyBill?.paidAmount,
+              calculatedPaidAmount: paidAmount,
+              orderTotal: order.total,
+              agencyBillAmount: order.agencyBill?.amount,
+              calculatedTotal: totalAmount,
+              remaining: totalAmount - paidAmount,
+              note: 'paidAmount should be accumulated total from all payments - if wrong, this is a Backend issue'
+            });
+            
+            return (paidAmount > 0) ? (
+              <>
+                {renderInfoRow('Paid Amount', formatPrice(paidAmount), {
+                  color: COLORS.SUCCESS,
+                  fontWeight: 'bold'
+                })}
+                {totalAmount > 0 && paidAmount < totalAmount && (
+                  renderInfoRow('Remaining Amount', formatPrice(totalAmount - paidAmount), {
+                    color: COLORS.WARNING
+                  })
+                )}
+              </>
+            ) : null;
+          })()}
         </View>
 
         {/* Order Items List */}
@@ -343,6 +606,17 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
             <Text style={styles.sectionTitle}>Bill Information</Text>
             {renderInfoRow('Bill ID', `#${order.agencyBill.id || 'N/A'}`)}
             {renderInfoRow('Amount', formatPrice(order.agencyBill.amount))}
+            {order.agencyBill.paidAmount !== undefined && order.agencyBill.paidAmount > 0 && (
+              renderInfoRow('Paid Amount', formatPrice(order.agencyBill.paidAmount), {
+                color: COLORS.SUCCESS,
+                fontWeight: 'bold'
+              })
+            )}
+            {order.agencyBill.amount && order.agencyBill.paidAmount !== undefined && order.agencyBill.paidAmount < order.agencyBill.amount && (
+              renderInfoRow('Remaining Amount', formatPrice(order.agencyBill.amount - (order.agencyBill.paidAmount || 0)), {
+                color: COLORS.WARNING
+              })
+            )}
             {renderInfoRow('Payment Type', order.agencyBill.type === 'FULL' ? 'Full Payment' : 'Deferred Payment')}
             {renderInfoRow('Created Date', formatDate(order.agencyBill.createAt))}
             {order.agencyBill.paidAt && renderInfoRow('Paid Date', formatDate(order.agencyBill.paidAt))}
@@ -353,68 +627,81 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
         )}
       </ScrollView>
 
-      {order && (
-        <View style={styles.fixedActionsContainer}>
-          {order.status === 'DRAFT' ? (
-            <>
+      {order && (() => {
+        // Calculate paid amount and total amount
+        const paidAmount = order.paidAmount || order.agencyBill?.paidAmount || 0;
+        const totalAmount = order.total || order.agencyBill?.amount || 0;
+        const isFullyPaid = totalAmount > 0 && paidAmount >= totalAmount;
+        
+        return (
+          <View style={styles.fixedActionsContainer}>
+            {order.status === 'DRAFT' ? (
+              <>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={async () => {
+                    try {
+                      const resp = await orderRestockManagerService.acceptOrderRestock(order.id);
+                      if (resp.success) {
+                        setOrder(resp.data);
+                        showSuccess('Success', 'Order has been confirmed!');
+                        if (onStatusUpdate) onStatusUpdate();
+                      } else {
+                        showError('Error', resp.error || 'Unable to confirm order');
+                      }
+                    } catch (e) {
+                      showError('Error', 'Unable to confirm order');
+                    }
+                  }}
+                >
+                  <Text style={styles.actionButtonText}>Accept</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteActionButton]}
+                  onPress={() => {
+                    showConfirm(
+                      'Confirm Delete',
+                      'Are you sure you want to delete this order? This action cannot be undone.',
+                      async () => {
+                        try {
+                          const resp = await orderRestockManagerService.deleteOrderRestock(order.id);
+                          if (resp.success) {
+                            showSuccess('Success', 'Order has been deleted!');
+                            if (onStatusUpdate) onStatusUpdate();
+                            navigation.goBack();
+                          } else {
+                            showError('Error', resp.error || 'Unable to delete order');
+                          }
+                        } catch (e) {
+                          showError('Error', 'Unable to delete order');
+                        }
+                      }
+                    );
+                  }}
+                >
+                  <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
+                </TouchableOpacity>
+              </>
+            ) : order.status === 'DELIVERED' && !isFullyPaid ? (
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={async () => {
-                  try {
-                    const resp = await orderRestockManagerService.acceptOrderRestock(order.id);
-                    if (resp.success) {
-                      setOrder(resp.data);
-                      showSuccess('Success', 'Order has been confirmed!');
-                      if (onStatusUpdate) onStatusUpdate();
-                    } else {
-                      showError('Error', resp.error || 'Unable to confirm order');
-                    }
-                  } catch (e) {
-                    showError('Error', 'Unable to confirm order');
-                  }
-                }}
+                onPress={handlePayment}
+                disabled={processingPayment}
               >
-                <Text style={styles.actionButtonText}>Accept</Text>
+                {processingPayment ? (
+                  <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.actionButtonText}>Pay</Text>
+                )}
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deleteActionButton]}
-                onPress={() => {
-                  showConfirm(
-                    'Confirm Delete',
-                    'Are you sure you want to delete this order? This action cannot be undone.',
-                    async () => {
-                      try {
-                        const resp = await orderRestockManagerService.deleteOrderRestock(order.id);
-                        if (resp.success) {
-                          showSuccess('Success', 'Order has been deleted!');
-                          if (onStatusUpdate) onStatusUpdate();
-                          navigation.goBack();
-                        } else {
-                          showError('Error', resp.error || 'Unable to delete order');
-                        }
-                      } catch (e) {
-                        showError('Error', 'Unable to delete order');
-                      }
-                    }
-                  );
-                }}
-              >
-                <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
-              </TouchableOpacity>
-            </>
-          ) : order.agencyBill && !order.agencyBill.isCompleted ? (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handlePayment}
-            >
-              <Text style={styles.actionButtonText}>Pay</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      )}
+            ) : null}
+          </View>
+        );
+      })()}
 
       {renderStatusModal()}
+      {renderPaymentModal()}
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -625,6 +912,99 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     textAlign: 'right',
+  },
+  // Payment Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+    borderTopLeftRadius: SIZES.RADIUS.LARGE,
+    borderTopRightRadius: SIZES.RADIUS.LARGE,
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: Platform.OS === 'ios' ? SIZES.PADDING.XXXLARGE : SIZES.PADDING.LARGE,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    textAlign: 'center',
+  },
+  modalInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.SURFACE,
+    padding: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  modalInfoLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  modalInfoValue: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.PRIMARY,
+  },
+  inputGroup: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  inputLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+    marginBottom: SIZES.PADDING.SMALL,
+    fontWeight: '600',
+  },
+  textInput: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.LARGE,
+    color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  amountPreview: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: SIZES.PADDING.XSMALL,
+    fontStyle: 'italic',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  modalButton: {
+    flex: 1,
+    padding: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    backgroundColor: COLORS.SURFACE,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  modalCancelButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    backgroundColor: "#009DFF",
+  },
+  modalConfirmButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
+    fontWeight: '600',
   },
 });
 
