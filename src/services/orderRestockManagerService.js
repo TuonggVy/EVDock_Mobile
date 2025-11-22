@@ -142,24 +142,69 @@ export const createOrderRestockBill = async (orderId, type = 'FULL') => {
 
 /**
  * Get VNPay payment URL for agency bill
- * @param {number} agencyBillId - Agency Bill ID
+ * @param {number} orderId - Order ID
+ * @param {number} amount - Payment amount
  * @returns {Promise<Object>} Payment URL data
  */
-export const getVNPayPaymentUrl = async (agencyBillId) => {
+export const getVNPayPaymentUrl = async (orderId, amount) => {
   try {
-    const response = await api.post('/vnpay/agency-bill?platform=mobile', {
-      agencyBillId
+    // Ensure orderId and amount are numbers (integers)
+    const requestBody = {
+      orderId: parseInt(orderId, 10),
+      amount: parseInt(amount, 10)
+    };
+
+    console.log('📞 [VNPay API] Calling /vnpay/agency-bill with request body:', {
+      ...requestBody,
+      platform: 'mobile'
     });
+
+    const response = await api.post('/vnpay/agency-bill?platform=mobile', requestBody);
+
+    console.log('📞 [VNPay API] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+      hasData: !!response.data?.data,
+      paymentUrl: response.data?.data?.paymentUrl || response.data?.paymentUrl
+    });
+
+    // Handle different response structures
+    const responseData = response.data;
+    const paymentUrl = responseData?.data?.paymentUrl || responseData?.paymentUrl || null;
+
+    if (!paymentUrl) {
+      console.error('📞 [VNPay API] No payment URL in response:', responseData);
+      return {
+        success: false,
+        error: 'Payment URL not found in response',
+        data: responseData
+      };
+    }
+
     return { 
       success: true, 
-      data: response.data?.data || response.data, 
-      paymentUrl: response.data?.data?.paymentUrl || response.data?.paymentUrl,
-      message: response.data?.message || 'Lấy URL thanh toán thành công' 
+      data: responseData?.data || responseData, 
+      paymentUrl: paymentUrl,
+      message: responseData?.message || 'Lấy URL thanh toán thành công' 
     };
   } catch (error) {
+    console.error('📞 [VNPay API] Error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText
+    });
+
+    const errorMessage = error.response?.data?.message 
+      || error.response?.data?.error
+      || error.message 
+      || 'Không thể lấy URL thanh toán';
+
     return { 
       success: false, 
-      error: error.response?.data?.message || 'Không thể lấy URL thanh toán' 
+      error: errorMessage,
+      status: error.response?.status
     };
   }
 };
