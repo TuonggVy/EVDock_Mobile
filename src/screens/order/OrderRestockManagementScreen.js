@@ -15,6 +15,7 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import orderRestockService from '../../services/orderRestockService';
 import agencyService from '../../services/agencyService';
+import UpdateStatusModal from './UpdateStatusModal';
 import { ArrowLeft, Search, Package } from 'lucide-react-native';
 
 const ACCENT_COLOR = '#009DFF';
@@ -35,6 +36,12 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   // Cache for order details (warehouse and motorbike names)
   const [orderDetailsCache, setOrderDetailsCache] = useState({});
   const [loadingDetails, setLoadingDetails] = useState({});
+  // Cache for full order data (including orderItems for warehouse check)
+  const [orderFullDataCache, setOrderFullDataCache] = useState({});
+  // Modal states
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -90,6 +97,12 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       const orderResponse = await orderRestockService.getOrderRestockDetail(orderId);
       
       if (orderResponse.success && orderResponse.data) {
+        // Cache full order data for warehouse check
+        setOrderFullDataCache(prev => ({
+          ...prev,
+          [orderId]: orderResponse.data
+        }));
+
         const firstItem = orderResponse.data.orderItems?.[0];
         const orderItemId = firstItem?.id;
         
@@ -156,8 +169,10 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         setOrders(sortedOrders);
         setPaginationInfo(response.paginationInfo || { page: 1, limit: 1000, total: sortedOrders.length });
         
-        // Load details for all orders in parallel
-        const detailPromises = sortedOrders.map(order => loadOrderDetail(order.id));
+        // Load details for all orders in parallel (especially for APPROVED orders to check warehouse)
+        const detailPromises = sortedOrders
+          .filter(order => order.status === 'APPROVED') // Only load detail for APPROVED orders to check warehouse
+          .map(order => loadOrderDetail(order.id));
         await Promise.all(detailPromises);
       } else {
         showError('Error', response.error || 'Cannot load order list');
@@ -186,14 +201,22 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     setRefreshing(true);
     // Clear cache to force reload of details
     setOrderDetailsCache({});
+    setOrderFullDataCache({});
     await loadAgencies();
     await loadOrders();
   };
 
-  const getAgencyName = (agencyId) => {
-    if (!agencyId) return 'N/A';
-    const agency = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-    return agency?.name || `Agency #${agencyId}`;
+  const getAgencyName = (order) => {
+    // First try to get from order.agency object (from API response)
+    if (order?.agency?.name) {
+      return order.agency.name;
+    }
+    // Fallback to agencies list
+    if (order?.agencyId) {
+      const agency = agencies.find(a => a.id === order.agencyId || a.id?.toString() === order.agencyId?.toString());
+      return agency?.name || `Agency #${order.agencyId}`;
+    }
+    return 'N/A';
   };
 
   const getWarehouseName = (order) => {
@@ -230,7 +253,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           order.id?.toString().toLowerCase().includes(query) ||
           motorbikeName.includes(query) ||
           warehouseName.includes(query) ||
-          getAgencyName(order.agencyId).toLowerCase().includes(query)
+          getAgencyName(order).toLowerCase().includes(query)
         );
       });
     }
@@ -264,7 +287,29 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       'PENDING': 'APPROVED',
       'APPROVED': 'DELIVERED',
     };
-    return statusFlow[order?.status] || null;
+    const nextStatus = statusFlow[order?.status] || null;
+    
+    // For DELIVERED status, check if all order items have warehouse
+    if (nextStatus === 'DELIVERED') {
+      // Check cached full order data first
+      const fullOrderData = orderFullDataCache[order.id];
+      if (fullOrderData?.orderItems) {
+        // Check if all order items have warehouseId
+        const allHaveWarehouse = fullOrderData.orderItems.every(item => item.warehouseId != null);
+        return allHaveWarehouse ? 'DELIVERED' : null;
+      }
+      
+      // If not in cache, check if order has orderItems in list response
+      if (order?.orderItems && order.orderItems.length > 0) {
+        const allHaveWarehouse = order.orderItems.every(item => item.warehouseId != null);
+        return allHaveWarehouse ? 'DELIVERED' : null;
+      }
+      
+      // If no orderItems data available, return null (need to load detail first)
+      return null;
+    }
+    
+    return nextStatus;
   };
 
   const handleUpdateToNextStatus = (order) => {
@@ -273,46 +318,23 @@ const OrderRestockManagementScreen = ({ navigation }) => {
       showError('Error', 'Cannot move to next status');
       return;
     }
+    setSelectedOrder(order);
+    setShowStatusModal(true);
+  };
 
-    showConfirm(
-      'Confirm Update',
-      `Are you sure you want to change order #${order.id} from "${getStatusLabel(order.status)}" to "${getStatusLabel(nextStatus)}"?`,
-      async () => {
-        try {
-          const response = await orderRestockService.updateOrderRestockStatus(order.id, nextStatus);
-          if (response.success) {
-            showSuccess('Success', 'Status updated successfully!');
-            loadOrders();
-          } else {
-            showError('Error', response.error || 'Cannot update status');
-          }
-        } catch (error) {
-          console.error('Error updating status:', error);
-          showError('Error', 'Cannot update status');
-        }
-      }
-    );
+  const handleStatusUpdateSuccess = async () => {
+    await loadOrders();
+    setSelectedOrder(null);
   };
 
   const handleCancelOrder = (order) => {
-    showConfirm(
-      'Confirm Cancel Order',
-      `Are you sure you want to cancel order #${order.id}?`,
-      async () => {
-        try {
-          const response = await orderRestockService.updateOrderRestockStatus(order.id, 'CANCELED');
-          if (response.success) {
-            showSuccess('Success', 'Order canceled successfully!');
-            loadOrders();
-          } else {
-            showError('Error', response.error || 'Cannot cancel order');
-          }
-        } catch (error) {
-          console.error('Error canceling order:', error);
-          showError('Error', 'Cannot cancel order');
-        }
-      }
-    );
+    setSelectedOrder(order);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelOrderSuccess = async () => {
+    await loadOrders();
+    setSelectedOrder(null);
   };
 
   const getStatusColor = (status) => {
@@ -362,7 +384,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Agency:</Text>
           <Text style={styles.detailValue}>
-            {getAgencyName(order.agencyId)}
+            {getAgencyName(order)}
           </Text>
         </View>
         <View style={styles.detailRow}>
@@ -384,7 +406,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Total:</Text>
           <Text style={[styles.detailValue, styles.priceValue]}>
-            {formatPrice(order.subtotal)}
+            {formatPrice(order.total)}
           </Text>
         </View>
       </View>
@@ -567,6 +589,31 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           </View>
         )}
       </ScrollView>
+
+      <UpdateStatusModal
+        visible={showStatusModal}
+        onClose={() => {
+          setShowStatusModal(false);
+          setSelectedOrder(null);
+        }}
+        orderId={selectedOrder?.id}
+        currentStatus={selectedOrder?.status}
+        nextStatus={selectedOrder ? getNextStatus(selectedOrder) : null}
+        onSuccess={handleStatusUpdateSuccess}
+      />
+
+      <UpdateStatusModal
+        visible={showCancelModal}
+        onClose={() => {
+          setShowCancelModal(false);
+          setSelectedOrder(null);
+        }}
+        orderId={selectedOrder?.id}
+        currentStatus={selectedOrder?.status}
+        nextStatus="CANCELED"
+        onSuccess={handleCancelOrderSuccess}
+        title="Cancel Order"
+      />
 
       <CustomAlert
         visible={alertConfig.visible}
