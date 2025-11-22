@@ -9,12 +9,13 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Edit } from 'lucide-react-native';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import orderRestockService from '../../services/orderRestockService';
 import agencyService from '../../services/agencyService';
+import UpdateStatusModal from './UpdateStatusModal';
 
 const ACCENT_COLOR = '#009DFF';
 
@@ -26,6 +27,8 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
   // Cache for order item details (motorbike, warehouse, color names)
   const [orderItemDetails, setOrderItemDetails] = useState({});
   const [loadingItemDetails, setLoadingItemDetails] = useState({});
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -134,16 +137,18 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
   };
 
   const getAgencyInfo = () => {
-    if (!order?.agencyId) return null;
-    // First try to get from agencies list
-    const agency = agencies.find(a => 
-      a.id === order.agencyId || 
-      a.id?.toString() === order.agencyId?.toString()
-    );
-    // If found, return it
-    if (agency) return agency;
-    // Otherwise, check if agencyBill is in order response
-    if (order.agencyBill) return order.agencyBill;
+    // First try to get from order.agency object (from API response)
+    if (order?.agency) {
+      return order.agency;
+    }
+    // Fallback to agencies list
+    if (order?.agencyId) {
+      const agency = agencies.find(a => 
+        a.id === order.agencyId || 
+        a.id?.toString() === order.agencyId?.toString()
+      );
+      if (agency) return agency;
+    }
     // Return null if nothing found
     return null;
   };
@@ -154,7 +159,19 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
       'PENDING': 'APPROVED',
       'APPROVED': 'DELIVERED',
     };
-    return statusFlow[order?.status] || null;
+    const nextStatus = statusFlow[order?.status] || null;
+    
+    // For DELIVERED status, check if all order items have warehouse
+    if (nextStatus === 'DELIVERED') {
+      if (!order?.orderItems || order.orderItems.length === 0) {
+        return null;
+      }
+      // Check if all order items have warehouseId
+      const allHaveWarehouse = order.orderItems.every(item => item.warehouseId != null);
+      return allHaveWarehouse ? 'DELIVERED' : null;
+    }
+    
+    return nextStatus;
   };
 
   const handleUpdateToNextStatus = () => {
@@ -163,100 +180,25 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
       showError('Error', 'Cannot move to next status');
       return;
     }
-
-    showConfirm(
-      'Confirm Update',
-      `Are you sure you want to change order from "${getStatusLabel(order.status)}" to "${getStatusLabel(nextStatus)}"?`,
-      async () => {
-        try {
-          const response = await orderRestockService.updateOrderRestockStatus(orderId, nextStatus);
-          if (response.success) {
-            setOrder(response.data);
-            // Reload order item details if orderItems exist
-            if (response.data.orderItems && response.data.orderItems.length > 0) {
-              const itemDetailPromises = response.data.orderItems.map(item => 
-                loadOrderItemDetail(item.id)
-              );
-              await Promise.all(itemDetailPromises);
-            }
-            showSuccess('Success', 'Status updated successfully!');
-            // Trigger refresh on parent screen immediately
-            if (onStatusUpdate) {
-              onStatusUpdate();
-            }
-          } else {
-            showError('Error', response.error || 'Cannot update status');
-          }
-        } catch (error) {
-          console.error('Error updating status:', error);
-          showError('Error', 'Cannot update status');
-        }
-      }
-    );
+    setShowStatusModal(true);
   };
 
-  const handleCheckCredit = () => {
-    showConfirm(
-      'Confirm Check Credit',
-      `Are you sure you want to check credit for order #${order.id}?`,
-      async () => {
-        try {
-          const response = await orderRestockService.checkOrderCredit(orderId);
-          if (response.success) {
-            setOrder(response.data);
-            // Reload order item details if orderItems exist
-            if (response.data.orderItems && response.data.orderItems.length > 0) {
-              const itemDetailPromises = response.data.orderItems.map(item => 
-                loadOrderItemDetail(item.id)
-              );
-              await Promise.all(itemDetailPromises);
-            }
-            showSuccess('Success', 'Credit checked successfully!');
-            // Trigger refresh on parent screen immediately
-            if (onStatusUpdate) {
-              onStatusUpdate();
-            }
-          } else {
-            showError('Error', response.error || 'Cannot check credit');
-          }
-        } catch (error) {
-          console.error('Error checking credit:', error);
-          showError('Error', 'Cannot check credit');
-        }
-      }
-    );
+  const handleStatusUpdateSuccess = async () => {
+    await loadOrderDetail();
+    if (onStatusUpdate) {
+      onStatusUpdate();
+    }
   };
 
   const handleCancelOrder = () => {
-    showConfirm(
-      'Confirm Cancel Order',
-      `Are you sure you want to cancel order #${order.id}?`,
-      async () => {
-        try {
-          const response = await orderRestockService.updateOrderRestockStatus(orderId, 'CANCELED');
-          if (response.success) {
-            setOrder(response.data);
-            // Reload order item details if orderItems exist
-            if (response.data.orderItems && response.data.orderItems.length > 0) {
-              const itemDetailPromises = response.data.orderItems.map(item => 
-                loadOrderItemDetail(item.id)
-              );
-              await Promise.all(itemDetailPromises);
-            }
-            showSuccess('Success', 'Order canceled successfully!');
-            // Trigger refresh on parent screen immediately
-            if (onStatusUpdate) {
-              onStatusUpdate();
-            }
-          } else {
-            showError('Error', response.error || 'Cannot cancel order');
-          }
-        } catch (error) {
-          console.error('Error canceling order:', error);
-          showError('Error', 'Cannot cancel order');
-        }
-      }
-    );
+    setShowCancelModal(true);
+  };
+
+  const handleCancelOrderSuccess = async () => {
+    await loadOrderDetail();
+    if (onStatusUpdate) {
+      onStatusUpdate();
+    }
   };
 
   const getStatusColor = (status) => {
@@ -350,8 +292,8 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           {renderInfoRow('Order ID', `#${order.id}`)}
           {renderInfoRow('Order Date', formatDate(order.orderAt))}
           {renderInfoRow('Quantity', `${order.itemQuantity || 0} units`)}
-          {renderInfoRow('Order Type', order.orderType || 'N/A')}
-          {renderInfoRow('Credit Checked', order.creditChecked ? 'Yes' : 'No')}
+          {order.paidAmount !== undefined && renderInfoRow('Paid Amount', formatPrice(order.paidAmount))}
+          {order.note && renderInfoRow('Note', order.note)}
         </View>
 
         {/* Agency Info */}
@@ -393,6 +335,19 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
                   {renderInfoRow('Price Policy ID', item.pricePolicyId?.toString() || 'N/A')}
                   {renderInfoRow('Discount ID', item.discountId?.toString() || 'N/A')}
                   {renderInfoRow('Promotion ID', item.promotionId?.toString() || 'N/A')}
+                  <TouchableOpacity
+                    style={styles.editItemButton}
+                    onPress={() => navigation.navigate('UpdateWarehouseItem', {
+                      orderItemId: item.id,
+                      orderId: order.id,
+                      onUpdate: () => {
+                        loadOrderDetail();
+                      }
+                    })}
+                  >
+                    <Edit size={18} color={ACCENT_COLOR} />
+                    <Text style={styles.editItemButtonText}>Update Warehouse Item</Text>
+                  </TouchableOpacity>
                 </View>
               );
             })}
@@ -402,24 +357,19 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
         {/* Pricing Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pricing Summary</Text>
-          {renderInfoRow('Total', formatPrice(order.subtotal), { 
+          {renderInfoRow('Total', formatPrice(order.total), { 
             color: COLORS.SUCCESS, 
             fontWeight: 'bold',
             fontSize: SIZES.FONT.MEDIUM 
+          })}
+          {order.paidAmount !== undefined && renderInfoRow('Paid Amount', formatPrice(order.paidAmount), {
+            color: COLORS.PRIMARY,
+            fontWeight: '600'
           })}
         </View>
 
         {/* Actions Section */}
         <View style={styles.actionsSection}>
-          {order.status === 'PENDING' && !order.creditChecked && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.checkCreditButton]}
-              onPress={handleCheckCredit}
-            >
-              <Text style={styles.actionButtonText}>Check Credit</Text>
-            </TouchableOpacity>
-          )}
-          
           {getNextStatus() && (
             <TouchableOpacity
               style={[styles.actionButton, styles.nextStatusButton]}
@@ -441,6 +391,25 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
           )}
         </View>
       </ScrollView>
+
+      <UpdateStatusModal
+        visible={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        orderId={orderId}
+        currentStatus={order?.status}
+        nextStatus={getNextStatus()}
+        onSuccess={handleStatusUpdateSuccess}
+      />
+
+      <UpdateStatusModal
+        visible={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        orderId={orderId}
+        currentStatus={order?.status}
+        nextStatus="CANCELED"
+        onSuccess={handleCancelOrderSuccess}
+        title="Cancel Order"
+      />
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -608,9 +577,6 @@ const styles = StyleSheet.create({
     color: COLORS.ERROR,
     fontWeight: '600',
   },
-  checkCreditButton: {
-    backgroundColor: COLORS.WARNING,
-  },
   orderItemContainer: {
     marginBottom: SIZES.PADDING.MEDIUM,
     paddingBottom: SIZES.PADDING.MEDIUM,
@@ -622,6 +588,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: ACCENT_COLOR,
     marginBottom: SIZES.PADDING.SMALL,
+  },
+  editItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    backgroundColor: 'rgba(0,157,255,0.1)',
+    borderWidth: 1,
+    borderColor: ACCENT_COLOR,
+    gap: SIZES.PADDING.SMALL,
+  },
+  editItemButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: ACCENT_COLOR,
+    fontWeight: '600',
   },
 });
 

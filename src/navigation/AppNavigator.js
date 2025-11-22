@@ -81,6 +81,7 @@ import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
 import EditPromotionScreen from '../screens/promotion/EditPromotionScreen';
 import OrderRestockManagementScreen from '../screens/order/OrderRestockManagementScreen';
 import OrderRestockDetailScreen from '../screens/order/OrderRestockDetailScreen';
+import UpdateWarehouseItemScreen from '../screens/order/UpdateWarehouseItemScreen';
 import OrderRestockDetailManagerScreen from '../screens/orderrestockmanager/OrderRestockDetailManagerScreen';
 import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
 import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
@@ -550,6 +551,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="OrderRestockDetail" 
               component={OrderRestockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="UpdateWarehouseItem" 
+              component={UpdateWarehouseItemScreen} 
               options={{ headerShown: false }}
             />
           <Stack.Screen 

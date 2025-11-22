@@ -9,6 +9,8 @@ const ORDER_RESTOCK_ENDPOINTS = {
   DETAIL: (orderId) => `/order-restock-management/detail/${orderId}`,
   ORDER_ITEM_DETAIL: (orderItemId) => `/order-restock-management/detail/order-item/${orderItemId}`,
   UPDATE_STATUS: (orderId) => `/order-restock-management/status/${orderId}`,
+  UPDATE_WAREHOUSE_ITEM: (orderItemId, motorbikeId, warehouseId, colorId) => 
+    `/order-restock-management/update/warehouse-item/${orderItemId}/${motorbikeId}/${warehouseId}/${colorId}`,
   CHECK_CREDIT: (orderId) => `/order-restock-management/checked/${orderId}`,
   DELETE: (orderId) => `/order-restock-management/${orderId}`,
 };
@@ -20,6 +22,7 @@ const ORDER_RESTOCK_ENDPOINTS = {
  * @param {number} params.limit - Items per page
  * @param {string} params.status - Filter by status (optional)
  * @param {number} params.agencyId - Filter by agency ID (optional)
+ * @param {string} params.sort - Sort order (e.g., 'newest', 'oldest') (optional)
  * @returns {Promise<Object>} Orders data with pagination
  */
 export const getOrderRestockList = async (params = {}) => {
@@ -30,6 +33,7 @@ export const getOrderRestockList = async (params = {}) => {
     if (params.limit) queryParams.append('limit', params.limit);
     if (params.status) queryParams.append('status', params.status);
     if (params.agencyId) queryParams.append('agencyId', params.agencyId);
+    if (params.sort) queryParams.append('sort', params.sort);
 
     const response = await api.get(`${ORDER_RESTOCK_ENDPOINTS.LIST}?${queryParams}`);
     return {
@@ -73,13 +77,16 @@ export const getOrderRestockDetail = async (orderId) => {
  * Update order status
  * @param {number} orderId - Order ID
  * @param {string} status - New status (DRAFT, PENDING, APPROVED, DELIVERED, PAID, CANCELED)
+ * @param {string} note - Optional note for the status update
  * @returns {Promise<Object>} Updated order data
  */
-export const updateOrderRestockStatus = async (orderId, status) => {
+export const updateOrderRestockStatus = async (orderId, status, note = null) => {
   try {
-    const response = await api.patch(ORDER_RESTOCK_ENDPOINTS.UPDATE_STATUS(orderId), {
-      status
-    });
+    const requestBody = { status };
+    if (note) {
+      requestBody.note = note;
+    }
+    const response = await api.patch(ORDER_RESTOCK_ENDPOINTS.UPDATE_STATUS(orderId), requestBody);
     return {
       success: true,
       data: response.data.data,
@@ -138,6 +145,33 @@ export const checkOrderCredit = async (orderId) => {
 };
 
 /**
+ * Update warehouse item for an order item
+ * @param {number} orderItemId - Order Item ID
+ * @param {number} motorbikeId - Motorbike ID
+ * @param {number} warehouseId - Warehouse ID
+ * @param {number} colorId - Color ID
+ * @returns {Promise<Object>} Updated order data
+ */
+export const updateWarehouseItem = async (orderItemId, motorbikeId, warehouseId, colorId) => {
+  try {
+    const response = await api.patch(
+      ORDER_RESTOCK_ENDPOINTS.UPDATE_WAREHOUSE_ITEM(orderItemId, motorbikeId, warehouseId, colorId)
+    );
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message || 'Cập nhật warehouse item thành công'
+    };
+  } catch (error) {
+    console.error('Error updating warehouse item:', error);
+    return {
+      success: false,
+      error: error.response?.data?.message || 'Không thể cập nhật warehouse item'
+    };
+  }
+};
+
+/**
  * Delete order
  * @param {number} orderId - Order ID
  * @returns {Promise<Object>} Delete response
@@ -163,6 +197,7 @@ const orderRestockService = {
   getOrderRestockDetail,
   getOrderItemDetail,
   updateOrderRestockStatus,
+  updateWarehouseItem,
   checkOrderCredit,
   deleteOrderRestock,
 };
