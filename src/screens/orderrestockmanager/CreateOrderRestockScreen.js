@@ -14,7 +14,7 @@ import {
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import warehouseService from '../../services/warehouseService';
 import motorbikeService from '../../services/motorbikeService';
@@ -33,6 +33,10 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   
+  // List of orderItems to be created
+  const [orderItemsList, setOrderItemsList] = useState([]);
+  
+  // Current orderItem being filled in the form
   const [orderItem, setOrderItem] = useState({
     quantity: '',
     warehouseId: '',
@@ -41,8 +45,6 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     discountId: '',
     promotionId: '',
   });
-  
-  const [orderType, setOrderType] = useState('FULL');
 
   const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
 
@@ -180,14 +182,66 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     }
   };
 
-  const handleCreateOrder = async () => {
-    if (!orderItem.quantity || !orderItem.colorId) {
-      showError('Error', 'Please enter quantity and select color');
+  const handleAddItem = () => {
+    // Validate current item before adding
+    if (!orderItem.quantity || !orderItem.motorbikeId || !orderItem.colorId) {
+      showError('Error', 'Please fill in quantity, motorbike, and color');
       return;
     }
 
-    if (!orderItem.warehouseId || !orderItem.motorbikeId) {
-      showError('Error', 'Please select Warehouse and Motorbike');
+    const motorbike = motorbikes.find(mb => String(mb.id) === String(orderItem.motorbikeId));
+    const color = motorbikeColors.find(c => String(c.id) === String(orderItem.colorId));
+    const discount = discounts.find(d => String(d.id) === String(orderItem.discountId));
+    const promotion = promotions.find(p => String(p.id) === String(orderItem.promotionId));
+
+    // Create item object with display info
+    const newItem = {
+      id: Date.now(), // Temporary ID for list management
+      quantity: parseInt(orderItem.quantity) || 0,
+      motorbikeId: parseInt(orderItem.motorbikeId),
+      colorId: parseInt(orderItem.colorId),
+      discountId: orderItem.discountId ? parseInt(orderItem.discountId) : null,
+      promotionId: orderItem.promotionId ? parseInt(orderItem.promotionId) : null,
+      // Display info
+      motorbikeName: motorbike?.name || motorbike?.model || `Motorbike ${orderItem.motorbikeId}`,
+      colorName: color?.colorType || `Color ${orderItem.colorId}`,
+      discountName: discount?.name || discount?.description || null,
+      promotionName: promotion?.name || null,
+    };
+
+    setOrderItemsList(prev => [...prev, newItem]);
+
+    // Reset form
+    setOrderItem({
+      quantity: '',
+      warehouseId: orderItem.warehouseId, // Keep warehouse if was set
+      motorbikeId: '',
+      colorId: '',
+      discountId: '',
+      promotionId: '',
+    });
+    setMotorbikeColors([]);
+  };
+
+  const handleRemoveItem = (itemId) => {
+    setOrderItemsList(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const clearForm = () => {
+    setOrderItem({
+      quantity: '',
+      warehouseId: '',
+      motorbikeId: '',
+      colorId: '',
+      discountId: '',
+      promotionId: '',
+    });
+    setMotorbikeColors([]);
+  };
+
+  const handleCreateOrder = async () => {
+    if (orderItemsList.length === 0) {
+      showError('Error', 'Please add at least one order item');
       return;
     }
 
@@ -199,19 +253,16 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     setCreating(true);
 
     try {
+      // API expects: { orderItems: [{ quantity, motorbikeId, colorId, discountId?, promotionId? }], agencyId }
       const orderRestockData = {
-        orderType: orderType,
         agencyId: parseInt(user.agencyId),
-        orderItems: [
-          {
-            quantity: parseInt(orderItem.quantity) || 0,
-            warehouseId: parseInt(orderItem.warehouseId) || 0,
-            motorbikeId: parseInt(orderItem.motorbikeId) || 0,
-            colorId: parseInt(orderItem.colorId) || 1,
-            ...(orderItem.discountId ? { discountId: parseInt(orderItem.discountId) } : {}),
-            ...(orderItem.promotionId ? { promotionId: parseInt(orderItem.promotionId) } : {}),
-          }
-        ]
+        orderItems: orderItemsList.map(item => ({
+          quantity: item.quantity,
+          motorbikeId: item.motorbikeId,
+          colorId: item.colorId,
+          ...(item.discountId ? { discountId: item.discountId } : {}),
+          ...(item.promotionId ? { promotionId: item.promotionId } : {}),
+        }))
       };
 
       console.log('Creating order restock with data:', orderRestockData);
@@ -283,40 +334,56 @@ const CreateOrderRestockScreen = ({ navigation }) => {
           contentContainerStyle={styles.contentContainer}
         >
           <View style={styles.formSection}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Order Type *</Text>
-              <View style={styles.vehicleSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.vehicleOption,
-                    orderType === 'FULL' && styles.selectedVehicleOption
-                  ]}
-                  onPress={() => setOrderType('FULL')}
-                >
-                  <Text style={[
-                    styles.vehicleOptionText,
-                    orderType === 'FULL' && styles.selectedVehicleOptionText
-                  ]}>
-                    Full Payment
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.vehicleOption,
-                    orderType === 'DEFERRED' && styles.selectedVehicleOption
-                  ]}
-                  onPress={() => setOrderType('DEFERRED')}
-                >
-                  <Text style={[
-                    styles.vehicleOptionText,
-                    orderType === 'DEFERRED' && styles.selectedVehicleOptionText
-                  ]}>
-                    Deferred Payment
-                  </Text>
-                </TouchableOpacity>
+            {/* Order Items List */}
+            {orderItemsList.length > 0 && (
+              <View style={styles.itemsListSection}>
+                <Text style={styles.sectionTitle}>Order Items ({orderItemsList.length})</Text>
+                {orderItemsList.map((item, index) => (
+                  <View key={item.id} style={styles.itemCard}>
+                    <View style={styles.itemCardContent}>
+                      <Text style={styles.itemCardTitle}>Item #{index + 1}</Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Motorbike: </Text>
+                        {item.motorbikeName}
+                      </Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Color: </Text>
+                        {item.colorName}
+                      </Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Quantity: </Text>
+                        {item.quantity}
+                      </Text>
+                      {item.discountName && (
+                        <Text style={styles.itemCardText}>
+                          <Text style={styles.itemCardLabel}>Discount: </Text>
+                          {item.discountName}
+                        </Text>
+                      )}
+                      {item.promotionName && (
+                        <Text style={styles.itemCardText}>
+                          <Text style={styles.itemCardLabel}>Promotion: </Text>
+                          {item.promotionName}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveItem(item.id)}
+                    >
+                      <Trash2 size={18} color={COLORS.ERROR} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
-            </View>
+            )}
 
+            {/* Add New Item Form */}
+            <View style={styles.addItemSection}>
+              <Text style={styles.sectionTitle}>
+                {orderItemsList.length > 0 ? 'Add Another Item' : 'Add Order Item'}
+              </Text>
+              
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Quantity *</Text>
               <TextInput
@@ -383,32 +450,6 @@ const CreateOrderRestockScreen = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Warehouse *</Text>
-              <View style={styles.vehicleSelector}>
-                {warehouses.length > 0 ? (
-                  warehouses.map((wh) => (
-                    <TouchableOpacity
-                      key={wh.id}
-                      style={[
-                        styles.vehicleOption,
-                        orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOption
-                      ]}
-                      onPress={() => setOrderItem({ ...orderItem, warehouseId: String(wh.id) })}
-                    >
-                      <Text style={[
-                        styles.vehicleOptionText,
-                        orderItem.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
-                      ]}>
-                        {wh.name || wh.location || `Warehouse`}
-                      </Text>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={styles.noOptionsText}>Loading warehouses...</Text>
-                )}
-              </View>
-            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Discount (optional)</Text>
@@ -495,16 +536,28 @@ const CreateOrderRestockScreen = ({ navigation }) => {
             </View>
 
             <TouchableOpacity
-              style={[styles.submitButton, creating && styles.submitButtonDisabled]}
-              onPress={handleCreateOrder}
-              disabled={creating}
+              style={styles.addItemButton}
+              onPress={handleAddItem}
             >
-              {creating ? (
-                <ActivityIndicator size="small" color="#009DFF" />
-              ) : (
-                <Text style={styles.submitButtonText}>Create Order</Text>
-              )}
+              <Plus size={18} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.addItemButtonText}>Add Item</Text>
             </TouchableOpacity>
+            </View>
+
+            {/* Submit Button */}
+            {orderItemsList.length > 0 && (
+              <TouchableOpacity
+                style={[styles.submitButton, creating && styles.submitButtonDisabled]}
+                onPress={handleCreateOrder}
+                disabled={creating}
+              >
+                {creating ? (
+                  <ActivityIndicator size="small" color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Create Order ({orderItemsList.length} items)</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -649,6 +702,69 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  itemsListSection: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  itemCard: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  itemCardContent: {
+    flex: 1,
+  },
+  itemCardTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.XSMALL,
+  },
+  itemCardText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 2,
+  },
+  itemCardLabel: {
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  removeButton: {
+    padding: SIZES.PADDING.SMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  addItemSection: {
+    marginBottom: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.MEDIUM,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BORDER.PRIMARY,
+  },
+  addItemButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.PADDING.SMALL,
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  addItemButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },

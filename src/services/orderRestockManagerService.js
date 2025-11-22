@@ -61,7 +61,9 @@ export const getOrderRestockListByAgency = async (agencyId, params = {}) => {
 
 /**
  * Create order restock
- * @param {Object} orderData - Order data with orderType, orderItems, agencyId
+ * @param {Object} orderData - Order data with orderItems array and agencyId
+ * @param {Array} orderData.orderItems - Array of order items: [{ quantity, motorbikeId, colorId, discountId?, promotionId? }]
+ * @param {number} orderData.agencyId - Agency ID
  * @returns {Promise<Object>} Created order data
  */
 export const createOrderRestock = async (orderData) => {

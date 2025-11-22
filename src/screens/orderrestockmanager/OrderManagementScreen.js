@@ -17,7 +17,6 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { ArrowLeft, Plus, Search, Package, Clock } from 'lucide-react-native';
-import { orderService } from '../../services/orderService';
 import orderRestockManagerService from '../../services/orderRestockManagerService';
 import { vehicleService } from '../../services/vehicleService';
 import warehouseService from '../../services/warehouseService';
@@ -113,14 +112,12 @@ const OrderManagementScreen = ({ navigation }) => {
   // Build a deterministic key from available list fields to help resolve id-less items
   const buildOrderKey = (orderLike) => {
     if (!orderLike) return 'null';
-    const qty = orderLike.quantity ?? '';
-    const basePrice = orderLike.basePrice ?? '';
-    const wholesalePrice = orderLike.wholesalePrice ?? '';
-    const subtotal = orderLike.subtotal ?? '';
-    const finalPrice = orderLike.finalPrice ?? '';
+    const qty = orderLike.itemsQuantity ?? orderLike.quantity ?? '';
+    const total = orderLike.total ?? orderLike.subtotal ?? '';
     const status = orderLike.status ?? '';
     const orderAt = orderLike.orderAt ? new Date(orderLike.orderAt).toISOString() : '';
-    return `q=${qty}|bp=${basePrice}|wp=${wholesalePrice}|fp=${finalPrice}|sub=${subtotal}|st=${status}|at=${orderAt}`;
+    const orderId = orderLike.id ?? '';
+    return `id=${orderId}|q=${qty}|total=${total}|st=${status}|at=${orderAt}`;
   };
 
   // Load vehicle names from Catalog and aggregate per name
@@ -465,12 +462,11 @@ const OrderManagementScreen = ({ navigation }) => {
       return;
     }
 
-    if (!newOrder.warehouseId || !newOrder.motorbikeId) {
-      console.warn('⚠️ [OrderManagement] Thiếu thông tin bắt buộc: warehouseId/motorbikeId', {
-        warehouseId: newOrder.warehouseId,
+    if (!newOrder.motorbikeId) {
+      console.warn('⚠️ [OrderManagement] Thiếu thông tin bắt buộc: motorbikeId', {
         motorbikeId: newOrder.motorbikeId,
       });
-      showError('Error', 'Please select Warehouse and Motorbike');
+      showError('Error', 'Please select Motorbike');
       setCreating(false);
       return;
     }
@@ -490,24 +486,24 @@ const OrderManagementScreen = ({ navigation }) => {
 
     try {
       console.log('🚀 [OrderManagement] Bắt đầu gọi API tạo đơn...');
+      // API expects: { orderItems: [{ quantity, motorbikeId, colorId, discountId?, promotionId? }], agencyId }
       const orderRestockData = {
-        quantity: parseInt(newOrder.quantity) || 0,
-        warehouseId: parseInt(newOrder.warehouseId) || 0,
-        motorbikeId: parseInt(newOrder.motorbikeId) || 0,
-        colorId: parseInt(newOrder.colorId) || 1,
         agencyId: parseInt(newOrder.agencyId || user?.agencyId) || 0,
+        orderItems: [
+          {
+            quantity: parseInt(newOrder.quantity) || 0,
+            motorbikeId: parseInt(newOrder.motorbikeId) || 0,
+            colorId: parseInt(newOrder.colorId) || 1,
+            ...(newOrder.discountId ? { discountId: parseInt(newOrder.discountId) } : {}),
+            ...(newOrder.promotionId ? { promotionId: parseInt(newOrder.promotionId) } : {}),
+          }
+        ]
       };
-      if (newOrder.discountId) {
-        orderRestockData.discountId = parseInt(newOrder.discountId);
-      }
-      if (newOrder.promotionId) {
-        orderRestockData.promotionId = parseInt(newOrder.promotionId);
-      }
 
       console.log('Creating order restock with data:', orderRestockData);
 
-      // Call the order-restock API
-      const response = await orderService.createOrderRestock(orderRestockData);
+      // Call the order-restock API using orderRestockManagerService
+      const response = await orderRestockManagerService.createOrderRestock(orderRestockData);
       
       console.log('📦 [OrderManagement] Create order response:', {
         success: response.success,
@@ -524,8 +520,8 @@ const OrderManagementScreen = ({ navigation }) => {
         console.log('📦 [OrderManagement] Order created:', {
           orderId,
           status: orderData.status,
-          quantity: orderData.quantity,
-          subtotal: orderData.subtotal,
+          itemsQuantity: orderData.itemsQuantity,
+          total: orderData.total,
           orderDataKeys: Object.keys(orderData),
           responseOrderId: response.orderId,
           orderDataId: orderData.id,
@@ -741,43 +737,13 @@ const OrderManagementScreen = ({ navigation }) => {
 
         <View style={styles.orderDetails}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Quantity:</Text>
-            <Text style={styles.detailValue}>{order.itemQuantity || order.orderItems?.[0]?.quantity || 0} units</Text>
+            <Text style={styles.detailLabel}>Item Quantity:</Text>
+            <Text style={styles.detailValue}>{order.itemQuantity || order.orderItems?.length || 0} items</Text>
           </View>
-          {order.orderItems?.[0] && (
-            <>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Base Price:</Text>
-                <Text style={styles.detailValue}>{formatPrice(order.orderItems[0].basePrice || 0)}</Text>
-              </View>
-              {order.orderItems[0].discountTotal > 0 && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Discount:</Text>
-                  <Text style={[styles.detailValue, { color: COLORS.ERROR }]}>
-                    -{formatPrice(order.orderItems[0].discountTotal || 0)}
-                  </Text>
-                </View>
-              )}
-              {order.orderItems[0].promotionTotal > 0 && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Promotion:</Text>
-                  <Text style={[styles.detailValue, { color: COLORS.SUCCESS }]}>
-                    -{formatPrice(order.orderItems[0].promotionTotal || 0)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Final Price:</Text>
-                <Text style={[styles.detailValue, { fontWeight: 'bold' }]}>
-                  {formatPrice(order.orderItems[0].finalPrice || 0)}
-                </Text>
-              </View>
-            </>
-          )}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total:</Text>
             <Text style={[styles.detailValue, styles.priceValue]}>
-              {formatPrice(order.subtotal || 0)}
+              {formatPrice(order.total || 0)}
             </Text>
           </View>
         </View>
@@ -911,33 +877,7 @@ const OrderManagementScreen = ({ navigation }) => {
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Warehouse *</Text>
-            <View style={styles.vehicleSelector}>
-              {warehouses.length > 0 ? (
-                warehouses.map((wh) => (
-                  <TouchableOpacity
-                    key={wh.id}
-                    style={[
-                      styles.vehicleOption,
-                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOption
-                    ]}
-                    onPress={() => setNewOrder({ ...newOrder, warehouseId: String(wh.id) })}
-                  >
-                    <Text style={[
-                      styles.vehicleOptionText,
-                      newOrder.warehouseId === String(wh.id) && styles.selectedVehicleOptionText
-                    ]}>
-                      {wh.name || wh.location || `Warehouse`}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.noOptionsText}>Loading warehouses...</Text>
-              )}
-            </View>
-          </View>
-
+          {/* Warehouse is determined by backend, not sent in request */}
           {/* Đại lý: không cần hiển thị vì tự lấy từ user.agencyId */}
 
           <View style={styles.inputGroup}>
