@@ -169,9 +169,48 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         setOrders(sortedOrders);
         setPaginationInfo(response.paginationInfo || { page: 1, limit: 1000, total: sortedOrders.length });
         
-        // Load details for all orders in parallel (especially for APPROVED orders to check warehouse)
+        // Try to extract warehouse and motorbike info from orderItems in list response first
+        const newDetailsCache = {};
+        const newFullDataCache = {};
+        
+        sortedOrders.forEach(order => {
+          if (order.orderItems && order.orderItems.length > 0) {
+            const firstItem = order.orderItems[0];
+            // If orderItems already have warehouse and motorbike info, use it
+            if (firstItem.warehouse?.name || firstItem.electricMotorbike?.name) {
+              newDetailsCache[order.id] = {
+                warehouseName: firstItem.warehouse?.name || null,
+                motorbikeName: firstItem.electricMotorbike?.name || null,
+              };
+              // Also cache full order data if available
+              newFullDataCache[order.id] = order;
+            }
+          }
+        });
+        
+        // Update cache with info from list response
+        if (Object.keys(newDetailsCache).length > 0) {
+          setOrderDetailsCache(prev => ({ ...prev, ...newDetailsCache }));
+        }
+        if (Object.keys(newFullDataCache).length > 0) {
+          setOrderFullDataCache(prev => ({ ...prev, ...newFullDataCache }));
+        }
+        
+        // Load details for orders that don't have complete info from list response
         const detailPromises = sortedOrders
-          .filter(order => order.status === 'APPROVED') // Only load detail for APPROVED orders to check warehouse
+          .filter(order => {
+            // Skip if we already have the info from list response
+            if (newDetailsCache[order.id]?.warehouseName && newDetailsCache[order.id]?.motorbikeName) {
+              return false;
+            }
+            // Also check existing cache
+            const existingCache = orderDetailsCache[order.id];
+            if (existingCache?.warehouseName && existingCache?.motorbikeName) {
+              return false;
+            }
+            // Load detail for all orders that don't have complete info
+            return true;
+          })
           .map(order => loadOrderDetail(order.id));
         await Promise.all(detailPromises);
       } else {
@@ -400,7 +439,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Quantity:</Text>
+          <Text style={styles.detailLabel}>Item Quantity:</Text>
           <Text style={styles.detailValue}>{order.itemQuantity || 0} units</Text>
         </View>
         <View style={styles.detailRow}>
