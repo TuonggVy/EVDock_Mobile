@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, Car, CarFront, Gift, Bus, CircleDollarSign, CreditCard, NotepadText, WalletCards, Building2, Users, PackageOpen, SquareChartGantt } from 'lucide-react-native';
+import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, Car, CarFront, Gift, Bus, CircleDollarSign, CreditCard, NotepadText, WalletCards, Building2, Users, PackageOpen } from 'lucide-react-native';
 import useUserProfile from '../../hooks/useUserProfile';
 
 const { width } = Dimensions.get('window');
@@ -146,12 +146,6 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <PackageOpen color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('StockManagement'),
-    },
-    {
-      title: 'Ap Batches Management',
-      gradient: ['#302F32', '#302F32', '#302F32'],
-      icon: <SquareChartGantt color="#A1D9FF" size={60} />,
-      onPress: () => navigation.navigate('AgencyBatchManagement'),
     },
     {
       title: 'Reports',
