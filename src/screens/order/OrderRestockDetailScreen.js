@@ -366,7 +366,47 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
             color: COLORS.PRIMARY,
             fontWeight: '600'
           })}
+          {order.orderPayments && order.orderPayments.length > 0 && (
+            <>
+              {renderInfoRow('Total Payments', formatPrice(order.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)), {
+                color: COLORS.SUCCESS,
+                fontWeight: '600'
+              })}
+              {order.total && (
+                renderInfoRow('Remaining', formatPrice(order.total - order.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)), {
+                  color: order.total - order.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0) > 0 ? COLORS.WARNING : COLORS.SUCCESS,
+                  fontWeight: '600'
+                })
+              )}
+            </>
+          )}
         </View>
+
+        {/* Order Payments */}
+        {order.orderPayments && order.orderPayments.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment History ({order.orderPayments.length})</Text>
+            {[...order.orderPayments]
+              .sort((a, b) => {
+                // Sort by payAt date (newest first)
+                const dateA = new Date(a.payAt || 0);
+                const dateB = new Date(b.payAt || 0);
+                return dateB - dateA;
+              })
+              .map((payment, index) => (
+                <View key={payment.id || index} style={styles.paymentItemContainer}>
+                  <Text style={styles.paymentItemTitle}>Payment #{index + 1}</Text>
+                  {renderInfoRow('Invoice Number', payment.invoiceNumber || 'N/A')}
+                  {renderInfoRow('Amount', formatPrice(payment.amount), {
+                    color: COLORS.SUCCESS,
+                    fontWeight: '600'
+                  })}
+                  {renderInfoRow('Payment Date', formatDate(payment.payAt))}
+                  {payment.id && renderInfoRow('Payment ID', payment.id.toString())}
+                </View>
+              ))}
+          </View>
+        )}
 
         {/* Actions Section */}
         <View style={styles.actionsSection}>
@@ -605,6 +645,18 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: ACCENT_COLOR,
     fontWeight: '600',
+  },
+  paymentItemContainer: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  paymentItemTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: ACCENT_COLOR,
+    marginBottom: SIZES.PADDING.SMALL,
   },
 });
 
