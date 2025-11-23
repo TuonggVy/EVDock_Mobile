@@ -27,7 +27,8 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   const [warehouses, setWarehouses] = useState([]);
   const [motorbikes, setMotorbikes] = useState([]);
   const [motorbikeColors, setMotorbikeColors] = useState([]);
-  const [promotions, setPromotions] = useState([]);
+  const [generalPromotions, setGeneralPromotions] = useState([]); // Promotions for all motorbikes
+  const [motorbikePromotions, setMotorbikePromotions] = useState([]); // Promotions for specific motorbike
   const [allDiscounts, setAllDiscounts] = useState([]);
   const [discounts, setDiscounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,26 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   useEffect(() => {
     if (orderItem.motorbikeId) {
       fetchMotorbikeColors();
+      fetchMotorbikePromotions();
+      
+      // Clear promotion only if it's motorbike-specific (not in general promotions)
+      // General promotions work for all motorbikes, so keep them selected
+      if (orderItem.promotionId) {
+        const isGeneralPromotion = generalPromotions.some(p => String(p.id) === String(orderItem.promotionId));
+        if (!isGeneralPromotion) {
+          // It's a motorbike-specific promotion, clear it when motorbike changes
+          setOrderItem(prev => ({ ...prev, promotionId: '' }));
+        }
+      }
+    } else {
+      setMotorbikePromotions([]);
+      // Clear motorbike-specific promotions when no motorbike is selected
+      if (orderItem.promotionId) {
+        const isGeneralPromotion = generalPromotions.some(p => String(p.id) === String(orderItem.promotionId));
+        if (!isGeneralPromotion) {
+          setOrderItem(prev => ({ ...prev, promotionId: '' }));
+        }
+      }
     }
   }, [orderItem.motorbikeId]);
 
@@ -65,7 +86,8 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   useEffect(() => {
     // Clear promotion if it becomes incompatible
     if (!orderItem.promotionId) return;
-    const selectedPromo = promotions.find(p => String(p.id) === String(orderItem.promotionId));
+    const allPromotions = [...generalPromotions, ...motorbikePromotions];
+    const selectedPromo = allPromotions.find(p => String(p.id) === String(orderItem.promotionId));
     if (!selectedPromo) return;
     const now = new Date();
     const withinTime = (!selectedPromo.startAt || new Date(selectedPromo.startAt) <= now)
@@ -78,7 +100,7 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     if (!withinTime || !motorbikeOk) {
       setOrderItem(prev => ({ ...prev, promotionId: '' }));
     }
-  }, [orderItem.motorbikeId, orderItem.promotionId, promotions]);
+  }, [orderItem.motorbikeId, orderItem.promotionId, generalPromotions, motorbikePromotions]);
 
   const loadOptions = async () => {
     try {
@@ -103,7 +125,7 @@ const CreateOrderRestockScreen = ({ navigation }) => {
         setMotorbikes(motorbikesResponse.data || []);
       }
 
-      // Load promotions
+      // Load general promotions (for all motorbikes)
       const promotionsResponse = await promotionService.getAgencyPromotions(1, 100);
       if (promotionsResponse.success) {
         const now = new Date();
@@ -115,7 +137,7 @@ const CreateOrderRestockScreen = ({ navigation }) => {
           const endOk = !endInclusive || endInclusive >= now;
           return statusOk && startOk && endOk;
         });
-        setPromotions(activePromos);
+        setGeneralPromotions(activePromos);
       }
 
       // Load discounts
@@ -161,6 +183,37 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     }
   };
 
+  const fetchMotorbikePromotions = async () => {
+    try {
+      if (!orderItem.motorbikeId) {
+        setMotorbikePromotions([]);
+        return;
+      }
+      const response = await promotionService.getAgencyPromotionsWithMotorbike(
+        parseInt(orderItem.motorbikeId),
+        1,
+        100
+      );
+      if (response.success) {
+        const now = new Date();
+        const activePromos = (response.data || []).filter(p => {
+          const statusOk = (p.status || 'ACTIVE') === 'ACTIVE';
+          const startOk = !p.startAt || new Date(p.startAt) <= now;
+          const endAt = p.endAt ? new Date(p.endAt) : null;
+          const endInclusive = endAt ? new Date(endAt.getTime() + 24*60*60*1000 - 1) : null;
+          const endOk = !endInclusive || endInclusive >= now;
+          return statusOk && startOk && endOk;
+        });
+        setMotorbikePromotions(activePromos);
+      } else {
+        setMotorbikePromotions([]);
+      }
+    } catch (e) {
+      console.error('Error loading promotions for motorbike:', e);
+      setMotorbikePromotions([]);
+    }
+  };
+
   const filterDiscounts = () => {
     if (!allDiscounts) return;
     const now = new Date();
@@ -192,7 +245,8 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     const motorbike = motorbikes.find(mb => String(mb.id) === String(orderItem.motorbikeId));
     const color = motorbikeColors.find(c => String(c.id) === String(orderItem.colorId));
     const discount = discounts.find(d => String(d.id) === String(orderItem.discountId));
-    const promotion = promotions.find(p => String(p.id) === String(orderItem.promotionId));
+    const allPromotions = [...generalPromotions, ...motorbikePromotions];
+    const promotion = allPromotions.find(p => String(p.id) === String(orderItem.promotionId));
 
     // Create item object with display info
     const newItem = {
@@ -509,29 +563,85 @@ const CreateOrderRestockScreen = ({ navigation }) => {
                     None
                   </Text>
                 </TouchableOpacity>
-                {promotions.length > 0 ? (
-                  promotions
-                    .filter(p => !p.motorbikeId || String(p.motorbikeId) === String(orderItem.motorbikeId || ''))
-                    .map((promo) => (
-                      <TouchableOpacity
-                        key={promo.id}
-                        style={[
-                          styles.vehicleOption,
-                          orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
-                        ]}
-                        onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
-                      >
-                        <Text style={[
-                          styles.vehicleOptionText,
-                          orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
-                        ]}>
-                          {promo.name || `Promotion ${promo.id}`}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                ) : (
-                  <Text style={styles.noOptionsText}>Loading promotions...</Text>
-                )}
+                {(() => {
+                  const allPromotions = [...generalPromotions, ...motorbikePromotions];
+                  if (allPromotions.length > 0) {
+                    return (
+                      <>
+                        {/* General promotions (for all motorbikes) */}
+                        {generalPromotions.length > 0 && (
+                          <>
+                            {generalPromotions.map((promo) => (
+                              <TouchableOpacity
+                                key={`general-${promo.id}`}
+                                style={[
+                                  styles.vehicleOption,
+                                  styles.generalPromotionOption,
+                                  orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
+                                ]}
+                                onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
+                              >
+                                <View style={styles.promotionOptionContent}>
+                                  <Text style={[
+                                    styles.vehicleOptionText,
+                                    orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
+                                  ]}>
+                                    {promo.name || `Promotion ${promo.id}`}
+                                  </Text>
+                                  {promo.valueType && promo.value !== undefined && (
+                                    <Text style={styles.promotionValue}>
+                                      {promotionService.formatValue(promo.value, promo.valueType)}
+                                    </Text>
+                                  )}
+                                  <Text style={styles.promotionBadge}>All Motorbikes</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                        {/* Motorbike-specific promotions */}
+                        {motorbikePromotions.length > 0 && (
+                          <>
+                            {motorbikePromotions.map((promo) => (
+                              <TouchableOpacity
+                                key={`motorbike-${promo.id}`}
+                                style={[
+                                  styles.vehicleOption,
+                                  styles.motorbikePromotionOption,
+                                  orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
+                                ]}
+                                onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
+                              >
+                                <View style={styles.promotionOptionContent}>
+                                  <Text style={[
+                                    styles.vehicleOptionText,
+                                    orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
+                                  ]}>
+                                    {promo.name || `Promotion ${promo.id}`}
+                                  </Text>
+                                  {promo.valueType && promo.value !== undefined && (
+                                    <Text style={styles.promotionValue}>
+                                      {promotionService.formatValue(promo.value, promo.valueType)}
+                                    </Text>
+                                  )}
+                                  <Text style={styles.promotionBadge}>This Motorbike</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    );
+                  } else {
+                    return (
+                      <Text style={styles.noOptionsText}>
+                        {orderItem.motorbikeId 
+                          ? 'No promotions available for this motorbike' 
+                          : 'Select a motorbike to see available promotions'}
+                      </Text>
+                    );
+                  }
+                })()}
               </View>
             </View>
 
@@ -767,6 +877,31 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
+  },
+  promotionOptionContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  generalPromotionOption: {
+    borderColor: '#4CAF50',
+    borderWidth: 1.5,
+  },
+  motorbikePromotionOption: {
+    borderColor: '#FF9800',
+    borderWidth: 1.5,
+  },
+  promotionBadge: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  promotionValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#009DFF',
+    marginTop: 2,
+    fontWeight: '600',
   },
 });
 

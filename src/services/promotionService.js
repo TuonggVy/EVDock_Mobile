@@ -7,7 +7,7 @@ const API_BASE_URL = '';
 
 class PromotionService {
   // Get all promotions
-  async getAllPromotions(page = 1, limit = 10) {
+  async getAllPromotions(page = 1, limit = 1000) {
     try {
       console.log('🔄 [PromotionService] Fetching promotions:', { page, limit });
       const response = await axiosInstance.get(`${API_BASE_URL}/promotion/list`, {
@@ -164,8 +164,8 @@ class PromotionService {
     }
   }
 
-  // Get promotions for agency (dealer view)
-  async getAgencyPromotions(page = 1, limit = 10) {
+  // Get promotions for agency (dealer view) - general promotions (for all motorbikes)
+  async getAgencyPromotions(page = 1, limit = 1000) {
     try {
       const response = await axiosInstance.get(`${API_BASE_URL}/promotion/agency/list`, {
         params: { page, limit }
@@ -183,6 +183,37 @@ class PromotionService {
         error: error.response?.data?.message || 'Failed to fetch agency promotions',
         data: [],
         message: 'Failed to fetch agency promotions'
+      };
+    }
+  }
+
+  // Get promotions for agency with specific motorbike
+  async getAgencyPromotionsWithMotorbike(motorbikeId, page = 1, limit = 1000) {
+    try {
+      if (!motorbikeId) {
+        return {
+          success: false,
+          error: 'motorbikeId is required',
+          data: [],
+          message: 'motorbikeId is required'
+        };
+      }
+      const response = await axiosInstance.get(`${API_BASE_URL}/promotion/agency/list/with-motorbike/${motorbikeId}`, {
+        params: { page, limit }
+      });
+      return {
+        success: true,
+        data: response.data.data || [],
+        pagination: response.data.paginationInfo,
+        message: response.data.message || 'Get promotion list for agency with motorbike successfully!'
+      };
+    } catch (error) {
+      console.error('Error fetching agency promotions with motorbike:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to fetch agency promotions with motorbike',
+        data: [],
+        message: 'Failed to fetch agency promotions with motorbike'
       };
     }
   }
