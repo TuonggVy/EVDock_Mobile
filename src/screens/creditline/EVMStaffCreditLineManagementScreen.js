@@ -76,7 +76,33 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
       if (response.success) {
         // Sort credit lines by ID descending (newest first)
         const sortedData = [...response.data].sort((a, b) => (b.id || 0) - (a.id || 0));
-        setCreditLines(sortedData);
+        
+        // Fetch detail for each credit line to get agency information
+        const creditLinesWithAgency = await Promise.all(
+          sortedData.map(async (creditLine) => {
+            // If agency info already exists, use it
+            if (creditLine.agency?.name) {
+              return creditLine;
+            }
+            
+            // Otherwise, fetch detail to get agency info
+            try {
+              const detailResponse = await creditLineService.getCreditLineDetail(creditLine.id);
+              if (detailResponse.success && detailResponse.data) {
+                return {
+                  ...creditLine,
+                  agency: detailResponse.data.agency || creditLine.agency
+                };
+              }
+            } catch (error) {
+              console.warn(`⚠️ Failed to fetch detail for credit line ${creditLine.id}:`, error);
+            }
+            
+            return creditLine;
+          })
+        );
+        
+        setCreditLines(creditLinesWithAgency);
         if (response.pagination) {
           setTotalPages(Math.ceil(response.pagination.totalItems / response.pagination.limit));
         }
@@ -373,6 +399,12 @@ const EVMStaffCreditLineManagementScreen = ({ navigation }) => {
                     <Text style={styles.detailLabel}>Credit Limit:</Text>
                     <Text style={styles.detailValue}>
                       {creditLineService.formatCreditLimit(creditLine.creditLimit)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Current Debt:</Text>
+                    <Text style={styles.detailValue}>
+                      {creditLineService.formatCreditLimit(creditLine.currentDebt || 0)}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
