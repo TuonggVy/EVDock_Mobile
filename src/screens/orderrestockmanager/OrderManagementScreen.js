@@ -89,25 +89,6 @@ const OrderManagementScreen = ({ navigation }) => {
     return 0;
   };
 
-  // Check if order is completed (fully paid)
-  const isOrderCompleted = (order) => {
-    if (!order) return false;
-    const totalPaid = getTotalPaidAmount(order);
-    const finalPrice = getTotalAmount(order);
-    // Use a small epsilon for floating point comparison
-    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
-  };
-
-  // Get display status - show COMPLETED if fully paid, otherwise use actual status
-  const getDisplayStatus = (order) => {
-    if (!order) return null;
-    // If order is fully paid, show as COMPLETED
-    if (isOrderCompleted(order)) {
-      return 'COMPLETED';
-    }
-    return order.status;
-  };
-
   const statusCounts = useMemo(() => {
     const baseCounts = {
       ALL: 0,
@@ -121,12 +102,12 @@ const OrderManagementScreen = ({ navigation }) => {
 
     return orders.reduce((acc, order) => {
       acc.ALL += 1;
-      const displayStatus = getDisplayStatus(order);
-      if (displayStatus) {
-        if (Object.prototype.hasOwnProperty.call(acc, displayStatus)) {
-          acc[displayStatus] += 1;
+      const status = order.status;
+      if (status) {
+        if (Object.prototype.hasOwnProperty.call(acc, status)) {
+          acc[status] += 1;
         } else {
-          acc[displayStatus] = (acc[displayStatus] || 0) + 1;
+          acc[status] = (acc[status] || 0) + 1;
         }
       }
       return acc;
@@ -487,25 +468,15 @@ const OrderManagementScreen = ({ navigation }) => {
     let list = [...orders];
 
     if (activeStatusFilter !== 'ALL') {
-      if (activeStatusFilter === 'COMPLETED') {
-        // Filter for completed orders (fully paid)
-        list = list.filter(order => isOrderCompleted(order));
-      } else {
-        // For other statuses, filter by display status
-        list = list.filter(order => {
-          const displayStatus = getDisplayStatus(order);
-          return displayStatus === activeStatusFilter;
-        });
-      }
+      list = list.filter(order => order.status === activeStatusFilter);
     }
 
     if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase();
       list = list.filter(order => {
-        const displayStatus = getDisplayStatus(order);
         return (
           order.id?.toString().toLowerCase().includes(searchLower) ||
-          displayStatus?.toLowerCase().includes(searchLower)
+          order.status?.toLowerCase().includes(searchLower)
         );
       });
     }
@@ -719,16 +690,14 @@ const OrderManagementScreen = ({ navigation }) => {
     }
   };
 
-  // Get status color for an order (considering completed status)
+  // Get status color for an order
   const getOrderStatusColor = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusColor(displayStatus);
+    return getStatusColor(order?.status);
   };
 
-  // Get status text for an order (considering completed status)
+  // Get status text for an order
   const getOrderStatusText = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusText(displayStatus);
+    return getStatusText(order?.status);
   };
 
   // Get motorbike name(s) from order

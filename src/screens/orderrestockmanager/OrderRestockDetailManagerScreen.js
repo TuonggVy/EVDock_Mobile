@@ -193,25 +193,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     return 0;
   };
 
-  // Check if order is completed (fully paid)
-  const isOrderCompleted = (order) => {
-    if (!order) return false;
-    const totalPaid = getTotalPaidAmount(order);
-    const finalPrice = getTotalAmount(order);
-    // Use a small epsilon for floating point comparison
-    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
-  };
-
-  // Get display status - show COMPLETED if fully paid, otherwise use actual status
-  const getDisplayStatus = (order) => {
-    if (!order) return null;
-    // If order is fully paid, show as COMPLETED
-    if (isOrderCompleted(order)) {
-      return 'COMPLETED';
-    }
-    return order.status;
-  };
-
   const getStatusColor = (status) => {
     const statusOption = orderStatuses.find(s => s.key === status);
     return statusOption ? statusOption.color : COLORS.TEXT.SECONDARY;
@@ -222,16 +203,14 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     return statusOption ? statusOption.label : status;
   };
 
-  // Get status color for an order (considering completed status)
+  // Get status color for an order
   const getOrderStatusColor = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusColor(displayStatus);
+    return getStatusColor(order?.status);
   };
 
-  // Get status label for an order (considering completed status)
+  // Get status label for an order
   const getOrderStatusLabel = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusLabel(displayStatus);
+    return getStatusLabel(order?.status);
   };
 
   const formatPrice = (price) => {
@@ -744,10 +723,6 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {order && (() => {
-        // Check if order is completed using helper function
-        const completed = isOrderCompleted(order);
-        const displayStatus = getDisplayStatus(order);
-        
         return (
           <View style={styles.fixedActionsContainer}>
             {order.status === 'DRAFT' ? (
@@ -798,7 +773,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                   <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
                 </TouchableOpacity>
               </>
-            ) : order.status === 'DELIVERED' && !completed ? (
+            ) : order.status === 'DELIVERED' && order.status !== 'COMPLETED' ? (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handlePayment}

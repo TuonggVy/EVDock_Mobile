@@ -157,7 +157,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
   // Get the next status based on current status
   const getNextStatus = () => {
     // Don't show next status button for completed or canceled orders
-    if (isOrderCompleted(order) || order?.status === 'CANCELED' || order?.status === 'COMPLETED') {
+    if (order?.status === 'CANCELED' || order?.status === 'COMPLETED') {
       return null;
     }
 
@@ -227,25 +227,6 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     return order.total || 0;
   };
 
-  // Check if order is completed (fully paid)
-  const isOrderCompleted = (order) => {
-    if (!order) return false;
-    const totalPaid = getTotalPaidAmount(order);
-    const finalPrice = getTotalAmount(order);
-    // Use a small epsilon for floating point comparison
-    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
-  };
-
-  // Get display status - show COMPLETED if fully paid, otherwise use actual status
-  const getDisplayStatus = (order) => {
-    if (!order) return null;
-    // If order is fully paid, show as COMPLETED
-    if (isOrderCompleted(order)) {
-      return 'COMPLETED';
-    }
-    return order.status;
-  };
-
   const getStatusColor = (status) => {
     const statusOption = orderStatuses.find(s => s.key === status);
     return statusOption ? statusOption.color : COLORS.TEXT.SECONDARY;
@@ -256,16 +237,14 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     return statusOption ? statusOption.label : status;
   };
 
-  // Get status color for an order (considering completed status)
+  // Get status color for an order
   const getOrderStatusColor = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusColor(displayStatus);
+    return getStatusColor(order?.status);
   };
 
-  // Get status label for an order (considering completed status)
+  // Get status label for an order
   const getOrderStatusLabel = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusLabel(displayStatus);
+    return getStatusLabel(order?.status);
   };
 
   const formatPrice = (price) => {
@@ -478,7 +457,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           )}
           
-          {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && !isOrderCompleted(order) && (
+          {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && (
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton]}
               onPress={handleCancelOrder}
