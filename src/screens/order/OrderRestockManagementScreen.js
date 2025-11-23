@@ -175,7 +175,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         const newFullDataCache = {};
         
         sortedOrders.forEach(order => {
-          // Always cache full order data (including payment info) for completed status check
+          // Cache full order data (including payment info)
           newFullDataCache[order.id] = order;
           
           if (order.orderItems && order.orderItems.length > 0) {
@@ -296,24 +296,6 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     return 0;
   };
 
-  // Check if order is completed (fully paid)
-  const isOrderCompleted = (order) => {
-    const fullOrderData = orderFullDataCache[order.id] || order;
-    const totalPaid = getTotalPaidAmount(order);
-    const finalPrice = fullOrderData.total || order.total || 0;
-    // Use a small epsilon for floating point comparison
-    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
-  };
-
-  // Get display status - show COMPLETED if fully paid, otherwise use actual status
-  const getDisplayStatus = (order) => {
-    // If order is fully paid, show as COMPLETED
-    if (isOrderCompleted(order)) {
-      return 'COMPLETED';
-    }
-    return order.status;
-  };
-
   const filterOrders = () => {
     // First filter out DRAFT orders
     let filtered = orders.filter(order => order.status !== 'DRAFT');
@@ -335,16 +317,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
     // Filter by status
     if (selectedStatus !== 'all') {
-      if (selectedStatus === 'COMPLETED') {
-        // Filter for completed orders (fully paid)
-        filtered = filtered.filter(order => isOrderCompleted(order));
-      } else {
-        // For other statuses, filter by actual status but exclude completed orders
-        filtered = filtered.filter(order => {
-          const displayStatus = getDisplayStatus(order);
-          return displayStatus === selectedStatus;
-        });
-      }
+      filtered = filtered.filter(order => order.status === selectedStatus);
     }
 
     setFilteredOrders(filtered);
@@ -368,7 +341,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   // Get the next status based on current status
   const getNextStatus = (order) => {
     // Don't show next status button for completed or canceled orders
-    if (isOrderCompleted(order) || order?.status === 'CANCELED' || order?.status === 'COMPLETED') {
+    if (order?.status === 'CANCELED' || order?.status === 'COMPLETED') {
       return null;
     }
 
@@ -436,16 +409,14 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     return statusOption ? statusOption.label : status;
   };
 
-  // Get status color for an order (considering completed status)
+  // Get status color for an order
   const getOrderStatusColor = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusColor(displayStatus);
+    return getStatusColor(order?.status);
   };
 
-  // Get status label for an order (considering completed status)
+  // Get status label for an order
   const getOrderStatusLabel = (order) => {
-    const displayStatus = getDisplayStatus(order);
-    return getStatusLabel(displayStatus);
+    return getStatusLabel(order?.status);
   };
 
   const formatPrice = (price) => {
@@ -527,7 +498,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
         
-        {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && !isOrderCompleted(order) && (
+        {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.secondaryActionButton]}
             onPress={(e) => {
@@ -546,17 +517,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   const totalOrders = orders.filter(o => o.status !== 'DRAFT').length;
   const statusCounts = orderStatuses.reduce((acc, status) => {
     if (status.key !== 'all') {
-      if (status.key === 'COMPLETED') {
-        // Count completed orders (fully paid)
-        acc[status.key] = orders.filter(o => o.status !== 'DRAFT' && isOrderCompleted(o)).length;
-      } else {
-        // For other statuses, count by actual status but exclude completed orders
-        acc[status.key] = orders.filter(o => {
-          if (o.status === 'DRAFT') return false;
-          const displayStatus = getDisplayStatus(o);
-          return displayStatus === status.key;
-        }).length;
-      }
+      acc[status.key] = orders.filter(o => o.status !== 'DRAFT' && o.status === status.key).length;
     }
     return acc;
   }, {});
