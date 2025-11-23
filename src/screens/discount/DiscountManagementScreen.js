@@ -14,8 +14,6 @@ import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { discountService } from '../../services/discountService';
-import motorbikeService from '../../services/motorbikeService';
-import agencyService from '../../services/agencyService';
 import {
   ArrowLeft,
   Plus,
@@ -39,15 +37,11 @@ const DiscountManagementScreen = ({ navigation }) => {
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'ACTIVE', 'INACTIVE'
   const [filterType, setFilterType] = useState('all'); // 'all', 'VOLUME', 'SPECIAL'
   const [loading, setLoading] = useState(false);
-  const [agencies, setAgencies] = useState([]);
-  const [motorbikes, setMotorbikes] = useState([]);
 
   const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
   useEffect(() => {
     loadDiscounts();
-    loadAgencies();
-    loadMotorbikes();
   }, []);
 
   useEffect(() => {
@@ -76,28 +70,13 @@ const DiscountManagementScreen = ({ navigation }) => {
     }
   };
 
-  const loadAgencies = async () => {
-    try {
-      const result = await agencyService.getAgencies({ limit: 100 });
-      setAgencies(result?.data || []);
-    } catch (error) {
-      console.error('Error loading agencies:', error);
-    }
-  };
-
-  const loadMotorbikes = async () => {
-    try {
-      const response = await motorbikeService.getAllMotorbikes({ limit: 100 });
-      if (response.success && Array.isArray(response.data)) {
-        setMotorbikes(response.data);
-      }
-    } catch (error) {
-      console.error('Error loading motorbikes:', error);
-    }
-  };
 
   const handleAddDiscount = () => {
     navigation.navigate('AddDiscount');
+  };
+
+  const handleViewDetail = (discount) => {
+    navigation.navigate('DiscountDetail', { discount });
   };
 
   const handleEditDiscount = (discount) => {
@@ -137,13 +116,15 @@ const DiscountManagementScreen = ({ navigation }) => {
     { value: 'SPECIAL', label: 'Special' },
   ];
 
-  const filteredDiscounts = discounts.filter((discount) => {
-    const matchesSearch = discount.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      discount.type.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || discount.status === filterStatus;
-    const matchesType = filterType === 'all' || discount.type === filterType;
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  const filteredDiscounts = discounts
+    .filter((discount) => {
+      const matchesSearch = discount.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        discount.type.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || discount.status === filterStatus;
+      const matchesType = filterType === 'all' || discount.type === filterType;
+      return matchesSearch && matchesStatus && matchesType;
+    })
+    .sort((a, b) => b.id - a.id); // Sort by ID descending (newest first)
 
   const totalDiscounts = discounts.length;
   const activeDiscounts = discounts.filter(discount => discount.status === 'ACTIVE').length;
@@ -164,7 +145,12 @@ const DiscountManagementScreen = ({ navigation }) => {
         : `${numericValue.toLocaleString('vi-VN')} VND`;
 
     return (
-      <View key={discount.id} style={styles.discountCard}>
+      <TouchableOpacity
+        key={discount.id}
+        style={styles.discountCard}
+        onPress={() => handleViewDetail(discount)}
+        activeOpacity={0.7}
+      >
         <View style={styles.cardHeader}>
           <View style={styles.discountInfo}>
             <Text style={styles.discountName}>{discount.name}</Text>
@@ -214,25 +200,25 @@ const DiscountManagementScreen = ({ navigation }) => {
             </View>
             <Text style={styles.detailValue}>{formatDate(discount.endAt)}</Text>
           </View>
-          {discount.agencyId && (
+          {discount.agency && (
             <View style={styles.detailRow}>
               <View style={styles.detailLabelWrapper}>
                 <Building2 size={14} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.detailLabel}>Agency</Text>
               </View>
               <Text style={styles.detailValue}>
-                {agencies.find(a => a.id === discount.agencyId)?.name || `ID: ${discount.agencyId}`}
+                {discount.agency.name}
               </Text>
             </View>
           )}
-          {discount.motorbikeId && (
+          {discount.motorbike && (
             <View style={styles.detailRow}>
               <View style={styles.detailLabelWrapper}>
                 <Bike size={14} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.detailLabel}>Motorbike</Text>
               </View>
               <Text style={styles.detailValue}>
-                {motorbikes.find(b => b.id === discount.motorbikeId)?.name || `ID: ${discount.motorbikeId}`}
+                {discount.motorbike.name}
               </Text>
             </View>
           )}
@@ -252,7 +238,7 @@ const DiscountManagementScreen = ({ navigation }) => {
             <Trash2 size={16} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
