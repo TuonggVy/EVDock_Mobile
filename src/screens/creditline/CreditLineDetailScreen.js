@@ -190,6 +190,12 @@ const CreditLineDetailScreen = ({ navigation, route }) => {
               </Text>
             </View>
             <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Current Debt</Text>
+              <Text style={[styles.infoValue, styles.highlightValue]}>
+                {creditLineService.formatCreditLimit(creditLine.currentDebt || 0)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Warning Threshold</Text>
               <Text style={styles.infoValue}>{creditLine.warningThreshold}%</Text>
             </View>
