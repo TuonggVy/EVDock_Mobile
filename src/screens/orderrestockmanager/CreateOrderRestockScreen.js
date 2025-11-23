@@ -29,8 +29,9 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   const [motorbikeColors, setMotorbikeColors] = useState([]);
   const [generalPromotions, setGeneralPromotions] = useState([]); // Promotions for all motorbikes
   const [motorbikePromotions, setMotorbikePromotions] = useState([]); // Promotions for specific motorbike
-  const [allDiscounts, setAllDiscounts] = useState([]);
-  const [discounts, setDiscounts] = useState([]);
+  const [agencyDiscounts, setAgencyDiscounts] = useState([]); // Agency-specific discounts
+  const [systemDiscounts, setSystemDiscounts] = useState([]); // System-wide discounts for motorbike
+  const [discounts, setDiscounts] = useState([]); // Combined and filtered discounts
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   
@@ -80,8 +81,25 @@ const CreateOrderRestockScreen = ({ navigation }) => {
   }, [orderItem.motorbikeId]);
 
   useEffect(() => {
+    if (orderItem.motorbikeId) {
+      fetchSystemDiscounts();
+    } else {
+      setSystemDiscounts([]);
+    }
+  }, [orderItem.motorbikeId]);
+
+  useEffect(() => {
+    if (orderItem.motorbikeId) {
+      fetchAgencyDiscounts();
+    } else {
+      // Load all agency discounts when no motorbike selected
+      fetchAgencyDiscounts();
+    }
+  }, [orderItem.motorbikeId, user?.agencyId]);
+
+  useEffect(() => {
     filterDiscounts();
-  }, [orderItem.quantity, orderItem.motorbikeId, allDiscounts]);
+  }, [orderItem.quantity, orderItem.motorbikeId, agencyDiscounts, systemDiscounts]);
 
   useEffect(() => {
     // Clear promotion if it becomes incompatible
@@ -140,17 +158,7 @@ const CreateOrderRestockScreen = ({ navigation }) => {
         setGeneralPromotions(activePromos);
       }
 
-      // Load discounts
-      if (user?.agencyId) {
-        const discountsResponse = await discountService.getAgencyDiscounts(
-          parseInt(user.agencyId),
-          1,
-          200
-        );
-        if (discountsResponse.success) {
-          setAllDiscounts(discountsResponse.data || []);
-        }
-      }
+      // Agency discounts will be loaded by useEffect when component mounts
     } catch (error) {
       console.error('Error loading options:', error);
     } finally {
@@ -214,21 +222,81 @@ const CreateOrderRestockScreen = ({ navigation }) => {
     }
   };
 
+  const fetchAgencyDiscounts = async () => {
+    try {
+      if (!user?.agencyId) return;
+      
+      const motorbikeId = orderItem.motorbikeId ? parseInt(orderItem.motorbikeId) : undefined;
+      const response = await discountService.getAgencyDiscounts(
+        parseInt(user.agencyId),
+        1,
+        200,
+        undefined, // type
+        motorbikeId // motorbikeId filter
+      );
+      
+      if (response.success) {
+        setAgencyDiscounts(response.data || []);
+      } else {
+        console.warn('⚠️ [CreateOrderRestock] Cannot load agency discounts:', response.error);
+        setAgencyDiscounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading agency discounts:', error);
+      setAgencyDiscounts([]);
+    }
+  };
+
+  const fetchSystemDiscounts = async () => {
+    try {
+      if (!orderItem.motorbikeId) {
+        setSystemDiscounts([]);
+        return;
+      }
+      
+      const response = await discountService.getMotorbikeDiscounts(
+        parseInt(orderItem.motorbikeId),
+        1,
+        200
+      );
+      
+      if (response.success) {
+        setSystemDiscounts(response.data || []);
+      } else {
+        console.warn('⚠️ [CreateOrderRestock] Cannot load system discounts:', response.error);
+        setSystemDiscounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading system discounts:', error);
+      setSystemDiscounts([]);
+    }
+  };
+
   const filterDiscounts = () => {
-    if (!allDiscounts) return;
     const now = new Date();
     const qty = parseInt(orderItem.quantity) || 0;
     const selectedMotorbikeId = orderItem.motorbikeId ? Number(orderItem.motorbikeId) : null;
-    const filtered = (allDiscounts || []).filter(d => {
+    
+    // Combine agency and system discounts
+    const allDiscounts = [...agencyDiscounts, ...systemDiscounts];
+    
+    // Remove duplicates by ID (in case same discount appears in both lists)
+    const uniqueDiscounts = Array.from(
+      new Map(allDiscounts.map(d => [d.id, d])).values()
+    );
+    
+    const filtered = uniqueDiscounts.filter(d => {
       const statusOk = (d.status || 'ACTIVE') === 'ACTIVE';
       const startOk = !d.startAt || new Date(d.startAt) <= now;
       const dEnd = d.endAt ? new Date(d.endAt) : null;
       const endInclusive = dEnd ? new Date(dEnd.getTime() + 24*60*60*1000 - 1) : null;
       const endOk = !endInclusive || endInclusive >= now;
       const qtyOk = !d.min_quantity || qty === 0 || qty >= Number(d.min_quantity);
+      // For system discounts, motorbikeId should match. For agency discounts, motorbikeId filter is already applied by API
       const motorbikeOk = !d.motorbikeId || (selectedMotorbikeId && Number(d.motorbikeId) === selectedMotorbikeId);
       return statusOk && startOk && endOk && motorbikeOk && qtyOk;
     });
+    
     setDiscounts(filtered);
     if (orderItem.discountId && !filtered.find(d => String(d.id) === String(orderItem.discountId))) {
       setOrderItem(prev => ({ ...prev, discountId: '' }));
@@ -523,25 +591,55 @@ const CreateOrderRestockScreen = ({ navigation }) => {
                   </Text>
                 </TouchableOpacity>
                 {discounts.length > 0 ? (
-                  discounts.map((disc) => (
-                    <TouchableOpacity
-                      key={disc.id}
-                      style={[
-                        styles.vehicleOption,
-                        orderItem.discountId === String(disc.id) && styles.selectedVehicleOption
-                      ]}
-                      onPress={() => setOrderItem({ ...orderItem, discountId: String(disc.id) })}
-                    >
-                      <Text style={[
-                        styles.vehicleOptionText,
-                        orderItem.discountId === String(disc.id) && styles.selectedVehicleOptionText
-                      ]}>
-                        {disc.name || disc.description || `Discount ${disc.id}`}
-                      </Text>
-                    </TouchableOpacity>
-                  ))
+                  discounts.map((disc) => {
+                    // Check if discount is from system (priority) or agency
+                    const isSystemDiscount = systemDiscounts.some(sd => sd.id === disc.id);
+                    const isAgencyDiscount = !isSystemDiscount && agencyDiscounts.some(ad => ad.id === disc.id);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={disc.id}
+                        style={[
+                          styles.vehicleOption,
+                          isAgencyDiscount && styles.agencyDiscountOption,
+                          isSystemDiscount && styles.systemDiscountOption,
+                          orderItem.discountId === String(disc.id) && styles.selectedVehicleOption
+                        ]}
+                        onPress={() => setOrderItem({ ...orderItem, discountId: String(disc.id) })}
+                      >
+                        <View style={styles.discountOptionContent}>
+                          <Text style={[
+                            styles.vehicleOptionText,
+                            orderItem.discountId === String(disc.id) && styles.selectedVehicleOptionText
+                          ]}>
+                            {disc.name || disc.description || `Discount ${disc.id}`}
+                          </Text>
+                          {disc.valueType && disc.value !== undefined && (
+                            <Text style={styles.discountValue}>
+                              {promotionService.formatValue(disc.value, disc.valueType)}
+                            </Text>
+                          )}
+                          {disc.min_quantity && (
+                            <Text style={styles.discountMinQty}>
+                              Min: {disc.min_quantity} units
+                            </Text>
+                          )}
+                          {isAgencyDiscount && (
+                            <Text style={styles.discountBadge}>Agency Discount</Text>
+                          )}
+                          {isSystemDiscount && (
+                            <Text style={styles.discountBadge}>System Discount</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
                 ) : (
-                  <Text style={styles.noOptionsText}>No discount codes available</Text>
+                  <Text style={styles.noOptionsText}>
+                    {orderItem.motorbikeId 
+                      ? 'No discount codes available for this motorbike' 
+                      : 'Select a motorbike to see available discounts'}
+                  </Text>
                 )}
               </View>
             </View>
@@ -902,6 +1000,36 @@ const styles = StyleSheet.create({
     color: '#009DFF',
     marginTop: 2,
     fontWeight: '600',
+  },
+  discountOptionContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  agencyDiscountOption: {
+    borderColor: '#4CAF50',
+    borderWidth: 1.5,
+  },
+  systemDiscountOption: {
+    borderColor: '#FF9800',
+    borderWidth: 1.5,
+  },
+  discountBadge: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  discountValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#009DFF',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  discountMinQty: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 2,
   },
 });
 

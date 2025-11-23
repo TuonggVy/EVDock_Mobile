@@ -85,15 +85,19 @@ export const discountService = {
   },
 
   // Get discounts for a specific agency
-  getAgencyDiscounts: async (agencyId, page = 1, limit = 10, type) => {
+  getAgencyDiscounts: async (agencyId, page = 1, limit = 10, type, motorbikeId) => {
     try {
       await delay(300);
       if (!agencyId) {
         return { success: false, error: 'Thiếu agencyId', data: [] };
       }
-      console.log('🔄 [DiscountService] Fetching agency discounts:', { agencyId, page, limit, type });
+      console.log('🔄 [DiscountService] Fetching agency discounts:', { agencyId, page, limit, type, motorbikeId });
+      const params = { page, limit };
+      if (type) params.type = type;
+      if (motorbikeId) params.motorbikeId = motorbikeId;
+      
       const response = await axiosInstance.get(`/discount/agency/list/${agencyId}`, {
-        params: { page, limit, ...(type ? { type } : {}) }
+        params
       });
       console.log('✅ [DiscountService] Agency discounts fetched:', response.data);
       return {
