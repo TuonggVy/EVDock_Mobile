@@ -41,6 +41,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: COLORS.PRIMARY },
+    { key: 'COMPLETED', label: 'Completed', color: COLORS.SUCCESS },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
@@ -159,6 +160,58 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     }
   };
 
+  // Calculate total paid amount from order
+  const getTotalPaidAmount = (order) => {
+    if (!order) return 0;
+    // First, try to calculate from orderPayments array (most accurate)
+    if (order.orderPayments && Array.isArray(order.orderPayments) && order.orderPayments.length > 0) {
+      const totalFromPayments = order.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+      return totalFromPayments;
+    }
+    // Fallback to paidAmount field if available
+    if (order.paidAmount !== undefined && order.paidAmount !== null) {
+      return order.paidAmount;
+    }
+    // Otherwise try agencyBill paidAmount
+    if (order.agencyBill?.paidAmount !== undefined && order.agencyBill?.paidAmount !== null) {
+      return order.agencyBill.paidAmount;
+    }
+    return 0;
+  };
+
+  // Get total amount (final price) from order
+  const getTotalAmount = (order) => {
+    if (!order) return 0;
+    // First try total field
+    if (order.total !== undefined && order.total !== null) {
+      return order.total;
+    }
+    // Otherwise try agencyBill amount
+    if (order.agencyBill?.amount !== undefined && order.agencyBill?.amount !== null) {
+      return order.agencyBill.amount;
+    }
+    return 0;
+  };
+
+  // Check if order is completed (fully paid)
+  const isOrderCompleted = (order) => {
+    if (!order) return false;
+    const totalPaid = getTotalPaidAmount(order);
+    const finalPrice = getTotalAmount(order);
+    // Use a small epsilon for floating point comparison
+    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
+  };
+
+  // Get display status - show COMPLETED if fully paid, otherwise use actual status
+  const getDisplayStatus = (order) => {
+    if (!order) return null;
+    // If order is fully paid, show as COMPLETED
+    if (isOrderCompleted(order)) {
+      return 'COMPLETED';
+    }
+    return order.status;
+  };
+
   const getStatusColor = (status) => {
     const statusOption = orderStatuses.find(s => s.key === status);
     return statusOption ? statusOption.color : COLORS.TEXT.SECONDARY;
@@ -167,6 +220,18 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
   const getStatusLabel = (status) => {
     const statusOption = orderStatuses.find(s => s.key === status);
     return statusOption ? statusOption.label : status;
+  };
+
+  // Get status color for an order (considering completed status)
+  const getOrderStatusColor = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusColor(displayStatus);
+  };
+
+  // Get status label for an order (considering completed status)
+  const getOrderStatusLabel = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusLabel(displayStatus);
   };
 
   const formatPrice = (price) => {
@@ -463,7 +528,10 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           {renderInfoRow('Order ID', `#${order?.id || 'N/A'}`)}
           {order && order.orderAt && renderInfoRow('Order Date', formatDate(order.orderAt))}
           {order && order.itemQuantity && renderInfoRow('Item Quantity', `${order.itemQuantity} items`)}
-          {order && renderInfoRow('Status', order.status || 'N/A')}
+          {order && renderInfoRow('Status', getOrderStatusLabel(order) || 'N/A', {
+            color: getOrderStatusColor(order),
+            fontWeight: '600'
+          })}
           {order && order.note && renderInfoRow('Note', order.note)}
           {order && order.total && renderInfoRow('Order Total', formatPrice(order.total || 0))}
           {(() => {
@@ -600,6 +668,50 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* Payment History */}
+        {order && order.orderPayments && order.orderPayments.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment History ({order.orderPayments.length})</Text>
+            {(() => {
+              // Calculate total from orderPayments
+              const totalPayments = order.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+              
+              return (
+                <>
+                  {renderInfoRow('Total Payments', formatPrice(totalPayments), {
+                    color: COLORS.SUCCESS,
+                    fontWeight: 'bold'
+                  })}
+                  {order.total && (
+                    renderInfoRow('Remaining', formatPrice(order.total - totalPayments), {
+                      color: order.total - totalPayments > 0 ? COLORS.WARNING : COLORS.SUCCESS,
+                      fontWeight: '600'
+                    })
+                  )}
+                </>
+              );
+            })()}
+            {[...order.orderPayments]
+              .sort((a, b) => {
+                // Sort by payAt date (newest first)
+                const dateA = new Date(a.payAt || 0);
+                const dateB = new Date(b.payAt || 0);
+                return dateB - dateA;
+              })
+              .map((payment, index) => (
+                <View key={payment.id || index} style={styles.paymentItemContainer}>
+                  <Text style={styles.paymentItemTitle}>Payment #{index + 1}</Text>
+                  {renderInfoRow('Invoice Number', payment.invoiceNumber || 'N/A')}
+                  {renderInfoRow('Amount', formatPrice(payment.amount), {
+                    color: COLORS.SUCCESS,
+                    fontWeight: '600'
+                  })}
+                  {renderInfoRow('Payment Date', formatDate(payment.payAt))}
+                  {payment.id && renderInfoRow('Payment ID', payment.id.toString())}
+                </View>
+              ))}
+          </View>
+        )}
 
         {order && order.agencyBill && (
           <View style={styles.section}>
@@ -628,10 +740,9 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {order && (() => {
-        // Calculate paid amount and total amount
-        const paidAmount = order.paidAmount || order.agencyBill?.paidAmount || 0;
-        const totalAmount = order.total || order.agencyBill?.amount || 0;
-        const isFullyPaid = totalAmount > 0 && paidAmount >= totalAmount;
+        // Check if order is completed using helper function
+        const completed = isOrderCompleted(order);
+        const displayStatus = getDisplayStatus(order);
         
         return (
           <View style={styles.fixedActionsContainer}>
@@ -683,7 +794,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                   <Text style={[styles.actionButtonText, styles.deleteActionButtonText]}>Delete</Text>
                 </TouchableOpacity>
               </>
-            ) : order.status === 'DELIVERED' && !isFullyPaid ? (
+            ) : order.status === 'DELIVERED' && !completed ? (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handlePayment}
@@ -912,6 +1023,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     textAlign: 'right',
+  },
+  paymentItemContainer: {
+    marginBottom: SIZES.PADDING.MEDIUM,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  paymentItemTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: "#009DFF",
+    marginBottom: SIZES.PADDING.SMALL,
   },
   // Payment Modal Styles
   modalOverlay: {
