@@ -13,16 +13,12 @@ import {
 } from 'react-native';
 import { COLORS, SIZES } from '../../constants';
 import pricePolicyService from '../../services/pricePolicyService';
-import agencyService from '../../services/agencyService';
-import motorbikeService from '../../services/motorbikeService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { Pencil, Trash2, ArrowLeft, Plus, Search, DollarSign } from 'lucide-react-native';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 
 const PricePolicyManagementScreen = ({ navigation }) => {
   const [pricePolicies, setPricePolicies] = useState([]);
-  const [agencies, setAgencies] = useState([]);
-  const [motorbikes, setMotorbikes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,8 +26,6 @@ const PricePolicyManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadPricePolicies();
-    loadAgencies();
-    loadMotorbikes();
 
     const unsubscribe = navigation.addListener('focus', () => {
       loadPricePolicies();
@@ -39,28 +33,6 @@ const PricePolicyManagementScreen = ({ navigation }) => {
 
     return unsubscribe;
   }, [navigation]);
-
-  const loadAgencies = async () => {
-    try {
-      const response = await agencyService.getAgencies({ limit: 100 });
-      if (response.success && Array.isArray(response.data)) {
-        setAgencies(response.data);
-      }
-    } catch (error) {
-      console.error('Error loading agencies:', error);
-    }
-  };
-
-  const loadMotorbikes = async () => {
-    try {
-      const response = await motorbikeService.getAllMotorbikes({ limit: 100 });
-      if (response.success && Array.isArray(response.data)) {
-        setMotorbikes(response.data);
-      }
-    } catch (error) {
-      console.error('Error loading motorbikes:', error);
-    }
-  };
 
   const loadPricePolicies = async () => {
     try {
@@ -117,14 +89,12 @@ const PricePolicyManagementScreen = ({ navigation }) => {
     navigation.navigate('AddPricePolicy');
   };
 
-  const getAgencyName = (agencyId) => {
-    const agency = agencies.find(a => a.id === agencyId);
-    return agency?.name || `Agency #${agencyId}`;
+  const getAgencyName = (policy) => {
+    return policy?.agency?.name || (policy?.agencyId ? `Agency #${policy.agencyId}` : 'N/A');
   };
 
-  const getMotorbikeName = (motorbikeId) => {
-    const motorbike = motorbikes.find(m => m.id === motorbikeId);
-    return motorbike?.name || `Motorbike #${motorbikeId}`;
+  const getMotorbikeName = (policy) => {
+    return policy?.motorbike?.name || (policy?.motorbikeId ? `Motorbike #${policy.motorbikeId}` : 'N/A');
   };
 
   const filteredPolicies = pricePolicies.filter(policy => {
@@ -224,24 +194,35 @@ const PricePolicyManagementScreen = ({ navigation }) => {
             </View>
           ) : (
             filteredPolicies.map((policy) => (
-              <View key={policy.id} style={styles.policyCard}>
+              <TouchableOpacity
+                key={policy.id}
+                style={styles.policyCard}
+                onPress={() => navigation.navigate('PricePolicyDetail', { pricePolicyId: policy.id })}
+                activeOpacity={0.7}
+              >
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderInfo}>
                     <Text style={styles.policyTitle}>{policy.title || 'Untitled Policy'}</Text>
                     <Text style={styles.policyMeta}>
-                      {getAgencyName(policy.agencyId)} • {getMotorbikeName(policy.motorbikeId)}
+                      {getAgencyName(policy)} • {getMotorbikeName(policy)}
                     </Text>
                   </View>
                   <View style={styles.cardActions}>
                     <TouchableOpacity
                       style={styles.actionButton}
-                      onPress={() => handleEdit(policy)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleEdit(policy);
+                      }}
                     >
                       <Pencil size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.actionButton}
-                      onPress={() => handleDelete(policy.id, policy.title)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDelete(policy.id, policy.title);
+                      }}
                     >
                       <Trash2 size={16} color={COLORS.TEXT.WHITE} />
                     </TouchableOpacity>
@@ -266,14 +247,14 @@ const PricePolicyManagementScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Agency</Text>
-                    <Text style={styles.detailValue}>{getAgencyName(policy.agencyId)}</Text>
+                    <Text style={styles.detailValue}>{getAgencyName(policy)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Motorbike</Text>
-                    <Text style={styles.detailValue}>{getMotorbikeName(policy.motorbikeId)}</Text>
+                    <Text style={styles.detailValue}>{getMotorbikeName(policy)}</Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>
