@@ -693,21 +693,25 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
             })()}
             {[...order.orderPayments]
               .sort((a, b) => {
-                // Sort by payAt date (newest first)
+                // Sort by payment id (newest first - highest id = most recent)
+                // If id is not available, fallback to payAt date
+                if (a.id && b.id) {
+                  return b.id - a.id;
+                }
+                // Fallback to payAt date (newest first)
                 const dateA = new Date(a.payAt || 0);
                 const dateB = new Date(b.payAt || 0);
                 return dateB - dateA;
               })
               .map((payment, index) => (
                 <View key={payment.id || index} style={styles.paymentItemContainer}>
-                  <Text style={styles.paymentItemTitle}>Payment #{index + 1}</Text>
+                  <Text style={styles.paymentItemTitle}>Payment #{payment.id || index + 1}</Text>
                   {renderInfoRow('Invoice Number', payment.invoiceNumber || 'N/A')}
                   {renderInfoRow('Amount', formatPrice(payment.amount), {
                     color: COLORS.SUCCESS,
                     fontWeight: '600'
                   })}
                   {renderInfoRow('Payment Date', formatDate(payment.payAt))}
-                  {payment.id && renderInfoRow('Payment ID', payment.id.toString())}
                 </View>
               ))}
           </View>
