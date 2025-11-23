@@ -50,6 +50,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     { key: 'PENDING', label: 'Pending', color: COLORS.WARNING },
     { key: 'APPROVED', label: 'Approved', color: COLORS.SUCCESS },
     { key: 'DELIVERED', label: 'Delivered', color: ACCENT_COLOR },
+    { key: 'COMPLETED', label: 'Completed', color: COLORS.SUCCESS },
     { key: 'CANCELED', label: 'Canceled', color: COLORS.ERROR },
   ];
 
@@ -77,7 +78,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterOrders();
-  }, [searchQuery, selectedStatus, orders, orderDetailsCache]);
+  }, [searchQuery, selectedStatus, orders, orderDetailsCache, orderFullDataCache]);
 
   const loadOrderDetail = async (orderId) => {
     // Check cache first
@@ -174,6 +175,9 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         const newFullDataCache = {};
         
         sortedOrders.forEach(order => {
+          // Always cache full order data (including payment info) for completed status check
+          newFullDataCache[order.id] = order;
+          
           if (order.orderItems && order.orderItems.length > 0) {
             const firstItem = order.orderItems[0];
             // If orderItems already have warehouse and motorbike info, use it
@@ -182,8 +186,6 @@ const OrderRestockManagementScreen = ({ navigation }) => {
                 warehouseName: firstItem.warehouse?.name || null,
                 motorbikeName: firstItem.electricMotorbike?.name || null,
               };
-              // Also cache full order data if available
-              newFullDataCache[order.id] = order;
             }
           }
         });
@@ -278,6 +280,40 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     return order.electricMotorbike?.name || 'Loading...';
   };
 
+  // Calculate total paid amount from order payments
+  const getTotalPaidAmount = (order) => {
+    // First check cached full order data
+    const fullOrderData = orderFullDataCache[order.id] || order;
+    
+    // First try paidAmount field if available
+    if (fullOrderData.paidAmount !== undefined && fullOrderData.paidAmount !== null) {
+      return fullOrderData.paidAmount;
+    }
+    // Otherwise calculate from orderPayments array
+    if (fullOrderData.orderPayments && fullOrderData.orderPayments.length > 0) {
+      return fullOrderData.orderPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    }
+    return 0;
+  };
+
+  // Check if order is completed (fully paid)
+  const isOrderCompleted = (order) => {
+    const fullOrderData = orderFullDataCache[order.id] || order;
+    const totalPaid = getTotalPaidAmount(order);
+    const finalPrice = fullOrderData.total || order.total || 0;
+    // Use a small epsilon for floating point comparison
+    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
+  };
+
+  // Get display status - show COMPLETED if fully paid, otherwise use actual status
+  const getDisplayStatus = (order) => {
+    // If order is fully paid, show as COMPLETED
+    if (isOrderCompleted(order)) {
+      return 'COMPLETED';
+    }
+    return order.status;
+  };
+
   const filterOrders = () => {
     // First filter out DRAFT orders
     let filtered = orders.filter(order => order.status !== 'DRAFT');
@@ -299,7 +335,16 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
     // Filter by status
     if (selectedStatus !== 'all') {
-      filtered = filtered.filter(order => order.status === selectedStatus);
+      if (selectedStatus === 'COMPLETED') {
+        // Filter for completed orders (fully paid)
+        filtered = filtered.filter(order => isOrderCompleted(order));
+      } else {
+        // For other statuses, filter by actual status but exclude completed orders
+        filtered = filtered.filter(order => {
+          const displayStatus = getDisplayStatus(order);
+          return displayStatus === selectedStatus;
+        });
+      }
     }
 
     setFilteredOrders(filtered);
@@ -322,6 +367,11 @@ const OrderRestockManagementScreen = ({ navigation }) => {
 
   // Get the next status based on current status
   const getNextStatus = (order) => {
+    // Don't show next status button for completed or canceled orders
+    if (isOrderCompleted(order) || order?.status === 'CANCELED' || order?.status === 'COMPLETED') {
+      return null;
+    }
+
     const statusFlow = {
       'PENDING': 'APPROVED',
       'APPROVED': 'DELIVERED',
@@ -386,6 +436,18 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     return statusOption ? statusOption.label : status;
   };
 
+  // Get status color for an order (considering completed status)
+  const getOrderStatusColor = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusColor(displayStatus);
+  };
+
+  // Get status label for an order (considering completed status)
+  const getOrderStatusLabel = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusLabel(displayStatus);
+  };
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -414,8 +476,8 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           <Text style={styles.orderId}>Order #{order.id}</Text>
           <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-          <Text style={styles.statusText}>{getStatusLabel(order.status)}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order) }]}>
+          <Text style={styles.statusText}>{getOrderStatusLabel(order)}</Text>
         </View>
       </View>
 
@@ -465,7 +527,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
         
-        {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && (
+        {order.status !== 'CANCELED' && order.status !== 'DELIVERED' && !isOrderCompleted(order) && (
           <TouchableOpacity
             style={[styles.actionButton, styles.secondaryActionButton]}
             onPress={(e) => {
@@ -484,7 +546,17 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   const totalOrders = orders.filter(o => o.status !== 'DRAFT').length;
   const statusCounts = orderStatuses.reduce((acc, status) => {
     if (status.key !== 'all') {
-      acc[status.key] = orders.filter(o => o.status === status.key && o.status !== 'DRAFT').length;
+      if (status.key === 'COMPLETED') {
+        // Count completed orders (fully paid)
+        acc[status.key] = orders.filter(o => o.status !== 'DRAFT' && isOrderCompleted(o)).length;
+      } else {
+        // For other statuses, count by actual status but exclude completed orders
+        acc[status.key] = orders.filter(o => {
+          if (o.status === 'DRAFT') return false;
+          const displayStatus = getDisplayStatus(o);
+          return displayStatus === status.key;
+        }).length;
+      }
     }
     return acc;
   }, {});
@@ -538,6 +610,12 @@ const OrderRestockManagementScreen = ({ navigation }) => {
             {statusCounts.DELIVERED || 0}
           </Text>
           <Text style={styles.statLabel}>Delivered</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>
+            {statusCounts.COMPLETED || 0}
+          </Text>
+          <Text style={styles.statLabel}>Completed</Text>
         </View>
       </View>
 

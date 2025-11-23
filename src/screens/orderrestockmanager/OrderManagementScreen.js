@@ -61,6 +61,53 @@ const OrderManagementScreen = ({ navigation }) => {
     agencyId: '',
   });
   
+  // Calculate total paid amount from order
+  const getTotalPaidAmount = (order) => {
+    if (!order) return 0;
+    // First try paidAmount field if available
+    if (order.paidAmount !== undefined && order.paidAmount !== null) {
+      return order.paidAmount;
+    }
+    // Otherwise try agencyBill paidAmount
+    if (order.agencyBill?.paidAmount !== undefined && order.agencyBill?.paidAmount !== null) {
+      return order.agencyBill.paidAmount;
+    }
+    return 0;
+  };
+
+  // Get total amount (final price) from order
+  const getTotalAmount = (order) => {
+    if (!order) return 0;
+    // First try total field
+    if (order.total !== undefined && order.total !== null) {
+      return order.total;
+    }
+    // Otherwise try agencyBill amount
+    if (order.agencyBill?.amount !== undefined && order.agencyBill?.amount !== null) {
+      return order.agencyBill.amount;
+    }
+    return 0;
+  };
+
+  // Check if order is completed (fully paid)
+  const isOrderCompleted = (order) => {
+    if (!order) return false;
+    const totalPaid = getTotalPaidAmount(order);
+    const finalPrice = getTotalAmount(order);
+    // Use a small epsilon for floating point comparison
+    return Math.abs(totalPaid - finalPrice) < 0.01 && finalPrice > 0;
+  };
+
+  // Get display status - show COMPLETED if fully paid, otherwise use actual status
+  const getDisplayStatus = (order) => {
+    if (!order) return null;
+    // If order is fully paid, show as COMPLETED
+    if (isOrderCompleted(order)) {
+      return 'COMPLETED';
+    }
+    return order.status;
+  };
+
   const statusCounts = useMemo(() => {
     const baseCounts = {
       ALL: 0,
@@ -68,16 +115,18 @@ const OrderManagementScreen = ({ navigation }) => {
       PENDING: 0,
       APPROVED: 0,
       DELIVERED: 0,
+      COMPLETED: 0,
       CANCELED: 0,
     };
 
     return orders.reduce((acc, order) => {
       acc.ALL += 1;
-      if (order.status) {
-        if (Object.prototype.hasOwnProperty.call(acc, order.status)) {
-          acc[order.status] += 1;
+      const displayStatus = getDisplayStatus(order);
+      if (displayStatus) {
+        if (Object.prototype.hasOwnProperty.call(acc, displayStatus)) {
+          acc[displayStatus] += 1;
         } else {
-          acc[order.status] = (acc[order.status] || 0) + 1;
+          acc[displayStatus] = (acc[displayStatus] || 0) + 1;
         }
       }
       return acc;
@@ -90,6 +139,7 @@ const OrderManagementScreen = ({ navigation }) => {
     { label: `Pending (${statusCounts.PENDING || 0})`, value: 'PENDING' },
     { label: `Approved (${statusCounts.APPROVED || 0})`, value: 'APPROVED' },
     { label: `Delivered (${statusCounts.DELIVERED || 0})`, value: 'DELIVERED' },
+    { label: `Completed (${statusCounts.COMPLETED || 0})`, value: 'COMPLETED' },
     { label: `Canceled (${statusCounts.CANCELED || 0})`, value: 'CANCELED' },
   ];
   
@@ -342,6 +392,18 @@ const OrderManagementScreen = ({ navigation }) => {
   useEffect(() => {
     console.log('📱 [OrderManagement] Component mounted, gọi loadOrders()');
     loadOrders();
+    // Load motorbikes for display in order cards
+    const loadMotorbikesForDisplay = async () => {
+      try {
+        const motorbikesResponse = await motorbikeService.getAllMotorbikes({ limit: 100 });
+        if (motorbikesResponse.success) {
+          setMotorbikes(motorbikesResponse.data || []);
+        }
+      } catch (error) {
+        console.error('Error loading motorbikes for display:', error);
+      }
+    };
+    loadMotorbikesForDisplay();
   }, []);
 
   useEffect(() => {
@@ -425,15 +487,27 @@ const OrderManagementScreen = ({ navigation }) => {
     let list = [...orders];
 
     if (activeStatusFilter !== 'ALL') {
-      list = list.filter(order => order.status === activeStatusFilter);
+      if (activeStatusFilter === 'COMPLETED') {
+        // Filter for completed orders (fully paid)
+        list = list.filter(order => isOrderCompleted(order));
+      } else {
+        // For other statuses, filter by display status
+        list = list.filter(order => {
+          const displayStatus = getDisplayStatus(order);
+          return displayStatus === activeStatusFilter;
+        });
+      }
     }
 
     if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase();
-      list = list.filter(order =>
-        order.id?.toString().toLowerCase().includes(searchLower) ||
-        order.status?.toLowerCase().includes(searchLower)
-      );
+      list = list.filter(order => {
+        const displayStatus = getDisplayStatus(order);
+        return (
+          order.id?.toString().toLowerCase().includes(searchLower) ||
+          displayStatus?.toLowerCase().includes(searchLower)
+        );
+      });
     }
 
     return list;
@@ -627,6 +701,7 @@ const OrderManagementScreen = ({ navigation }) => {
       case 'PENDING': return COLORS.WARNING;
       case 'APPROVED': return COLORS.SUCCESS;
       case 'DELIVERED': return COLORS.PRIMARY;
+      case 'COMPLETED': return COLORS.SUCCESS;
       case 'CANCELED': return COLORS.ERROR;
       default: return COLORS.TEXT.SECONDARY;
     }
@@ -638,8 +713,57 @@ const OrderManagementScreen = ({ navigation }) => {
       case 'PENDING': return 'Pending';
       case 'APPROVED': return 'Approved';
       case 'DELIVERED': return 'Delivered';
+      case 'COMPLETED': return 'Completed';
       case 'CANCELED': return 'Canceled';
       default: return status || 'Unknown';
+    }
+  };
+
+  // Get status color for an order (considering completed status)
+  const getOrderStatusColor = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusColor(displayStatus);
+  };
+
+  // Get status text for an order (considering completed status)
+  const getOrderStatusText = (order) => {
+    const displayStatus = getDisplayStatus(order);
+    return getStatusText(displayStatus);
+  };
+
+  // Get motorbike name(s) from order
+  const getMotorbikeNames = (order) => {
+    if (!order || !order.orderItems || order.orderItems.length === 0) {
+      return 'N/A';
+    }
+
+    // Check if orderItems have nested electricMotorbike data
+    const motorbikeNames = new Set();
+    order.orderItems.forEach(item => {
+      if (item.electricMotorbike?.name) {
+        motorbikeNames.add(item.electricMotorbike.name);
+      } else if (item.electricMotorbikeId) {
+        // If only ID is available, try to find from motorbikes list
+        const motorbike = motorbikes.find(m => m.id === item.electricMotorbikeId);
+        if (motorbike?.name) {
+          motorbikeNames.add(motorbike.name);
+        } else {
+          motorbikeNames.add(`ID: ${item.electricMotorbikeId}`);
+        }
+      }
+    });
+
+    if (motorbikeNames.size === 0) {
+      return 'N/A';
+    }
+
+    const namesArray = Array.from(motorbikeNames);
+    if (namesArray.length === 1) {
+      return namesArray[0];
+    } else if (namesArray.length <= 3) {
+      return namesArray.join(', ');
+    } else {
+      return `${namesArray.slice(0, 2).join(', ')} +${namesArray.length - 2} more`;
     }
   };
 
@@ -710,7 +834,8 @@ const OrderManagementScreen = ({ navigation }) => {
   };
 
   const renderOrderCard = (order) => {
-    const statusColor = getStatusColor(order.status);
+    const statusColor = getOrderStatusColor(order);
+    const statusText = getOrderStatusText(order);
 
     return (
       <TouchableOpacity 
@@ -729,13 +854,17 @@ const OrderManagementScreen = ({ navigation }) => {
               { backgroundColor: `${statusColor}20` }
             ]}>
               <Text style={[styles.statusText, { color: statusColor }]}>
-                {getStatusText(order.status)}
+                {statusText}
               </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.orderDetails}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Motorbike:</Text>
+            <Text style={styles.detailValue}>{getMotorbikeNames(order)}</Text>
+          </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Item Quantity:</Text>
             <Text style={styles.detailValue}>{order.itemQuantity || order.orderItems?.length || 0} items</Text>
