@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
-import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, PackageOpen, Bus, Warehouse, NotepadText, CircleDollarSign, Gift, RefreshCcw, CreditCard, Search } from 'lucide-react-native';
+import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, PackageOpen, Bus, Warehouse, NotepadText, CircleDollarSign, Gift, RefreshCcw, CreditCard, Search, Tag } from 'lucide-react-native';
 import useUserProfile from '../../hooks/useUserProfile';
 
 const EVMStaffHomeScreen = ({ navigation }) => {
@@ -128,6 +128,12 @@ const EVMStaffHomeScreen = ({ navigation }) => {
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <CreditCard color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('EVMStaffCreditLineManagement'),
+    },
+    {
+      title: 'Discount',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Tag color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DiscountManagement'),
     },
   ];
 
