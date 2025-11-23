@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -35,13 +35,17 @@ const CreditLineManagementScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
-    loadAgencies();
-    loadCreditLines();
+    const loadData = async () => {
+      // Load agencies first, then credit lines
+      await loadAgencies();
+      await loadCreditLines();
+    };
+    loadData();
 
     // Reload credit lines when screen comes into focus (after adding/editing)
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadAgencies();
-      loadCreditLines();
+    const unsubscribe = navigation.addListener('focus', async () => {
+      await loadAgencies();
+      await loadCreditLines();
     });
 
     return unsubscribe;
@@ -51,17 +55,66 @@ const CreditLineManagementScreen = ({ navigation }) => {
     try {
       const response = await agencyService.getAgencies({ limit: 100 });
       if (response.success && Array.isArray(response.data)) {
+        console.log('✅ Loaded agencies:', response.data.length);
         setAgencies(response.data);
+      } else {
+        console.warn('⚠️ Failed to load agencies:', response.error);
       }
     } catch (error) {
-      console.error('Error loading agencies:', error);
+      console.error('❌ Error loading agencies:', error);
     }
   };
 
+  // Create a map of agencies by ID for fast lookup
+  const agencyMap = useMemo(() => {
+    const map = new Map();
+    agencies.forEach(agency => {
+      if (agency.id !== undefined && agency.id !== null) {
+        // Store by both number and string key for flexibility
+        const id = agency.id;
+        map.set(id, agency);
+        map.set(String(id), agency);
+        map.set(Number(id), agency);
+      }
+    });
+    return map;
+  }, [agencies]);
+
   const getAgencyName = (agencyId) => {
-    if (!agencyId) return 'N/A';
-    const agency = agencies.find(a => a.id === agencyId || a.id?.toString() === agencyId?.toString());
-    return agency?.name || 'Unknown Agency';
+    if (!agencyId && agencyId !== 0) return 'N/A';
+    
+    // Try to find agency from map
+    let agency = agencyMap.get(agencyId);
+    if (!agency) {
+      agency = agencyMap.get(String(agencyId));
+    }
+    if (!agency) {
+      agency = agencyMap.get(Number(agencyId));
+    }
+    
+    if (agency?.name) {
+      return agency.name;
+    }
+    
+    // Fallback: try to find in agencies array directly
+    const foundAgency = agencies.find(a => {
+      const aId = a.id;
+      return aId === agencyId || 
+             String(aId) === String(agencyId) ||
+             Number(aId) === Number(agencyId);
+    });
+    
+    if (foundAgency?.name) {
+      return foundAgency.name;
+    }
+    
+    // Debug log if not found
+    if (agencies.length > 0) {
+      console.log('⚠️ Agency not found for agencyId:', agencyId, 'Type:', typeof agencyId);
+      console.log('Available agency IDs:', agencies.map(a => ({ id: a.id, type: typeof a.id, name: a.name })));
+    }
+    
+    return null; // Return null instead of fallback text, let the UI handle it
   };
 
   const loadCreditLines = async () => {
@@ -70,9 +123,47 @@ const CreditLineManagementScreen = ({ navigation }) => {
       const response = await creditLineService.getAllCreditLines(page, 10);
       
       if (response.success) {
+        console.log('✅ Loaded credit lines:', response.data.length);
+        
         // Sort credit lines by ID descending (newest first)
         const sortedData = [...response.data].sort((a, b) => (b.id || 0) - (a.id || 0));
-        setCreditLines(sortedData);
+        
+        // Fetch detail for each credit line to get agency information
+        const creditLinesWithAgency = await Promise.all(
+          sortedData.map(async (creditLine) => {
+            // If agency info already exists, use it
+            if (creditLine.agency?.name) {
+              return creditLine;
+            }
+            
+            // Otherwise, fetch detail to get agency info
+            try {
+              const detailResponse = await creditLineService.getCreditLineDetail(creditLine.id);
+              if (detailResponse.success && detailResponse.data) {
+                return {
+                  ...creditLine,
+                  agency: detailResponse.data.agency || creditLine.agency
+                };
+              }
+            } catch (error) {
+              console.warn(`⚠️ Failed to fetch detail for credit line ${creditLine.id}:`, error);
+            }
+            
+            return creditLine;
+          })
+        );
+        
+        console.log('✅ Loaded credit lines with agency info');
+        if (creditLinesWithAgency.length > 0) {
+          console.log('📋 Sample credit line:', {
+            id: creditLinesWithAgency[0].id,
+            agencyId: creditLinesWithAgency[0].agencyId,
+            hasAgency: !!creditLinesWithAgency[0].agency,
+            agencyName: creditLinesWithAgency[0].agency?.name
+          });
+        }
+        
+        setCreditLines(creditLinesWithAgency);
         if (response.pagination) {
           setTotalPages(Math.ceil(response.pagination.totalItems / response.pagination.limit));
         }
@@ -88,7 +179,7 @@ const CreditLineManagementScreen = ({ navigation }) => {
         setShowAlert(true);
       }
     } catch (error) {
-      console.error('Error loading credit lines:', error);
+      console.error('❌ Error loading credit lines:', error);
       setAlertConfig({
         title: 'Error',
         message: 'An unexpected error occurred',
@@ -129,10 +220,12 @@ const CreditLineManagementScreen = ({ navigation }) => {
   };
 
   const filteredCreditLines = creditLines.filter(creditLine => {
-    // Filter by search query
-    const agencyName = creditLine.agency?.name || getAgencyName(creditLine.agencyId);
-    const matchesSearch = agencyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      creditLine.id?.toString().includes(searchQuery);
+    // Filter by search query - prioritize agency name from detail API
+    const agencyName = creditLine.agency?.name || getAgencyName(creditLine.agencyId) || (creditLine.agencyId ? `Agency #${creditLine.agencyId}` : 'N/A');
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      agencyName.toLowerCase().includes(searchLower) ||
+      creditLine.id?.toString().includes(searchLower);
     
     // Filter by tab status
     const matchesTab = activeTab === 'active' 
@@ -298,7 +391,7 @@ const CreditLineManagementScreen = ({ navigation }) => {
                   <View style={styles.creditLineHeader}>
                     <View style={styles.creditLineHeaderLeft}>
                       <Text style={styles.agencyName}>
-                        {creditLine.agency?.name || getAgencyName(creditLine.agencyId)}
+                        {creditLine.agency?.name || getAgencyName(creditLine.agencyId) || (creditLine.agencyId ? `Agency #${creditLine.agencyId}` : 'N/A')}
                       </Text>
                       <View style={[
                         styles.statusBadge, 
@@ -318,7 +411,11 @@ const CreditLineManagementScreen = ({ navigation }) => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.iconButton, styles.deleteButton]}
-                        onPress={(e) => handleDelete(creditLine.id, creditLine.agency?.name || getAgencyName(creditLine.agencyId), e)}
+                        onPress={(e) => handleDelete(
+                          creditLine.id, 
+                          creditLine.agency?.name || getAgencyName(creditLine.agencyId) || (creditLine.agencyId ? `Agency #${creditLine.agencyId}` : 'N/A'), 
+                          e
+                        )}
                       >
                         <Trash2 size={16} color={COLORS.TEXT.WHITE} />
                       </TouchableOpacity>
@@ -330,6 +427,12 @@ const CreditLineManagementScreen = ({ navigation }) => {
                       <Text style={styles.detailLabel}>Credit Limit</Text>
                       <Text style={styles.detailValue}>
                         {creditLineService.formatCreditLimit(creditLine.creditLimit)}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Current Debt</Text>
+                      <Text style={styles.detailValue}>
+                        {creditLineService.formatCreditLimit(creditLine.currentDebt || 0)}
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
