@@ -18,6 +18,8 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, Car, CarFront, Gift, Bus, CircleDollarSign, CreditCard, NotepadText, WalletCards, Building2, Users, PackageOpen } from 'lucide-react-native';
 import useUserProfile from '../../hooks/useUserProfile';
+import dashboardService from '../../services/dashboardService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -29,11 +31,65 @@ const DealerManagerHomeScreen = ({ navigation }) => {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Dashboard stats state
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
+  
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
   const fadeAnim = useState(new Animated.Value(1))[0];
   const slideAnim = useState(new Animated.Value(0))[0];
+
+  // Load dashboard stats
+  useEffect(() => {
+    loadDashboardStats();
+
+    // Reload when screen comes into focus
+    const unsubscribe = navigation?.addListener('focus', () => {
+      loadDashboardStats();
+    });
+
+    return unsubscribe;
+  }, [navigation, user?.agencyId]);
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoadingStats(true);
+      // Get agencyId from AsyncStorage or user object
+      const storedAgencyId = await AsyncStorage.getItem('agencyId');
+      const userAgencyId = user?.agencyId;
+      const agencyId = storedAgencyId || userAgencyId;
+
+      if (!agencyId) {
+        console.warn('No agencyId found for loading dashboard stats');
+        setLoadingStats(false);
+        return;
+      }
+
+      const [totalCustomerRes, totalRevenueRes] = await Promise.all([
+        dashboardService.getTotalCustomer(agencyId),
+        dashboardService.getTotalRevenue(agencyId),
+      ]);
+
+      setTotalCustomers(totalCustomerRes?.data?.totalCustomers || 0);
+      setTotalRevenue(totalRevenueRes?.data?.totalRevenue || 0);
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const formatRevenue = (value) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(2)}M VNĐ`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)}K VNĐ`;
+    }
+    return `${value.toLocaleString('vi-VN')} VNĐ`;
+  };
 
   // Auto-slide effect with smooth transitions
   useEffect(() => {
@@ -146,6 +202,12 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       gradient: ['#302F32', '#302F32', '#302F32'],
       icon: <PackageOpen color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('StockManagement'),
+    },
+    {
+      title: 'Credit Line',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CreditCard color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerCreditLine'),
     },
     {
       title: 'Reports',
@@ -282,20 +344,16 @@ const DealerManagerHomeScreen = ({ navigation }) => {
           <View style={styles.statsContainer}>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>8</Text>
-                <Text style={styles.statLabel}>Nhân viên</Text>
+                <Text style={styles.statNumber}>
+                  {loadingStats ? '...' : totalCustomers.toLocaleString('vi-VN')}
+                </Text>
+                <Text style={styles.statLabel}>Tổng khách hàng</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>45</Text>
-                <Text style={styles.statLabel}>Đơn hàng hôm nay</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>$125,000</Text>
-                <Text style={styles.statLabel}>Doanh thu tháng</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>92%</Text>
-                <Text style={styles.statLabel}>Tỷ lệ hoàn thành</Text>
+                <Text style={styles.statNumber}>
+                  {loadingStats ? '...' : formatRevenue(totalRevenue)}
+                </Text>
+                <Text style={styles.statLabel}>Tổng doanh thu</Text>
               </View>
             </View>
           </View>
