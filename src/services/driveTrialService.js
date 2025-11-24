@@ -68,10 +68,17 @@ const driveTrialService = {
    * Get list of drive trials for an agency
    * @param {number} agencyId - Agency ID
    * @param {Object} params - Query parameters (page, limit)
+   * @param {boolean} fetchAll - If true, fetch all pages of drive trials
    * @returns {Promise<Object>} Response with list of bookings and pagination info
    */
-  async getDriveTrials(agencyId, params = {}) {
+  async getDriveTrials(agencyId, params = {}, fetchAll = true) {
     try {
+      // If fetchAll is true, fetch all pages
+      if (fetchAll) {
+        return await this._fetchAllDriveTrials(agencyId, params);
+      }
+      
+      // Otherwise, fetch single page
       const token = await this.getAuthTokenAsync();
       const url = `${API_BASE_URL}/drive-trial/list/${agencyId}`;
       
@@ -119,6 +126,102 @@ const driveTrialService = {
       };
     } catch (error) {
       console.error('Error fetching drive trials:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch drive trials',
+        data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
+   * Helper method to fetch all pages of drive trials
+   * @private
+   */
+  async _fetchAllDriveTrials(agencyId, params = {}) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}/drive-trial/list/${agencyId}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const allBookings = [];
+      let currentPage = 1;
+      let totalPages = null;
+      const limit = params.limit || 100; // Use provided limit or default to 100 per page
+
+      while (totalPages === null || currentPage <= totalPages) {
+        // Build query string for current page
+        const queryParams = new URLSearchParams();
+        queryParams.append('page', currentPage);
+        queryParams.append('limit', limit);
+        
+        const queryString = queryParams.toString();
+        const fullUrl = `${url}?${queryString}`;
+        
+        const response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: headers,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.message || `HTTP error! status: ${response.status}`,
+            data: allBookings,
+            paginationInfo: null,
+          };
+        }
+
+        // Extract bookings from response
+        const pageBookings = data.data || [];
+        allBookings.push(...pageBookings);
+
+        // Update pagination info from first response
+        if (data.paginationInfo) {
+          totalPages = data.paginationInfo.totalPages || 1;
+        } else {
+          // If no pagination info, assume this is the only page
+          totalPages = 1;
+        }
+
+        // If we got fewer items than the limit, we've reached the last page
+        if (pageBookings.length < limit) {
+          break;
+        }
+
+        currentPage++;
+
+        // Safety check: if totalPages is still null after first request, break
+        if (totalPages === null && currentPage > 1) {
+          break;
+        }
+
+        // Safety limit to prevent infinite loops
+        if (currentPage > 1000) {
+          console.warn('Reached safety limit of 1000 pages for drive trials');
+          break;
+        }
+      }
+
+      return {
+        success: true,
+        data: allBookings,
+        paginationInfo: { totalPages, currentPage: currentPage - 1 },
+        message: 'Drive trials loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching all drive trials:', error);
       return {
         success: false,
         error: error.message || 'Failed to fetch drive trials',

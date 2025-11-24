@@ -29,8 +29,11 @@ export const useCustomerManagement = () => {
 
   /**
    * Load customers data
+   * @param {number} page - Page number (optional, not used when fetchAll is true)
+   * @param {number} limit - Items per page (optional, defaults to 100 when fetchAll is true)
+   * @param {boolean} fetchAll - Whether to fetch all customers (default: true)
    */
-  const loadCustomers = useCallback(async (page = 1, limit = 10) => {
+  const loadCustomers = useCallback(async (page = 1, limit = 100, fetchAll = true) => {
     if (!user?.agencyId) {
       console.warn('No agencyId available, cannot load customers');
       setErrors(prev => ({ ...prev, customers: 'No agency ID available' }));
@@ -41,7 +44,11 @@ export const useCustomerManagement = () => {
     setErrors(prev => ({ ...prev, customers: null }));
     
     try {
-      const data = await customerManagementService.getCustomers(user.agencyId, { page, limit });
+      const data = await customerManagementService.getCustomers(
+        user.agencyId, 
+        { page, limit }, 
+        fetchAll
+      );
       setCustomers(data);
     } catch (error) {
       setErrors(prev => ({ ...prev, customers: error.message }));

@@ -16,18 +16,78 @@ class CustomerManagementService {
   /**
    * Get all customers for an agency
    * @param {number} agencyId - Agency ID
-   * @param {Object} params - Query parameters (page, limit)
-   * @returns {Promise<Object>} Response with data and paginationInfo
+   * @param {Object} params - Query parameters (page, limit, fetchAll)
+   * @param {boolean} fetchAll - If true, fetch all pages of customers
+   * @returns {Promise<Array>} Array of customers sorted by id descending (newest first)
    */
-  async getCustomers(agencyId, params = {}) {
+  async getCustomers(agencyId, params = {}, fetchAll = true) {
     try {
+      // If fetchAll is true, fetch all pages
+      if (fetchAll) {
+        return await this._fetchAllCustomers(agencyId, params);
+      }
+      
+      // Otherwise, fetch single page
       const response = await api.get(ENDPOINTS.LIST_BY_AGENCY(agencyId), { params });
-      // Return the data array from response, sorted by id descending (newest first)
       const customers = response.data?.data || [];
       // Sort by id descending to show newest customers first
       return customers.sort((a, b) => (b.id || 0) - (a.id || 0));
     } catch (error) {
       console.error('Error fetching customers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to fetch all pages of customers
+   * @private
+   */
+  async _fetchAllCustomers(agencyId, params = {}) {
+    try {
+      const allCustomers = [];
+      let currentPage = 1;
+      let totalPages = null;
+      const limit = params.limit || 100; // Use provided limit or default to 100 per page
+
+      while (totalPages === null || currentPage <= totalPages) {
+        const response = await api.get(ENDPOINTS.LIST_BY_AGENCY(agencyId), {
+          params: { ...params, page: currentPage, limit }
+        });
+
+        const pageCustomers = response.data?.data || [];
+        allCustomers.push(...pageCustomers);
+
+        // Update pagination info from response
+        if (response.data?.paginationInfo) {
+          totalPages = response.data.paginationInfo.totalPages || 1;
+        } else {
+          // If no pagination info, assume this is the only page
+          totalPages = 1;
+        }
+
+        // If we got fewer items than the limit, we've reached the last page
+        if (pageCustomers.length < limit) {
+          break;
+        }
+
+        currentPage++;
+
+        // Safety check: if totalPages is still null after first request, break
+        if (totalPages === null && currentPage > 1) {
+          break;
+        }
+
+        // Safety limit to prevent infinite loops
+        if (currentPage > 1000) {
+          console.warn('Reached safety limit of 1000 pages for customers');
+          break;
+        }
+      }
+
+      // Sort by id descending to show newest customers first
+      return allCustomers.sort((a, b) => (b.id || 0) - (a.id || 0));
+    } catch (error) {
+      console.error('Error fetching all customers:', error);
       throw error;
     }
   }

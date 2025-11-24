@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  Modal,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
@@ -23,25 +21,20 @@ import {
   Phone, 
   User,
   Check,
-  Pencil,
+  X,
   Trash
 } from 'lucide-react-native';
 
 const DriveTrialDetailScreen = ({ navigation, route }) => {
-  const { bookingId, updateStatus } = route.params || {};
+  const { bookingId } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [booking, setBooking] = useState(null);
   const { alertConfig, hideAlert, showError, showInfo, showSuccess, showConfirm } = useCustomAlert();
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [newStatus, setNewStatus] = useState('');
 
   useEffect(() => {
     loadBookingDetail();
-    if (updateStatus) {
-      setShowStatusModal(true);
-    }
-  }, [bookingId, updateStatus]);
+  }, [bookingId]);
 
   const loadBookingDetail = async () => {
     try {
@@ -50,7 +43,6 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
       
       if (response.success && response.data) {
         setBooking(response.data);
-        setNewStatus(response.data.status);
       } else {
         showError('Error', response.error || 'Failed to load booking details');
         navigation.goBack();
@@ -64,23 +56,72 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleUpdateStatus = async () => {
+  const handleAccept = async () => {
     try {
       setUpdating(true);
       const response = await driveTrialService.updateDriveTrial(bookingId, {
-        status: newStatus,
+        status: 'ACCEPTED',
       });
 
       if (response.success) {
-        showSuccess('Success', 'Status updated successfully');
-        setShowStatusModal(false);
+        showSuccess('Success', 'Booking accepted successfully');
         loadBookingDetail();
       } else {
-        showError('Error', response.error || 'Failed to update status');
+        showError('Error', response.error || 'Failed to accept booking');
       }
     } catch (error) {
-      console.error('Error updating status:', error);
-      showError('Error', 'Failed to update status');
+      console.error('Error accepting booking:', error);
+      showError('Error', 'Failed to accept booking');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      setUpdating(true);
+      const response = await driveTrialService.updateDriveTrial(bookingId, {
+        status: 'COMPLETED',
+      });
+
+      if (response.success) {
+        showSuccess('Success', 'Booking completed successfully');
+        loadBookingDetail();
+      } else {
+        showError('Error', response.error || 'Failed to complete booking');
+      }
+    } catch (error) {
+      console.error('Error completing booking:', error);
+      showError('Error', 'Failed to complete booking');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleCancel = () => {
+    showConfirm(
+      'Cancel Booking',
+      `Are you sure you want to cancel this booking for "${booking?.fullname}"?`,
+      cancelBooking
+    );
+  };
+
+  const cancelBooking = async () => {
+    try {
+      setUpdating(true);
+      const response = await driveTrialService.updateDriveTrial(bookingId, {
+        status: 'CANCELED',
+      });
+
+      if (response.success) {
+        showSuccess('Success', 'Booking canceled successfully');
+        loadBookingDetail();
+      } else {
+        showError('Error', response.error || 'Failed to cancel booking');
+      }
+    } catch (error) {
+      console.error('Error canceling booking:', error);
+      showError('Error', 'Failed to cancel booking');
     } finally {
       setUpdating(false);
     }
@@ -164,13 +205,6 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
     }
   };
 
-  const statusOptions = [
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'ACCEPTED', label: 'Accepted' },
-    { value: 'COMPLETED', label: 'Completed' },
-    { value: 'CANCELED', label: 'Canceled' },
-  ];
-
   if (loading) {
     return <LoadingScreen />;
   }
@@ -178,6 +212,14 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
   if (!booking) {
     return null;
   }
+
+  // Get current status in uppercase for comparison
+  const currentStatus = booking.status?.toUpperCase() || '';
+  
+  // Determine which buttons to show based on status
+  const showAcceptButton = currentStatus === 'PENDING';
+  const showCompleteButton = currentStatus === 'ACCEPTED';
+  const showCancelButton = currentStatus === 'PENDING' || currentStatus === 'ACCEPTED';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -270,103 +312,62 @@ const DriveTrialDetailScreen = ({ navigation, route }) => {
         </ScrollView>
 
         {/* Action Buttons at Bottom */}
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={styles.statusButton}
-            onPress={() => setShowStatusModal(true)}
-            disabled={updating}
-          >
-            <LinearGradient
-              colors={['#009DFF', '#009DFF']}
-              style={styles.buttonGradient}
-            >
-              <View style={styles.buttonContent}>
-                <Pencil size={14} color="#FFFFFF" />
-                <Text style={styles.buttonText}> Update Status</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDelete}
-            disabled={loading}
-          >
-            <View style={styles.deleteButtonContent}>
-              {loading ? (
-                <Text style={styles.deleteButtonText}>Deleting...</Text>
-              ) : (
-                <>
-                  <Trash size={14} color={COLORS.TEXT.WHITE} />
-                  <Text style={styles.deleteButtonText}> Delete</Text>
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {(showAcceptButton || showCompleteButton || showCancelButton) && (
+          <View style={styles.bottomActions}>
+            {/* Accept Button - shown when status is PENDING */}
+            {showAcceptButton && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleAccept}
+                disabled={updating}
+              >
+                <LinearGradient
+                  colors={['#4CAF50', '#4CAF50']}
+                  style={styles.buttonGradient}
+                >
+                  <View style={styles.buttonContent}>
+                    <Check size={16} color="#FFFFFF" />
+                    <Text style={styles.buttonText}> Accept</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
 
-      {/* Status Update Modal */}
-      <Modal
-        visible={showStatusModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowStatusModal(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowStatusModal(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Update Status</Text>
-                
-                <View style={styles.statusOptionsContainer}>
-                  {statusOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.statusOptionButton,
-                        newStatus === option.value && styles.statusOptionButtonActive,
-                      ]}
-                      onPress={() => setNewStatus(option.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.statusOptionText,
-                          newStatus === option.value && styles.statusOptionTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                      {newStatus === option.value && (
-                        <Check size={16} color="#FFFFFF" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
+            {/* Complete Button - shown when status is ACCEPTED */}
+            {showCompleteButton && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleComplete}
+                disabled={updating}
+              >
+                <LinearGradient
+                  colors={['#2196F3', '#2196F3']}
+                  style={styles.buttonGradient}
+                >
+                  <View style={styles.buttonContent}>
+                    <Check size={16} color="#FFFFFF" />
+                    <Text style={styles.buttonText}> Complete</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
 
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonCancel]}
-                    onPress={() => setShowStatusModal(false)}
-                  >
-                    <Text style={styles.modalButtonCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonConfirm]}
-                    onPress={handleUpdateStatus}
-                    disabled={updating}
-                  >
-                    {updating ? (
-                      <Text style={styles.modalButtonConfirmText}>Updating...</Text>
-                    ) : (
-                      <Text style={styles.modalButtonConfirmText}>Confirm</Text>
-                    )}
-                  </TouchableOpacity>
+            {/* Cancel Button - shown when status is PENDING or ACCEPTED */}
+            {showCancelButton && (
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+                disabled={updating}
+              >
+                <View style={styles.cancelButtonContent}>
+                  <X size={16} color={COLORS.TEXT.WHITE} />
+                  <Text style={styles.cancelButtonText}> Cancel</Text>
                 </View>
-              </View>
-            </TouchableWithoutFeedback>
+              </TouchableOpacity>
+            )}
           </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        )}
+      </View>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -522,7 +523,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.SURFACE,
     gap: SIZES.PADDING.SMALL,
   },
-  statusButton: {
+  actionButton: {
     borderRadius: SIZES.RADIUS.LARGE,
     overflow: 'hidden',
   },
@@ -541,93 +542,22 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     marginLeft: 6,
   },
-  deleteButton: {
+  cancelButton: {
     backgroundColor: '#F44336',
     borderRadius: SIZES.RADIUS.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
   },
-  deleteButtonContent: {
+  cancelButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteButtonText: {
+  cancelButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
     marginLeft: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.SURFACE,
-    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
-    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
-    padding: SIZES.PADDING.LARGE,
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.XLARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SIZES.PADDING.LARGE,
-  },
-  statusOptionsContainer: {
-    marginBottom: SIZES.PADDING.LARGE,
-  },
-  statusOptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    backgroundColor: COLORS.SURFACE,
-    marginBottom: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.PRIMARY,
-  },
-  statusOptionButtonActive: {
-    backgroundColor: "#009DFF",
-    borderColor: "#009DFF",
-  },
-  statusOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
-  statusOptionTextActive: {
-    color: COLORS.TEXT.WHITE,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: SIZES.PADDING.SMALL,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderRadius: SIZES.RADIUS.LARGE,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: COLORS.SURFACE,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.PRIMARY,
-  },
-  modalButtonCancelText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  modalButtonConfirm: {
-    backgroundColor: "#009DFF",
-  },
-  modalButtonConfirmText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
   },
 });
 
