@@ -232,6 +232,16 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
     });
   };
 
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   const renderInfoRow = (label, value, valueStyle = {}) => (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -505,7 +515,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Information</Text>
           {renderInfoRow('Order ID', `#${order?.id || 'N/A'}`)}
-          {order && order.orderAt && renderInfoRow('Order Date', formatDate(order.orderAt))}
+          {order && order.orderAt && renderInfoRow('Order Date', formatDateOnly(order.orderAt))}
           {order && order.itemQuantity && renderInfoRow('Item Quantity', `${order.itemQuantity} items`)}
           {order && renderInfoRow('Status', getOrderStatusLabel(order) || 'N/A', {
             color: getOrderStatusColor(order),
@@ -690,7 +700,7 @@ const OrderRestockDetailManagerScreen = ({ navigation, route }) => {
                     color: COLORS.SUCCESS,
                     fontWeight: '600'
                   })}
-                  {renderInfoRow('Payment Date', formatDate(payment.payAt))}
+                  {renderInfoRow('Payment Date', formatDateOnly(payment.payAt))}
                 </View>
               ))}
           </View>
