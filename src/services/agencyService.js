@@ -87,14 +87,14 @@ const agencyService = {
 
   /**
    * Get list of agencies
-   * @param {Object} params - Query parameters (limit, page, location, address)
-   * @returns {Promise<Array>} List of agencies
+   * @param {Object} params - Query parameters (limit, page, location, address, sort, fetchAll)
+   * @param {boolean} params.fetchAll - If true, automatically fetch all pages. Default: true
+   * @returns {Promise<Object>} Response with data array and paginationInfo
    */
   async getAgencies(params = {}) {
     try {
-      // Use GET /agency/list endpoint as specified
       const token = await this.getAuthTokenAsync();
-      const url = `${API_BASE_URL}/agency/list`;
+      const baseUrl = `${API_BASE_URL}/agency/list`;
       
       const headers = {
         'Content-Type': 'application/json',
@@ -104,8 +104,27 @@ const agencyService = {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
+
+      // If fetchAll is true (default) or not specified, fetch all pages
+      const fetchAll = params.fetchAll !== false; // Default to true
       
-      const response = await fetch(url, {
+      if (fetchAll && !params.page) {
+        // Fetch all pages automatically
+        return await this._fetchAllAgencies(params, token, headers);
+      }
+
+      // Build query string from params
+      const queryParams = new URLSearchParams();
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.page) queryParams.append('page', params.page);
+      if (params.location) queryParams.append('location', params.location);
+      if (params.address) queryParams.append('address', params.address);
+      if (params.sort) queryParams.append('sort', params.sort);
+      
+      const queryString = queryParams.toString();
+      const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+      
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: headers,
       });
@@ -117,30 +136,19 @@ const agencyService = {
           success: false,
           error: data.message || `HTTP error! status: ${response.status}`,
           data: [],
+          paginationInfo: null,
         };
       }
 
-      // Handle different response formats
-      let agenciesData = [];
-      if (Array.isArray(data)) {
-        agenciesData = data;
-      } else if (data.data) {
-        // Handle nested data structures
-        if (Array.isArray(data.data)) {
-          agenciesData = data.data;
-        } else if (data.data.data && Array.isArray(data.data.data)) {
-          agenciesData = data.data.data;
-        } else if (data.data.agencies && Array.isArray(data.data.agencies)) {
-          agenciesData = data.data.agencies;
-        }
-      } else if (data.agencies && Array.isArray(data.agencies)) {
-        agenciesData = data.agencies;
-      }
+      // Handle response structure: { statusCode, message, data: [...], paginationInfo: {...} }
+      const agenciesData = data.data || [];
+      const paginationInfo = data.paginationInfo || null;
 
       return {
         success: true,
         data: agenciesData,
-        message: 'Agencies loaded successfully',
+        paginationInfo: paginationInfo,
+        message: data.message || 'Agencies loaded successfully',
       };
     } catch (error) {
       console.error('Error fetching agencies:', error);
@@ -148,6 +156,94 @@ const agencyService = {
         success: false,
         error: error.message || 'Failed to fetch agencies',
         data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
+   * Helper method to fetch all pages of agencies
+   * @private
+   */
+  async _fetchAllAgencies(params, token, headers) {
+    try {
+      const allAgencies = [];
+      let currentPage = 1;
+      let totalPages = null;
+      const limit = params.limit || 100; // Use provided limit or default to 100 per page
+
+      while (totalPages === null || currentPage <= totalPages) {
+        // Build query string for current page
+        const queryParams = new URLSearchParams();
+        queryParams.append('limit', limit);
+        queryParams.append('page', currentPage);
+        if (params.location) queryParams.append('location', params.location);
+        if (params.address) queryParams.append('address', params.address);
+        if (params.sort) queryParams.append('sort', params.sort);
+        
+        const queryString = queryParams.toString();
+        const url = `${API_BASE_URL}/agency/list?${queryString}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: headers,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.message || `HTTP error! status: ${response.status}`,
+            data: allAgencies,
+            paginationInfo: null,
+          };
+        }
+
+        // Extract agencies from response
+        const pageAgencies = data.data || [];
+        allAgencies.push(...pageAgencies);
+
+        // Update pagination info from first response
+        if (data.paginationInfo) {
+          totalPages = data.paginationInfo.totalPages || 1;
+        } else {
+          // If no pagination info, assume this is the only page
+          totalPages = 1;
+        }
+
+        // If we got fewer items than the limit, we've reached the last page
+        if (pageAgencies.length < limit) {
+          break;
+        }
+
+        currentPage++;
+
+        // Safety check: if totalPages is still null after first request, break
+        if (totalPages === null) {
+          totalPages = 1;
+          break;
+        }
+      }
+
+      return {
+        success: true,
+        data: allAgencies,
+        paginationInfo: {
+          page: 1,
+          limit: allAgencies.length,
+          total: allAgencies.length,
+          totalPages: 1,
+        },
+        message: 'All agencies loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching all agencies:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch all agencies',
+        data: [],
+        paginationInfo: null,
       };
     }
   },
