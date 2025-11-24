@@ -11,7 +11,6 @@ const REPORT_ENDPOINTS = {
   TOTAL_AGENCIES: '/report/total/agencies',
   TOTAL_WAREHOUSES: '/report/total/warehouses',
   TOTAL_MOTORBIKES: '/report/total/motorbikes',
-  TOTAL_AP_BATCHES: '/report/total/ap-batches',
   TOP_10_MOTORBIKES: '/report/top-10/motorbikes',
 };
 
@@ -101,26 +100,6 @@ class ReportService {
       return response.data;
     } catch (error) {
       console.error('Error fetching total motorbikes:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get total AP batches count
-   * @param {string} agencyId - Optional agency ID
-   * @returns {Promise<Object>} Response with totalApBatches
-   */
-  async getTotalApBatches(agencyId = null) {
-    try {
-      const params = {};
-      if (agencyId) {
-        params.agencyId = agencyId;
-      }
-      
-      const response = await api.get(REPORT_ENDPOINTS.TOTAL_AP_BATCHES, { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching total AP batches:', error);
       throw error;
     }
   }
