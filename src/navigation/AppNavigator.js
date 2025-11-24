@@ -38,6 +38,7 @@ import AllocationManagementScreen from '../screens/allocation/AllocationManageme
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
 import AddInventoryScreen from '../screens/inventory/AddInventoryScreen';
 import EditInventoryScreen from '../screens/inventory/EditInventoryScreen';
+import InventoryDetailScreen from '../screens/inventory/InventoryDetailScreen';
 import DealerManagementScreen from '../screens/dealer/DealerManagementScreen';
 import DealerStaffManagementScreen from '../screens/dealer/DealerStaffManagementScreen';
 import CreateDealerStaffScreen from '../screens/dealer/CreateDealerStaffScreen';
@@ -303,6 +304,11 @@ const AppNavigator = () => {
             <Stack.Screen
               name="EditInventory"
               component={EditInventoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InventoryDetail"
+              component={InventoryDetailScreen}
               options={{ headerShown: false }}
             />
              <Stack.Screen

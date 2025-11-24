@@ -187,6 +187,10 @@ const InventoryManagementScreen = ({ navigation }) => {
     navigation.navigate('AddInventory');
   };
 
+  const handleViewItem = (item) => {
+    navigation.navigate('InventoryDetail', { item });
+  };
+
   const handleEditItem = (item) => {
     navigation.navigate('EditInventory', { item });
   };
@@ -257,7 +261,12 @@ const InventoryManagementScreen = ({ navigation }) => {
     const statusMeta = getStatusMeta(item.quantity);
 
     return (
-      <View key={`${item.electricMotorbikeId}-${item.warehouseId}-${item.colorId}`} style={styles.inventoryCard}>
+      <TouchableOpacity 
+        key={`${item.electricMotorbikeId}-${item.warehouseId}-${item.colorId}`} 
+        style={styles.inventoryCard}
+        onPress={() => handleViewItem(item)}
+        activeOpacity={0.7}
+      >
         <View style={styles.cardHeader}>
           <View style={styles.itemInfo}>
             <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown'}</Text>
@@ -318,7 +327,7 @@ const InventoryManagementScreen = ({ navigation }) => {
             <Trash2 size={16} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
