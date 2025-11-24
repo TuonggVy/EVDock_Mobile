@@ -94,7 +94,7 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     try {
       setLoadingDetails(prev => ({ ...prev, [orderId]: true }));
       
-      // First, get order detail to find orderItemId
+      // First, get order detail to find all orderItems
       const orderResponse = await orderRestockService.getOrderRestockDetail(orderId);
       
       if (orderResponse.success && orderResponse.data) {
@@ -104,31 +104,60 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           [orderId]: orderResponse.data
         }));
 
-        const firstItem = orderResponse.data.orderItems?.[0];
-        const orderItemId = firstItem?.id;
+        const orderItems = orderResponse.data.orderItems || [];
         
-        if (!orderItemId) {
-          // No order item found, return null
+        if (orderItems.length === 0) {
+          // No order items found, return null
           return null;
         }
         
-        // Get order item detail to get full warehouse and motorbike info
-        const itemDetailResponse = await orderRestockService.getOrderItemDetail(orderItemId);
+        // Load details for all order items to get all motorbike names
+        const itemDetailPromises = orderItems.map(item => 
+          orderRestockService.getOrderItemDetail(item.id)
+        );
         
-        if (itemDetailResponse.success && itemDetailResponse.data) {
-          const detail = {
-            warehouseName: itemDetailResponse.data.warehouse?.name || null,
-            motorbikeName: itemDetailResponse.data.electricMotorbike?.name || null,
-          };
-          
-          // Cache the detail
-          setOrderDetailsCache(prev => ({
-            ...prev,
-            [orderId]: detail
-          }));
-          
-          return detail;
-        }
+        const itemDetailResponses = await Promise.all(itemDetailPromises);
+        
+        // Extract motorbike names and warehouse names from all items
+        const motorbikeNames = [];
+        const warehouseNames = new Set();
+        
+        itemDetailResponses.forEach((response, index) => {
+          if (response.success && response.data) {
+            const motorbikeName = response.data.electricMotorbike?.name;
+            const warehouseName = response.data.warehouse?.name;
+            const quantity = orderItems[index]?.quantity || 1;
+            
+            if (motorbikeName) {
+              // Add motorbike name with quantity if > 1
+              const displayName = quantity > 1 
+                ? `${motorbikeName} (x${quantity})`
+                : motorbikeName;
+              motorbikeNames.push(displayName);
+            }
+            
+            if (warehouseName) {
+              warehouseNames.add(warehouseName);
+            }
+          }
+        });
+        
+        // Use the first warehouse name (or join if multiple)
+        const warehouseName = Array.from(warehouseNames)[0] || null;
+        
+        const detail = {
+          warehouseName,
+          motorbikeNames: motorbikeNames.length > 0 ? motorbikeNames : null,
+          motorbikeName: motorbikeNames.length > 0 ? motorbikeNames.join(', ') : null, // For backward compatibility
+        };
+        
+        // Cache the detail
+        setOrderDetailsCache(prev => ({
+          ...prev,
+          [orderId]: detail
+        }));
+        
+        return detail;
       }
       return null;
     } catch (error) {
@@ -179,12 +208,37 @@ const OrderRestockManagementScreen = ({ navigation }) => {
           newFullDataCache[order.id] = order;
           
           if (order.orderItems && order.orderItems.length > 0) {
-            const firstItem = order.orderItems[0];
-            // If orderItems already have warehouse and motorbike info, use it
-            if (firstItem.warehouse?.name || firstItem.electricMotorbike?.name) {
+            // Check if all orderItems have complete info (warehouse and motorbike)
+            const allItemsHaveInfo = order.orderItems.every(
+              item => item.warehouse?.name && item.electricMotorbike?.name
+            );
+            
+            if (allItemsHaveInfo) {
+              // Extract all motorbike names
+              const motorbikeNames = [];
+              const warehouseNames = new Set();
+              
+              order.orderItems.forEach(item => {
+                const motorbikeName = item.electricMotorbike?.name;
+                const warehouseName = item.warehouse?.name;
+                const quantity = item.quantity || 1;
+                
+                if (motorbikeName) {
+                  const displayName = quantity > 1 
+                    ? `${motorbikeName} (x${quantity})`
+                    : motorbikeName;
+                  motorbikeNames.push(displayName);
+                }
+                
+                if (warehouseName) {
+                  warehouseNames.add(warehouseName);
+                }
+              });
+              
               newDetailsCache[order.id] = {
-                warehouseName: firstItem.warehouse?.name || null,
-                motorbikeName: firstItem.electricMotorbike?.name || null,
+                warehouseName: Array.from(warehouseNames)[0] || null,
+                motorbikeNames: motorbikeNames.length > 0 ? motorbikeNames : null,
+                motorbikeName: motorbikeNames.length > 0 ? motorbikeNames.join(', ') : null,
               };
             }
           }
@@ -202,12 +256,12 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         const detailPromises = sortedOrders
           .filter(order => {
             // Skip if we already have the info from list response
-            if (newDetailsCache[order.id]?.warehouseName && newDetailsCache[order.id]?.motorbikeName) {
+            if (newDetailsCache[order.id]?.motorbikeNames && newDetailsCache[order.id].motorbikeNames.length > 0) {
               return false;
             }
             // Also check existing cache
             const existingCache = orderDetailsCache[order.id];
-            if (existingCache?.warehouseName && existingCache?.motorbikeName) {
+            if (existingCache?.motorbikeNames && existingCache.motorbikeNames.length > 0) {
               return false;
             }
             // Load detail for all orders that don't have complete info
@@ -273,11 +327,37 @@ const OrderRestockManagementScreen = ({ navigation }) => {
   const getMotorbikeName = (order) => {
     // First check cache
     const cachedDetail = orderDetailsCache[order.id];
+    if (cachedDetail?.motorbikeNames && cachedDetail.motorbikeNames.length > 0) {
+      // Return array of motorbike names
+      return cachedDetail.motorbikeNames;
+    }
     if (cachedDetail?.motorbikeName) {
-      return cachedDetail.motorbikeName;
+      // Backward compatibility - single string
+      return [cachedDetail.motorbikeName];
     }
     // Fallback to order data if available
-    return order.electricMotorbike?.name || 'Loading...';
+    const orderFullData = orderFullDataCache[order.id] || order;
+    if (orderFullData?.orderItems && orderFullData.orderItems.length > 0) {
+      const motorbikeNames = [];
+      orderFullData.orderItems.forEach(item => {
+        const motorbikeName = item.electricMotorbike?.name;
+        const quantity = item.quantity || 1;
+        if (motorbikeName) {
+          const displayName = quantity > 1 
+            ? `${motorbikeName} (x${quantity})`
+            : motorbikeName;
+          motorbikeNames.push(displayName);
+        }
+      });
+      if (motorbikeNames.length > 0) {
+        return motorbikeNames;
+      }
+    }
+    // Fallback to single motorbike name
+    if (order.electricMotorbike?.name) {
+      return [order.electricMotorbike.name];
+    }
+    return ['Loading...'];
   };
 
   // Calculate total paid amount from order payments
@@ -304,11 +384,14 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => {
-        const motorbikeName = getMotorbikeName(order).toLowerCase();
+        const motorbikeNames = getMotorbikeName(order);
+        const motorbikeNamesStr = Array.isArray(motorbikeNames) 
+          ? motorbikeNames.join(' ').toLowerCase()
+          : motorbikeNames.toLowerCase();
         const warehouseName = getWarehouseName(order).toLowerCase();
         return (
           order.id?.toString().toLowerCase().includes(query) ||
-          motorbikeName.includes(query) ||
+          motorbikeNamesStr.includes(query) ||
           warehouseName.includes(query) ||
           getAgencyName(order).toLowerCase().includes(query)
         );
@@ -436,35 +519,43 @@ const OrderRestockManagementScreen = ({ navigation }) => {
     });
   };
 
-  const renderOrderCard = (order) => (
-    <TouchableOpacity
-      key={order.id}
-      style={styles.orderCard}
-      onPress={() => handleViewOrder(order)}
-    >
-      <View style={styles.orderHeader}>
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>Order #{order.id}</Text>
-          <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
+  const renderOrderCard = (order) => {
+    const motorbikeNames = getMotorbikeName(order);
+    
+    return (
+      <TouchableOpacity
+        key={order.id}
+        style={styles.orderCard}
+        onPress={() => handleViewOrder(order)}
+      >
+        <View style={styles.orderHeader}>
+          <View style={styles.orderInfo}>
+            <Text style={styles.orderId}>Order #{order.id}</Text>
+            <Text style={styles.orderDate}>{formatDate(order.orderAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order) }]}>
+            <Text style={styles.statusText}>{getOrderStatusLabel(order)}</Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order) }]}>
-          <Text style={styles.statusText}>{getOrderStatusLabel(order)}</Text>
-        </View>
-      </View>
 
-      <View style={styles.orderDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Agency:</Text>
-          <Text style={styles.detailValue}>
-            {getAgencyName(order)}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Vehicle:</Text>
-          <Text style={styles.detailValue}>
-            {getMotorbikeName(order)}
-          </Text>
-        </View>
+        <View style={styles.orderDetails}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Agency:</Text>
+            <Text style={styles.detailValue}>
+              {getAgencyName(order)}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Vehicle:</Text>
+            <View style={styles.motorbikeNamesContainer}>
+              {motorbikeNames.map((name, index) => (
+                <Text key={index} style={styles.detailValue}>
+                  {name}
+                  {index < motorbikeNames.length - 1 ? ', ' : ''}
+                </Text>
+              ))}
+            </View>
+          </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Warehouse:</Text>
           <Text style={styles.detailValue}>
@@ -511,7 +602,8 @@ const OrderRestockManagementScreen = ({ navigation }) => {
         )}
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   // Calculate statistics (excluding DRAFT orders)
   const totalOrders = orders.filter(o => o.status !== 'DRAFT').length;
@@ -890,7 +982,7 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 4,
   },
   detailLabel: {
@@ -901,6 +993,13 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
+  },
+  motorbikeNamesContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   priceValue: {
     color: COLORS.SUCCESS,

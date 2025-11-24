@@ -266,6 +266,16 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
     });
   };
 
+  const formatDateOnly = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   const renderInfoRow = (label, value, valueStyle = {}) => (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -437,7 +447,7 @@ const OrderRestockDetailScreen = ({ navigation, route }) => {
                     color: COLORS.SUCCESS,
                     fontWeight: '600'
                   })}
-                  {renderInfoRow('Payment Date', formatDate(payment.payAt))}
+                  {renderInfoRow('Payment Date', formatDateOnly(payment.payAt))}
                   {payment.id && renderInfoRow('Payment ID', payment.id.toString())}
                 </View>
               ))}
