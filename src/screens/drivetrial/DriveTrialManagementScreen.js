@@ -45,10 +45,14 @@ const DriveTrialManagementScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await driveTrialService.getDriveTrials(user.agencyId, {
-        page: 1,
-        limit: 100,
-      });
+      const response = await driveTrialService.getDriveTrials(
+        user.agencyId,
+        {
+          page: 1,
+          limit: 100,
+        },
+        true // fetchAll = true to get all drive trials
+      );
 
       if (response.success) {
         setBookings(response.data || []);
