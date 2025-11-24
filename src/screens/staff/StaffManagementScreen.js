@@ -112,14 +112,8 @@ const StaffManagementScreen = ({ navigation }) => {
   };
 
   const filterStaff = () => {
-    // Hide soft-deleted by default and treat no-agency as not active
-    let filtered = staffList
-      .filter(s => !s.isDeleted)
-      .map(s => ({
-        ...s,
-        status: s.agencyId ? (s.status || 'active') : 'inactive',
-        isActive: s.agencyId ? (s.isActive !== false) : false,
-      }));
+    // Hide soft-deleted by default
+    let filtered = staffList.filter(s => !s.isDeleted);
 
     // Apply search filter
     if (searchQuery) {
@@ -132,10 +126,10 @@ const StaffManagementScreen = ({ navigation }) => {
       );
     }
 
-    // Apply tab filter
+    // Apply tab filter - only use isActive field from API (same as Swagger)
     const matchesTab = activeTab === 'Active' 
-      ? filtered.filter(s => s.isActive && s.agencyId)
-      : filtered.filter(s => !s.isActive || !s.agencyId);
+      ? filtered.filter(s => s.isActive === true)
+      : filtered.filter(s => s.isActive === false);
 
     setFilteredStaff(matchesTab);
   };
@@ -653,10 +647,10 @@ const StaffManagementScreen = ({ navigation }) => {
     </Modal>
   );
 
-  // Calculate statistics
+  // Calculate statistics - only use isActive field from API (same as Swagger)
   const totalStaff = staffList.filter(s => !s.isDeleted).length;
-  const activeStaff = staffList.filter(s => !s.isDeleted && s.isActive && s.agencyId).length;
-  const inactiveStaff = staffList.filter(s => !s.isDeleted && (!s.isActive || !s.agencyId)).length;
+  const activeStaff = staffList.filter(s => !s.isDeleted && s.isActive === true).length;
+  const inactiveStaff = staffList.filter(s => !s.isDeleted && s.isActive === false).length;
 
   return (
     <SafeAreaView style={styles.container}>
