@@ -9,7 +9,6 @@ import {
   Alert,
   RefreshControl,
   Dimensions,
-  TextInput,
   FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,7 +30,6 @@ const ReportsScreen = ({ navigation }) => {
     totalAgencies: 0,
     totalWarehouses: 0,
     totalMotorbikes: 0,
-    totalApBatches: 0,
   });
 
   // Chart Data
@@ -53,14 +51,12 @@ const ReportsScreen = ({ navigation }) => {
         agenciesRes,
         warehousesRes,
         motorbikesRes,
-        apBatchesRes,
         top10Res,
       ] = await Promise.all([
         reportService.getTotalContractRevenue(agencyId),
         reportService.getTotalAgencies(),
         reportService.getTotalWarehouses(),
         reportService.getTotalMotorbikes(),
-        reportService.getTotalApBatches(agencyId),
         reportService.getTop10Motorbikes(),
       ]);
 
@@ -77,10 +73,6 @@ const ReportsScreen = ({ navigation }) => {
         totalMotorbikes:
           typeof (motorbikesRes?.data?.totalMotorbikes ?? motorbikesRes?.data) === 'number'
             ? (motorbikesRes?.data?.totalMotorbikes ?? motorbikesRes?.data)
-            : 0,
-        totalApBatches:
-          typeof (apBatchesRes?.data?.totalApBatches ?? apBatchesRes?.data) === 'number'
-            ? (apBatchesRes?.data?.totalApBatches ?? apBatchesRes?.data)
             : 0,
       });
 
@@ -106,19 +98,6 @@ const ReportsScreen = ({ navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadReports();
-  };
-
-  const handleYearChange = () => {
-    const year = parseInt(yearInput);
-    if (year >= 2000 && year <= 2100) {
-      // no-op: quarter chart removed
-    } else {
-      Alert.alert(
-        'Error',
-        'Invalid year. Please enter a year between 2000 and 2100.',
-        [{ text: 'OK' }]
-      );
-    }
   };
 
   // Format revenue for display
@@ -217,16 +196,6 @@ const ReportsScreen = ({ navigation }) => {
               >
                 <Text style={styles.kpiNumber}>{kpiData.totalMotorbikes}</Text>
                 <Text style={styles.kpiLabel}>Motorbikes</Text>
-              </LinearGradient>
-            </View>
-
-            <View style={styles.kpiCard}>
-              <LinearGradient
-                colors={['#009DFF', '#009DFF']}
-                style={styles.kpiGradient}
-              >
-                <Text style={styles.kpiNumber}>{kpiData.totalApBatches}</Text>
-                <Text style={styles.kpiLabel}>AP Batches</Text>
               </LinearGradient>
             </View>
           </View>
