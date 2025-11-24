@@ -81,7 +81,16 @@ const DealerManagerDashboardScreen = ({ navigation }) => {
       setTotalRevenue(totalRevenueRes?.data?.totalRevenue || 0);
 
       // Set chart data
-      const chartDataArray = chartRes?.data || [];
+      // Handle different response structures
+      let chartDataArray = [];
+      if (Array.isArray(chartRes?.data)) {
+        chartDataArray = chartRes.data;
+      } else if (Array.isArray(chartRes)) {
+        chartDataArray = chartRes;
+      } else if (chartRes?.data?.data && Array.isArray(chartRes.data.data)) {
+        chartDataArray = chartRes.data.data;
+      }
+      
       setChartData(chartDataArray);
 
       // Set staff revenue list
@@ -126,48 +135,59 @@ const DealerManagerDashboardScreen = ({ navigation }) => {
   };
 
   // Prepare grouped bar chart data for react-native-gifted-charts
-  // We'll create 3 separate bar charts or use stacked approach
+  // Each month will have 3 bars grouped together: Completed, Delivered, Pending
   const prepareGroupedChartData = () => {
-    if (!chartData || chartData.length === 0) return [];
+    if (!chartData || chartData.length === 0) return { chartData: [], maxValue: 10 };
 
     const monthNames = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
     
-    // Find max value for scaling
+    // Find max value for scaling (max of individual values, not sum)
     const maxValue = Math.max(
       ...chartData.flatMap(item => [
-        item.totalContractCompleted || 0,
-        item.totalContractDelivered || 0,
-        item.totalContractPending || 0,
+        Number(item.totalContractCompleted) || 0,
+        Number(item.totalContractDelivered) || 0,
+        Number(item.totalContractPending) || 0,
       ]),
       1 // Ensure at least 1 to avoid division by zero
     );
 
-    // Create data arrays for each series
-    const completedData = chartData.map((item) => ({
-      value: item.totalContractCompleted || 0,
-      label: monthNames[item.month - 1] || `T${item.month}`,
-      frontColor: '#4ABFF4',
-      spacing: 2,
-    }));
-
-    const deliveredData = chartData.map((item) => ({
-      value: item.totalContractDelivered || 0,
-      label: monthNames[item.month - 1] || `T${item.month}`,
-      frontColor: '#4CAF50',
-      spacing: 2,
-    }));
-
-    const pendingData = chartData.map((item) => ({
-      value: item.totalContractPending || 0,
-      label: monthNames[item.month - 1] || `T${item.month}`,
-      frontColor: '#FF9800',
-      spacing: 2,
-    }));
+    // Create grouped bar chart data
+    // For each month, create 3 bars: Completed (with label), Delivered, Pending
+    const groupedBarData = [];
+    
+    chartData.forEach((item) => {
+      const completed = Number(item.totalContractCompleted) || 0;
+      const delivered = Number(item.totalContractDelivered) || 0;
+      const pending = Number(item.totalContractPending) || 0;
+      const monthLabel = monthNames[item.month - 1] || `T${item.month}`;
+      
+      // First bar: Completed (with label)
+      groupedBarData.push({
+        value: completed,
+        label: monthLabel,
+        spacing: 2, // Small spacing between bars in the same group
+        labelWidth: 30,
+        labelTextStyle: { color: '#FFFFFF', fontSize: 10 },
+        frontColor: '#4ABFF4', // Blue for Completed
+      });
+      
+      // Second bar: Delivered (no label)
+      groupedBarData.push({
+        value: delivered,
+        spacing: 2, // Small spacing between bars in the same group
+        frontColor: '#4CAF50', // Green for Delivered
+      });
+      
+      // Third bar: Pending (no label)
+      groupedBarData.push({
+        value: pending,
+        spacing: 24, // Larger spacing after the group (before next month)
+        frontColor: '#FF9800', // Orange for Pending
+      });
+    });
 
     return {
-      completed: completedData,
-      delivered: deliveredData,
-      pending: pendingData,
+      chartData: groupedBarData,
       maxValue: maxValue,
     };
   };
@@ -349,7 +369,7 @@ const DealerManagerDashboardScreen = ({ navigation }) => {
           )}
 
           <View style={styles.chartCardDark}>
-            {groupedChartData.completed && groupedChartData.completed.length > 0 ? (
+            {groupedChartData.chartData && groupedChartData.chartData.length > 0 ? (
               <>
                 <View style={styles.chartLegend}>
                   <View style={styles.legendItem}>
@@ -373,30 +393,23 @@ const DealerManagerDashboardScreen = ({ navigation }) => {
                     style={styles.chartScrollView}
                   >
                     <BarChart
-                      data={groupedChartData.completed}
-                      width={Math.max(CHART_WIDTH, groupedChartData.completed.length * 60)}
+                      data={groupedChartData.chartData}
+                      width={Math.max(CHART_WIDTH, (groupedChartData.chartData.length / 3) * 50)}
                       height={200}
-                      showFractionalValue
-                      showYAxisIndices
+                      barWidth={8}
+                      roundedTop
+                      roundedBottom
+                      hideRules
+                      xAxisThickness={0}
+                      yAxisThickness={0}
+                      yAxisTextStyle={{ color: '#FFFFFF', fontSize: 12 }}
                       noOfSections={4}
                       maxValue={groupedChartData.maxValue * 1.2 || 10}
                       isAnimated
-                      yAxisTextStyle={{ color: '#FFFFFF', fontSize: 12 }}
-                      xAxisLabelTextStyle={{ color: '#FFFFFF', fontSize: 10 }}
-                      yAxisColor="rgba(255, 255, 255, 0.3)"
-                      xAxisColor="rgba(255, 255, 255, 0.3)"
-                      rulesColor="rgba(255, 255, 255, 0.2)"
-                      textColor="#FFFFFF"
-                      textFontSize={12}
-                      spacing={20}
+                      spacing={24}
                       initialSpacing={10}
                     />
                   </ScrollView>
-                </View>
-                <View style={styles.chartNote}>
-                  <Text style={styles.chartNoteText}>
-                    * Chart shows Completed contracts. Use legend to understand all series.
-                  </Text>
                 </View>
               </>
             ) : (
