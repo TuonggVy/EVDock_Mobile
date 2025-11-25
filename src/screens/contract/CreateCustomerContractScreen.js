@@ -26,11 +26,18 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
   
   // Get quotationId from route params if available
   const routeQuotationId = route?.params?.quotationId;
+  const fromDeposit = route?.params?.fromDeposit || false;
+  const fromFullPayment = route?.params?.fromFullPayment || false;
+  const quotationType = route?.params?.quotationType || '';
+  const isPreOrder = quotationType?.toUpperCase() === 'PRE_ORDER';
   const [quotationId, setQuotationId] = useState(routeQuotationId || '');
   const [loadingQuotation, setLoadingQuotation] = useState(false);
   const [formData, setFormData] = useState({
     title: '', content: '', finalPrice: '',
-    contractPaidType: 'FULL',
+    // Priority: fromDeposit > fromFullPayment > default FULL
+    // For PRE_ORDER: if fromDeposit, default to DEBT but allow change; otherwise default to FULL
+    // For non-PRE_ORDER: if fromDeposit, set to DEBT and disable; if fromFullPayment, set to FULL and disable
+    contractPaidType: fromDeposit ? 'DEBT' : (fromFullPayment ? 'FULL' : 'FULL'),
     customerId: null, electricMotorbikeId: null, colorId: null,
     quotationId: null,
   });
@@ -274,34 +281,50 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Customer <Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity style={[styles.dropdown, errors.customerId && styles.dropdownError]} onPress={() => setShowCustomerModal(true)}>
+              <TouchableOpacity 
+                style={[styles.dropdown, styles.dropdownReadOnly, errors.customerId && styles.dropdownError]} 
+                disabled={true}
+                activeOpacity={1}
+              >
                 <Text style={[styles.dropdownText, !formData.customerId && styles.dropdownPlaceholder]}>{getCustomerName()}</Text>
-                <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
               </TouchableOpacity>
               {errors.customerId && <Text style={styles.errorText}>{errors.customerId}</Text>}
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Motorbike <Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity style={[styles.dropdown, errors.electricMotorbikeId && styles.dropdownError]} onPress={() => setShowMotorbikeModal(true)}>
+              <TouchableOpacity 
+                style={[styles.dropdown, styles.dropdownReadOnly, errors.electricMotorbikeId && styles.dropdownError]} 
+                disabled={true}
+                activeOpacity={1}
+              >
                 <Text style={[styles.dropdownText, !formData.electricMotorbikeId && styles.dropdownPlaceholder]}>{getMotorbikeName()}</Text>
-                <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
               </TouchableOpacity>
               {errors.electricMotorbikeId && <Text style={styles.errorText}>{errors.electricMotorbikeId}</Text>}
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Color <Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity style={[styles.dropdown, errors.colorId && styles.dropdownError]} onPress={() => setShowColorModal(true)} disabled={!formData.electricMotorbikeId}>
+              <TouchableOpacity 
+                style={[styles.dropdown, styles.dropdownReadOnly, errors.colorId && styles.dropdownError]} 
+                disabled={true}
+                activeOpacity={1}
+              >
                 <Text style={[styles.dropdownText, !formData.colorId && styles.dropdownPlaceholder]}>{getColorName()}</Text>
-                <ChevronDown color={COLORS.TEXT.SECONDARY} size={20} />
               </TouchableOpacity>
               {errors.colorId && <Text style={styles.errorText}>{errors.colorId}</Text>}
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Final Price (VND) <Text style={styles.required}>*</Text></Text>
-              <TextInput style={[styles.formInput, errors.finalPrice && styles.formInputError]} placeholder="Enter final price" placeholderTextColor={COLORS.TEXT.SECONDARY} value={formData.finalPrice} onChangeText={(value) => handleInputChange('finalPrice', value.replace(/[^0-9]/g, ''))} keyboardType="numeric" />
+              <TextInput 
+                style={[styles.formInput, styles.formInputReadOnly, errors.finalPrice && styles.formInputError]} 
+                placeholder="Enter final price" 
+                placeholderTextColor={COLORS.TEXT.SECONDARY} 
+                value={formData.finalPrice} 
+                editable={false}
+                keyboardType="numeric" 
+              />
               {formData.finalPrice && <Text style={styles.formHelper}>{formatPrice(parseFloat(formData.finalPrice) || 0)}</Text>}
               {errors.finalPrice && <Text style={styles.errorText}>{errors.finalPrice}</Text>}
             </View>
@@ -311,15 +334,65 @@ const CreateCustomerContractScreen = ({ navigation, route }) => {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Contract Paid Type <Text style={styles.required}>*</Text></Text>
               <View style={styles.radioGroup}>
-                <TouchableOpacity style={[styles.radioButton, formData.contractPaidType === 'FULL' && styles.radioButtonActive]} onPress={() => handleInputChange('contractPaidType', 'FULL')}>
-                  <View style={[styles.radioCircle, formData.contractPaidType === 'FULL' && styles.radioCircleActive]} />
-                  <Text style={styles.radioLabel}>Full Payment</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.radioButton, 
+                    formData.contractPaidType === 'FULL' && styles.radioButtonActive,
+                    // Disable only if not PRE_ORDER and (fromDeposit or fromFullPayment)
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioButtonDisabled
+                  ]} 
+                  onPress={() => {
+                    // Allow selection if PRE_ORDER, or if not fromDeposit/fromFullPayment
+                    if (isPreOrder || !(fromDeposit || fromFullPayment)) {
+                      handleInputChange('contractPaidType', 'FULL');
+                    }
+                  }}
+                  disabled={!isPreOrder && (fromDeposit || fromFullPayment)}
+                  activeOpacity={(!isPreOrder && (fromDeposit || fromFullPayment)) ? 1 : 0.8}
+                >
+                  <View style={[
+                    styles.radioCircle, 
+                    formData.contractPaidType === 'FULL' && styles.radioCircleActive,
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioCircleDisabled
+                  ]} />
+                  <Text style={[
+                    styles.radioLabel,
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioLabelDisabled
+                  ]}>Full Payment</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.radioButton, formData.contractPaidType === 'DEBT' && styles.radioButtonActive]} onPress={() => handleInputChange('contractPaidType', 'DEBT')}>
-                  <View style={[styles.radioCircle, formData.contractPaidType === 'DEBT' && styles.radioCircleActive]} />
-                  <Text style={styles.radioLabel}>Debt</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.radioButton, 
+                    formData.contractPaidType === 'DEBT' && styles.radioButtonActive,
+                    // Disable only if not PRE_ORDER and (fromDeposit or fromFullPayment)
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioButtonDisabled
+                  ]} 
+                  onPress={() => {
+                    // Allow selection if PRE_ORDER, or if not fromDeposit/fromFullPayment
+                    if (isPreOrder || !(fromDeposit || fromFullPayment)) {
+                      handleInputChange('contractPaidType', 'DEBT');
+                    }
+                  }}
+                  disabled={!isPreOrder && (fromDeposit || fromFullPayment)}
+                  activeOpacity={(!isPreOrder && (fromDeposit || fromFullPayment)) ? 1 : 0.8}
+                >
+                  <View style={[
+                    styles.radioCircle, 
+                    formData.contractPaidType === 'DEBT' && styles.radioCircleActive,
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioCircleDisabled
+                  ]} />
+                  <Text style={[
+                    styles.radioLabel,
+                    (!isPreOrder && (fromDeposit || fromFullPayment)) && styles.radioLabelDisabled
+                  ]}>Debt</Text>
                 </TouchableOpacity>
               </View>
+              {fromDeposit && !isPreOrder && (
+                <Text style={styles.formHelper}>Contract Paid Type is set to Debt because this quotation has a deposit</Text>
+              )}
+              {fromFullPayment && !fromDeposit && !isPreOrder && (
+                <Text style={styles.formHelper}>Contract Paid Type is set to Full Payment because this contract is created from Full Payment</Text>
+              )}
             </View>
 
             
@@ -392,14 +465,17 @@ const styles = StyleSheet.create({
   formLabel: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.SMALL },
   required: { color: COLORS.ERROR },
   formInput: { backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY, borderWidth: 1, borderColor: '#D1D5DB' },
+  formInputReadOnly: { backgroundColor: '#F3F4F6', opacity: 0.7 },
   formInputError: { borderColor: COLORS.ERROR },
   textArea: { minHeight: 100, paddingTop: SIZES.PADDING.MEDIUM },
   formHelper: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.SECONDARY, marginTop: SIZES.PADDING.XSMALL },
   errorText: { fontSize: SIZES.FONT.SMALL, color: COLORS.ERROR, marginTop: SIZES.PADDING.XSMALL },
   dropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, borderWidth: 1, borderColor: '#D1D5DB' },
+  dropdownReadOnly: { backgroundColor: '#F3F4F6', opacity: 0.7 },
   dropdownError: { borderColor: COLORS.ERROR },
   dropdownText: { flex: 1, fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
   dropdownPlaceholder: { color: COLORS.TEXT.SECONDARY },
+  chevronContainer: { opacity: 0.3 },
   dateInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, borderWidth: 1, borderColor: '#D1D5DB' },
   dateInputText: { flex: 1, fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY },
   dateInputPlaceholder: { color: COLORS.TEXT.SECONDARY },
@@ -407,10 +483,13 @@ const styles = StyleSheet.create({
   radioButton: { flexDirection: 'row', alignItems: 'center', padding: SIZES.PADDING.MEDIUM, backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, flex: 1 },
   radioButtonSmall: { flex: 0, paddingHorizontal: SIZES.PADDING.SMALL, paddingVertical: SIZES.PADDING.SMALL, marginRight: SIZES.PADDING.SMALL },
   radioButtonActive: { backgroundColor: "#009DFF" + '20', borderWidth: 1, borderColor: "#009DFF" },
+  radioButtonDisabled: { backgroundColor: '#F3F4F6', opacity: 0.7 },
   radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.TEXT.SECONDARY, marginRight: SIZES.PADDING.SMALL },
   radioCircleSmall: { width: 16, height: 16, borderRadius: 8, marginRight: SIZES.PADDING.XSMALL },
   radioCircleActive: { borderColor: "#009DFF", backgroundColor: "#009DFF" },
+  radioCircleDisabled: { opacity: 0.5 },
   radioLabel: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.PRIMARY },
+  radioLabelDisabled: { color: COLORS.TEXT.SECONDARY },
   footer: { padding: SIZES.PADDING.LARGE, backgroundColor: COLORS.BACKGROUND.PRIMARY, borderTopWidth: 1, borderTopColor: COLORS.BACKGROUND.SECONDARY },
   submitButton: { borderRadius: SIZES.RADIUS.LARGE, overflow: 'hidden' },
   submitButtonDisabled: { opacity: 0.6 },

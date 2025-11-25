@@ -216,13 +216,14 @@ const CreateDepositScreen = ({ navigation, route }) => {
             // Pass deposit data back to previous screen
             const depositId = result.data?.id;
             setTimeout(() => {
-              // Navigate back to QuotationDetail and pass deposit info
+              // Replace current screen (CreateDeposit) with QuotationDetail to avoid stack buildup
               const quotation = route.params?.quotation || { id: parseInt(formData.quotationId) };
-              navigation.navigate('QuotationDetail', {
+              navigation.replace('QuotationDetail', {
                 quotation: quotation,
                 onQuotationUpdate: route.params?.onQuotationUpdate,
                 refreshDeposit: true,
                 depositId: depositId,
+                fromCreateDeposit: true, // Flag to indicate coming from CreateDeposit
               });
             }, 1500);
           } else {

@@ -14,6 +14,8 @@ import { ArrowLeft, ChevronDown, Calendar, Camera, X } from 'lucide-react-native
 import { formatPrice } from '../../utils/promotionUtils';
 import LoadingScreen from '../../components/common/LoadingScreen';
 
+// Status options in order: Pending -> Confirmed -> Processing -> Completed
+// Rejected can only be selected when status is Pending
 const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
   { value: 'CONFIRMED', label: 'Confirmed' },
@@ -21,6 +23,15 @@ const STATUS_OPTIONS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'REJECTED', label: 'Rejected' },
 ];
+
+// Status order for progression
+const STATUS_ORDER = {
+  'PENDING': 1,
+  'CONFIRMED': 2,
+  'PROCESSING': 3,
+  'COMPLETED': 4,
+  'REJECTED': 0, // Special case - only from PENDING
+};
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'ID_CARD', label: 'ID Card' },
@@ -159,6 +170,39 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
   const getStatusName = () => {
     const status = STATUS_OPTIONS.find(opt => opt.value === formData.status);
     return status ? status.label : 'Select Status';
+  };
+
+  // Check if a status can be selected based on current status
+  const canSelectStatus = (targetStatus) => {
+    const currentStatus = formData.status;
+    const currentOrder = STATUS_ORDER[currentStatus] || 0;
+    const targetOrder = STATUS_ORDER[targetStatus] || 0;
+
+    // Cannot select the same status
+    if (targetStatus === currentStatus) {
+      return false;
+    }
+
+    // If current status is REJECTED, cannot select any other status
+    if (currentStatus === 'REJECTED') {
+      return false;
+    }
+
+    // Rejected can only be selected when current status is PENDING
+    if (targetStatus === 'REJECTED') {
+      return currentStatus === 'PENDING';
+    }
+
+    // Processing requires signDate to be set
+    if (targetStatus === 'PROCESSING') {
+      if (!formData.signDate) {
+        return false;
+      }
+    }
+
+    // Can only move forward in order: PENDING -> CONFIRMED -> PROCESSING -> COMPLETED
+    // Cannot go backwards
+    return targetOrder > currentOrder;
   };
 
   const getDocumentTypeName = () => {
@@ -390,7 +434,14 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Final Price (VND) <Text style={styles.required}>*</Text></Text>
-              <TextInput style={[styles.formInput, errors.finalPrice && styles.formInputError]} placeholder="Enter final price" placeholderTextColor={COLORS.TEXT.SECONDARY} value={formData.finalPrice} onChangeText={(value) => handleInputChange('finalPrice', value.replace(/[^0-9]/g, ''))} keyboardType="numeric" />
+              <TextInput 
+                style={[styles.formInput, styles.formInputReadOnly, errors.finalPrice && styles.formInputError]} 
+                placeholder="Enter final price" 
+                placeholderTextColor={COLORS.TEXT.SECONDARY} 
+                value={formData.finalPrice} 
+                editable={false}
+                keyboardType="numeric" 
+              />
               {formData.finalPrice && <Text style={styles.formHelper}>{formatPrice(parseFloat(formData.finalPrice) || 0)}</Text>}
               {errors.finalPrice && <Text style={styles.errorText}>{errors.finalPrice}</Text>}
             </View>
@@ -418,13 +469,43 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Contract Paid Type</Text>
               <View style={styles.radioGroup}>
-                <TouchableOpacity style={[styles.radioButton, formData.contractPaidType === 'FULL' && styles.radioButtonActive]} onPress={() => handleInputChange('contractPaidType', 'FULL')}>
-                  <View style={[styles.radioCircle, formData.contractPaidType === 'FULL' && styles.radioCircleActive]} />
-                  <Text style={styles.radioLabel}>Full Payment</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.radioButton, 
+                    formData.contractPaidType === 'FULL' && styles.radioButtonActive,
+                    styles.radioButtonDisabled
+                  ]} 
+                  disabled={true}
+                  activeOpacity={1}
+                >
+                  <View style={[
+                    styles.radioCircle, 
+                    formData.contractPaidType === 'FULL' && styles.radioCircleActive,
+                    styles.radioCircleDisabled
+                  ]} />
+                  <Text style={[
+                    styles.radioLabel,
+                    styles.radioLabelDisabled
+                  ]}>Full Payment</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.radioButton, formData.contractPaidType === 'DEBT' && styles.radioButtonActive]} onPress={() => handleInputChange('contractPaidType', 'DEBT')}>
-                  <View style={[styles.radioCircle, formData.contractPaidType === 'DEBT' && styles.radioCircleActive]} />
-                  <Text style={styles.radioLabel}>Debt</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.radioButton, 
+                    formData.contractPaidType === 'DEBT' && styles.radioButtonActive,
+                    styles.radioButtonDisabled
+                  ]} 
+                  disabled={true}
+                  activeOpacity={1}
+                >
+                  <View style={[
+                    styles.radioCircle, 
+                    formData.contractPaidType === 'DEBT' && styles.radioCircleActive,
+                    styles.radioCircleDisabled
+                  ]} />
+                  <Text style={[
+                    styles.radioLabel,
+                    styles.radioLabelDisabled
+                  ]}>Debt</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -564,11 +645,55 @@ const EditCustomerContractScreen = ({ navigation, route }) => {
       <Modal visible={showStatusModal} transparent animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
         <View style={styles.modalOverlay}><View style={styles.modalContent}>
           <View style={styles.modalHeader}><Text style={styles.modalTitle}>Select Status</Text><TouchableOpacity onPress={() => setShowStatusModal(false)}><Text style={styles.modalClose}>✕</Text></TouchableOpacity></View>
-          <FlatList data={STATUS_OPTIONS} keyExtractor={(item) => item.value} renderItem={({ item }) => (
-            <TouchableOpacity style={styles.modalItem} onPress={() => { setFormData(prev => ({ ...prev, status: item.value })); setShowStatusModal(false); }}>
-              <Text style={styles.modalItemTitle}>{item.label}</Text>
-            </TouchableOpacity>
-          )} ListEmptyComponent={<View style={styles.emptyModal}><Text style={styles.emptyModalText}>No status found</Text></View>} />
+          <FlatList 
+            data={STATUS_OPTIONS} 
+            keyExtractor={(item) => item.value} 
+            renderItem={({ item }) => {
+              const isSelectable = canSelectStatus(item.value);
+              const isSelected = formData.status === item.value;
+              
+              // Get reason why status is not available
+              const getUnavailableReason = () => {
+                if (isSelectable || isSelected) return '';
+                if (item.value === 'PROCESSING' && !formData.signDate) {
+                  return ' (Sign Date required)';
+                }
+                return ' (Not available)';
+              };
+              
+              return (
+                <TouchableOpacity 
+                  style={[
+                    styles.modalItem,
+                    !isSelectable && styles.modalItemDisabled,
+                    isSelected && styles.modalItemSelected
+                  ]} 
+                  onPress={() => {
+                    if (isSelectable) {
+                      setFormData(prev => ({ ...prev, status: item.value }));
+                      setShowStatusModal(false);
+                    } else if (item.value === 'PROCESSING' && !formData.signDate) {
+                      // Show alert if trying to select Processing without signDate
+                      showError('Sign Date Required', 'Please set Sign Date before changing status to Processing');
+                    }
+                  }}
+                  disabled={!isSelectable}
+                  activeOpacity={isSelectable ? 0.7 : 1}
+                >
+                  <Text style={[
+                    styles.modalItemTitle,
+                    !isSelectable && styles.modalItemTitleDisabled,
+                    isSelected && styles.modalItemTitleSelected
+                  ]}>
+                    {item.label}
+                    {isSelected && ' ✓'}
+                    {getUnavailableReason()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }} 
+            ListEmptyComponent={<View style={styles.emptyModal}><Text style={styles.emptyModalText}>No status found</Text></View>} 
+          />
         </View></View>
       </Modal>
 
@@ -630,6 +755,7 @@ const styles = StyleSheet.create({
   formLabel: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.SMALL },
   required: { color: COLORS.ERROR },
   formInput: { backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.PRIMARY, borderWidth: 1, borderColor: '#D1D5DB' },
+  formInputReadOnly: { backgroundColor: '#F3F4F6', opacity: 0.7 },
   formInputError: { borderColor: COLORS.ERROR },
   textArea: { minHeight: 100, paddingTop: SIZES.PADDING.MEDIUM },
   formHelper: { fontSize: SIZES.FONT.SMALL, color: COLORS.TEXT.SECONDARY, marginTop: SIZES.PADDING.XSMALL },
@@ -644,10 +770,13 @@ const styles = StyleSheet.create({
   radioButton: { flexDirection: 'row', alignItems: 'center', padding: SIZES.PADDING.MEDIUM, backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, flex: 1 },
   radioButtonSmall: { flex: 0, paddingHorizontal: SIZES.PADDING.SMALL, paddingVertical: SIZES.PADDING.SMALL, marginRight: SIZES.PADDING.SMALL },
   radioButtonActive: { backgroundColor: "#009DFF" + '20', borderWidth: 1, borderColor: "#009DFF" },
+  radioButtonDisabled: { backgroundColor: '#F3F4F6', opacity: 0.7 },
   radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.TEXT.SECONDARY, marginRight: SIZES.PADDING.SMALL },
   radioCircleSmall: { width: 16, height: 16, borderRadius: 8, marginRight: SIZES.PADDING.XSMALL },
   radioCircleActive: { borderColor: "#009DFF", backgroundColor: "#009DFF" },
+  radioCircleDisabled: { opacity: 0.5 },
   radioLabel: { fontSize: SIZES.FONT.SMALL, color: "#000000" },
+  radioLabelDisabled: { color: COLORS.TEXT.SECONDARY },
   footer: { padding: SIZES.PADDING.LARGE, backgroundColor: COLORS.BACKGROUND.PRIMARY, borderTopWidth: 1, borderTopColor: COLORS.BACKGROUND.SECONDARY },
   submitButton: { borderRadius: SIZES.RADIUS.LARGE, overflow: 'hidden' },
   submitButtonDisabled: { opacity: 0.6 },
@@ -659,7 +788,11 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: SIZES.FONT.LARGE, fontWeight: 'bold', color: COLORS.TEXT.PRIMARY },
   modalClose: { fontSize: SIZES.FONT.XXLARGE, color: COLORS.TEXT.SECONDARY },
   modalItem: { padding: SIZES.PADDING.LARGE, borderBottomWidth: 1, borderBottomColor: "#D6D6D6" },
+  modalItemDisabled: { backgroundColor: '#F3F4F6', opacity: 0.6 },
+  modalItemSelected: { backgroundColor: "#009DFF" + '10' },
   modalItemTitle: { fontSize: SIZES.FONT.MEDIUM, fontWeight: '600', color: COLORS.TEXT.PRIMARY, marginBottom: SIZES.PADDING.XSMALL },
+  modalItemTitleDisabled: { color: COLORS.TEXT.SECONDARY },
+  modalItemTitleSelected: { color: "#009DFF", fontWeight: 'bold' },
   emptyModal: { padding: SIZES.PADDING.XXXLARGE, alignItems: 'center' },
   emptyModalText: { fontSize: SIZES.FONT.MEDIUM, color: COLORS.TEXT.SECONDARY },
   imagePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5E7EB', borderRadius: SIZES.RADIUS.MEDIUM, padding: SIZES.PADDING.MEDIUM, borderWidth: 1, borderColor: COLORS.PRIMARY, borderStyle: 'dashed', gap: SIZES.PADDING.SMALL },

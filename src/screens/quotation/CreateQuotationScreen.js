@@ -12,7 +12,6 @@ import {
   Dimensions,
   ActivityIndicator,
   Modal,
-  FlatList,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -63,6 +62,10 @@ const CreateQuotationScreen = ({ navigation, route }) => {
   const [customerErrors, setCustomerErrors] = useState({});
   const [showCustomerDobPicker, setShowCustomerDobPicker] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [customerMode, setCustomerMode] = useState('new'); // 'new' or 'existing'
+  const [existingCustomers, setExistingCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [selectedExistingCustomer, setSelectedExistingCustomer] = useState(null);
   const [pricing, setPricing] = useState({
     basePrice: Number(vehicle?.price) || 0,
     colorPrice: 0,
@@ -229,7 +232,28 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     loadMotorbikeColorData();
     loadAllColors(); // Load all colors from API to get color codes
     checkVehicleStock(); // Check if vehicle has stock at agency
+    loadExistingCustomers(); // Load existing customers when component mounts
   }, [vehicle, user]);
+
+  // Load existing customers list
+  const loadExistingCustomers = async () => {
+    if (!user?.agencyId) return;
+    
+    setLoadingCustomers(true);
+    try {
+      const customers = await customerManagementService.getCustomers(
+        parseInt(user.agencyId),
+        { limit: 100 },
+        false // Don't fetch all pages, just first page
+      );
+      setExistingCustomers(customers || []);
+    } catch (error) {
+      console.error('Error loading existing customers:', error);
+      setExistingCustomers([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
 
   // Check if vehicle has stock at agency
   const checkVehicleStock = async () => {
@@ -578,6 +602,56 @@ const CreateQuotationScreen = ({ navigation, route }) => {
     // Clear error when user starts typing
     if (customerErrors[field]) {
       setCustomerErrors(prev => ({ ...prev, [field]: null }));
+    }
+    
+    // If in existing customer mode and form is edited, switch to new mode
+    if (customerMode === 'existing' && selectedExistingCustomer) {
+      setCustomerMode('new');
+      setSelectedExistingCustomer(null);
+      setCustomerId(null);
+    }
+  };
+
+  // Handle selecting existing customer
+  const handleSelectExistingCustomer = (customer) => {
+    setSelectedExistingCustomer(customer);
+    setCustomerId(customer.id);
+    
+    // Auto-fill form with customer data
+    setCustomerFormData({
+      name: customer.name || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      credentialId: customer.credentialId || '',
+      dob: customer.dob ? new Date(customer.dob) : null,
+    });
+    
+    // Clear any errors
+    setCustomerErrors({});
+  };
+
+  // Handle customer mode change
+  const handleCustomerModeChange = (mode) => {
+    setCustomerMode(mode);
+    
+    if (mode === 'existing') {
+      // Reset form when switching to existing mode
+      setCustomerFormData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        credentialId: '',
+        dob: null,
+      });
+      setCustomerErrors({});
+      setSelectedExistingCustomer(null);
+      setCustomerId(null);
+    } else {
+      // Reset when switching to new mode
+      setSelectedExistingCustomer(null);
+      setCustomerId(null);
     }
   };
 
@@ -1259,13 +1333,15 @@ const CreateQuotationScreen = ({ navigation, route }) => {
       return `${day}/${month}/${year}`;
     };
 
-    // If customer already created, show customer info
+    // If customer already created/selected, show customer info
     if (customerId) {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer Information</Text>
           <View style={styles.customerInfoCard}>
-            <Text style={styles.customerInfoTitle}>Customer Created Successfully</Text>
+            <Text style={styles.customerInfoTitle}>
+              {customerMode === 'existing' ? 'Customer Selected' : 'Customer Created Successfully'}
+            </Text>
             <View style={styles.customerInfoRow}>
               <Text style={styles.customerInfoLabel}>Name:</Text>
               <Text style={styles.customerInfoValue}>{customerFormData.name || 'N/A'}</Text>
@@ -1290,135 +1366,210 @@ const CreateQuotationScreen = ({ navigation, route }) => {
             onPress={() => {
               setCustomerId(null);
               setCustomerErrors({});
+              setSelectedExistingCustomer(null);
             }}
           >
-            <Text style={styles.editCustomerButtonText}>Edit Customer Information</Text>
+            <Text style={styles.editCustomerButtonText}>Change Customer</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // Show customer creation form
+    // Show customer selection/creation form
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Customer Information</Text>
-        <Text style={styles.sectionSubtitle}>Please fill in customer information to create quotation</Text>
+        <Text style={styles.sectionSubtitle}>Please select or create customer information to create quotation</Text>
         
-        {/* Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>
-            Name <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, customerErrors.name && styles.inputError]}
-            placeholder="Enter customer name"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={customerFormData.name}
-            onChangeText={(text) => handleCustomerInputChange('name', text)}
-            autoCapitalize="words"
-          />
-          {customerErrors.name && (
-            <Text style={styles.errorText}>{customerErrors.name}</Text>
-          )}
-        </View>
-
-        {/* Email */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>
-            Email <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, customerErrors.email && styles.inputError]}
-            placeholder="Enter email"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={customerFormData.email}
-            onChangeText={(text) => handleCustomerInputChange('email', text)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {customerErrors.email && (
-            <Text style={styles.errorText}>{customerErrors.email}</Text>
-          )}
-        </View>
-
-        {/* Phone */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>
-            Phone <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, customerErrors.phone && styles.inputError]}
-            placeholder="Enter phone number (10-11 digits)"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={customerFormData.phone}
-            onChangeText={(text) => handleCustomerInputChange('phone', text)}
-            keyboardType="phone-pad"
-          />
-          {customerErrors.phone && (
-            <Text style={styles.errorText}>{customerErrors.phone}</Text>
-          )}
-        </View>
-
-        {/* Address */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Address</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea]}
-            placeholder="Enter address (optional)"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={customerFormData.address}
-            onChangeText={(text) => handleCustomerInputChange('address', text)}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Credential ID */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>ID Card</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter ID card number (optional)"
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={customerFormData.credentialId}
-            onChangeText={(text) => handleCustomerInputChange('credentialId', text)}
-          />
-        </View>
-
-        {/* Date of Birth */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Date of Birth</Text>
+        {/* Radio buttons for customer mode */}
+        <View style={styles.radioGroup}>
           <TouchableOpacity
-            style={[styles.dateInput, customerErrors.dob && styles.inputError]}
-            onPress={() => setShowCustomerDobPicker(true)}
+            style={[
+              styles.radioButton,
+              customerMode === 'new' && styles.radioButtonActive
+            ]}
+            onPress={() => handleCustomerModeChange('new')}
           >
-            <Text style={[
-              styles.dateInputText,
-              !customerFormData.dob && styles.dateInputPlaceholder
-            ]}>
-              {customerFormData.dob ? formatDateForDisplay(customerFormData.dob) : 'Select date of birth (optional)'}
-            </Text>
-            <Text style={styles.datePickerIcon}><Calendar color="#FFFFFF" size={16} /></Text>
+            <View style={[
+              styles.radioCircle,
+              customerMode === 'new' && styles.radioCircleActive
+            ]} />
+            <Text style={styles.radioLabel}>Create New Customer</Text>
           </TouchableOpacity>
-          {customerErrors.dob && (
-            <Text style={styles.errorText}>{customerErrors.dob}</Text>
-          )}
+          <TouchableOpacity
+            style={[
+              styles.radioButton,
+              customerMode === 'existing' && styles.radioButtonActive
+            ]}
+            onPress={() => handleCustomerModeChange('existing')}
+          >
+            <View style={[
+              styles.radioCircle,
+              customerMode === 'existing' && styles.radioCircleActive
+            ]} />
+            <Text style={styles.radioLabel}>Existing Customer</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Create Customer Button */}
-        <TouchableOpacity
-          style={[styles.createCustomerButton, creatingCustomer && styles.disabledButton]}
-          onPress={handleCreateCustomer}
-          disabled={creatingCustomer}
-        >
-          {creatingCustomer ? (
-            <ActivityIndicator color="#009DFF" />
-          ) : (
-            <Text style={styles.createCustomerButtonText}>Create Customer</Text>
-          )}
-        </TouchableOpacity>
+        {/* Show existing customers list or new customer form */}
+        {customerMode === 'existing' ? (
+          <View style={styles.existingCustomersContainer}>
+            {loadingCustomers ? (
+              <ActivityIndicator color="#009DFF" style={styles.loadingIndicator} />
+            ) : existingCustomers.length === 0 ? (
+              <Text style={styles.emptyListText}>No existing customers found</Text>
+            ) : (
+              <ScrollView 
+                style={styles.customerListContainer}
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+              >
+                {existingCustomers.map((item) => {
+                  const isSelected = selectedExistingCustomer?.id === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id?.toString() || Math.random().toString()}
+                      style={[
+                        styles.customerListItem,
+                        isSelected && styles.customerListItemSelected
+                      ]}
+                      onPress={() => handleSelectExistingCustomer(item)}
+                    >
+                      <View style={styles.customerListItemContent}>
+                        <Text style={styles.customerListItemName}>{item.name || 'N/A'}</Text>
+                        <Text style={styles.customerListItemEmail}>{item.email || 'N/A'}</Text>
+                        <Text style={styles.customerListItemPhone}>{item.phone || 'N/A'}</Text>
+                      </View>
+                      {isSelected && (
+                        <View style={styles.customerListCheckmark}>
+                          <Check color="#FFFFFF" size={16} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        ) : (
+          <>
+            {/* Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Name <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, customerErrors.name && styles.inputError]}
+                placeholder="Enter customer name"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={customerFormData.name}
+                onChangeText={(text) => handleCustomerInputChange('name', text)}
+                autoCapitalize="words"
+              />
+              {customerErrors.name && (
+                <Text style={styles.errorText}>{customerErrors.name}</Text>
+              )}
+            </View>
+
+            {/* Email */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Email <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, customerErrors.email && styles.inputError]}
+                placeholder="Enter email"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={customerFormData.email}
+                onChangeText={(text) => handleCustomerInputChange('email', text)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {customerErrors.email && (
+                <Text style={styles.errorText}>{customerErrors.email}</Text>
+              )}
+            </View>
+
+            {/* Phone */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Phone <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.textInput, customerErrors.phone && styles.inputError]}
+                placeholder="Enter phone number (10-11 digits)"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={customerFormData.phone}
+                onChangeText={(text) => handleCustomerInputChange('phone', text)}
+                keyboardType="phone-pad"
+              />
+              {customerErrors.phone && (
+                <Text style={styles.errorText}>{customerErrors.phone}</Text>
+              )}
+            </View>
+
+            {/* Address */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Address</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Enter address (optional)"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={customerFormData.address}
+                onChangeText={(text) => handleCustomerInputChange('address', text)}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Credential ID */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ID Card</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter ID card number (optional)"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                value={customerFormData.credentialId}
+                onChangeText={(text) => handleCustomerInputChange('credentialId', text)}
+              />
+            </View>
+
+            {/* Date of Birth */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Date of Birth</Text>
+              <TouchableOpacity
+                style={[styles.dateInput, customerErrors.dob && styles.inputError]}
+                onPress={() => setShowCustomerDobPicker(true)}
+              >
+                <Text style={[
+                  styles.dateInputText,
+                  !customerFormData.dob && styles.dateInputPlaceholder
+                ]}>
+                  {customerFormData.dob ? formatDateForDisplay(customerFormData.dob) : 'Select date of birth (optional)'}
+                </Text>
+                <Text style={styles.datePickerIcon}><Calendar color="#FFFFFF" size={16} /></Text>
+              </TouchableOpacity>
+              {customerErrors.dob && (
+                <Text style={styles.errorText}>{customerErrors.dob}</Text>
+              )}
+            </View>
+
+            {/* Create Customer Button */}
+            <TouchableOpacity
+              style={[styles.createCustomerButton, creatingCustomer && styles.disabledButton]}
+              onPress={handleCreateCustomer}
+              disabled={creatingCustomer}
+            >
+              {creatingCustomer ? (
+                <ActivityIndicator color="#009DFF" />
+              ) : (
+                <Text style={styles.createCustomerButtonText}>Create Customer</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Date Picker */}
         {showCustomerDobPicker && (
@@ -2441,6 +2592,106 @@ const styles = StyleSheet.create({
     backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Radio button styles
+  radioGroup: {
+    flexDirection: 'row',
+    gap: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SIZES.PADDING.MEDIUM,
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  radioButtonActive: {
+    backgroundColor: '#009DFF' + '20',
+    borderWidth: 2,
+    borderColor: '#009DFF',
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.TEXT.SECONDARY,
+    marginRight: SIZES.PADDING.SMALL,
+  },
+  radioCircleActive: {
+    borderColor: '#009DFF',
+    backgroundColor: '#009DFF',
+  },
+  radioLabel: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#000000',
+    fontWeight: '600',
+  },
+
+  // Existing customers list styles
+  existingCustomersContainer: {
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  loadingIndicator: {
+    padding: SIZES.PADDING.LARGE,
+  },
+  emptyListText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+    padding: SIZES.PADDING.LARGE,
+    fontStyle: 'italic',
+  },
+  customerListContainer: {
+    maxHeight: 300,
+  },
+  customerListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  customerListItemSelected: {
+    borderColor: '#009DFF',
+    borderWidth: 2,
+    backgroundColor: '#009DFF' + '10',
+  },
+  customerListItemContent: {
+    flex: 1,
+  },
+  customerListItemName: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  customerListItemEmail: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 2,
+  },
+  customerListItemPhone: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  customerListCheckmark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#009DFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SIZES.PADDING.SMALL,
   },
 });
 
