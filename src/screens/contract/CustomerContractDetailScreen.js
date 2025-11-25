@@ -520,7 +520,7 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             </View>
           </>
         )}
-        {!isDealerManager && !hasInstallmentContract && !isFullPayment && (
+        {!isDealerManager && !hasInstallmentContract && !isFullPayment && contract.status?.toUpperCase() === 'COMPLETED' && (
           <TouchableOpacity style={styles.installmentButton} onPress={handleChooseInstallmentPlan}>
             <LinearGradient colors={['#009DFF', '#009DFF']} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <CreditCard color={COLORS.TEXT.WHITE} size={20} />
@@ -544,18 +544,22 @@ const CustomerContractDetailScreen = ({ navigation, route }) => {
             onPress={() => setShowMenu(false)}
           >
             <View style={styles.menuContainer}>
-              {/* Full Payment entry - always available, passes customerContractId */}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation.navigate('ContractFullPayment', { customerContractId: contractId });
-                }}
-              >
-                <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
-                <Text style={styles.menuItemText}>Full Payment</Text>
-              </TouchableOpacity>
-              <View style={styles.menuDivider} />
+              {/* Full Payment entry - only show for FULL contractPaidType */}
+              {isFullPayment && (
+                <>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      setShowMenu(false);
+                      navigation.navigate('ContractFullPayment', { customerContractId: contractId });
+                    }}
+                  >
+                    <CreditCard color={COLORS.TEXT.PRIMARY} size={20} />
+                    <Text style={styles.menuItemText}>Full Payment</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuDivider} />
+                </>
+              )}
               {hasInstallmentContract && (
                 <>
                   <TouchableOpacity

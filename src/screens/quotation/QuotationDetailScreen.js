@@ -257,11 +257,19 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleContractView = () => {
+  const handleContractView = (fromFullPayment = false) => {
     const quote = getQuotationData();
     const quotationId = quote.id || quote.quotationId;
     if (quotationId) {
-      navigation.navigate('CreateCustomerContract', { quotationId: quotationId.toString() });
+      // Check if quotation has deposit (depositId exists) - convert to boolean
+      const hasDeposit = Boolean(depositInfo && depositInfo.id);
+      const quotationType = quote.type?.toUpperCase();
+      navigation.navigate('CreateCustomerContract', { 
+        quotationId: quotationId.toString(),
+        fromDeposit: hasDeposit, // Set flag if quotation has deposit
+        fromFullPayment: fromFullPayment, // Set flag if coming from Full Payment button
+        quotationType: quotationType, // Pass quotation type to check if PRE_ORDER
+      });
     } else {
       Alert.alert('Error', 'Quotation ID not found');
     }
@@ -346,11 +354,20 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     return JSON.stringify(fallbackData);
   };
 
+  const handleBackPress = () => {
+    // If coming from CreateDeposit, navigate to QuotationManagement instead of going back
+    if (route.params?.fromCreateDeposit) {
+      navigation.navigate('QuotationManagement');
+    } else {
+      navigation.goBack();
+    }
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => navigation.goBack()}
+        onPress={handleBackPress}
       >
         <Text style={styles.backButtonText}><ArrowLeft color="#FFFFFF" size={18} /></Text>
       </TouchableOpacity>
@@ -707,7 +724,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
             <Text style={styles.pricingValue}>{formatPrice(depositInfo.depositAmount)}</Text>
           </View>
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Hold Days:</Text>
+            <Text style={styles.pricingLabel}>Valid Until:</Text>
             <Text style={styles.pricingValue}>{formatDate(depositInfo.holdDays)}</Text>
           </View>
           <View style={[styles.pricingRow, styles.totalRow]}>
@@ -780,7 +797,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               {!hasCustomerContract && !depositInfo && (
                 <TouchableOpacity
                   style={styles.fullPaymentButton}
-                  onPress={handleContractView}
+                  onPress={() => handleContractView(true)}
                 >
                   <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
                 </TouchableOpacity>
