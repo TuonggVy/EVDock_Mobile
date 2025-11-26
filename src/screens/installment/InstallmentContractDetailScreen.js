@@ -33,7 +33,26 @@ const InstallmentContractDetailScreen = ({ navigation, route }) => {
       setLoading(true);
       const response = await installmentContractService.getInstallmentContractDetail(installmentContractId);
       if (response.success && response.data) {
-        setContractDetail(response.data);
+        let contractData = response.data;
+        
+        // Fetch totalInterestPaid from customer contract endpoint if customerContractId exists
+        if (contractData.customerContractId) {
+          try {
+            const customerContractResponse = await installmentContractService.getInstallmentContractByCustomerContract(contractData.customerContractId);
+            if (customerContractResponse.success && customerContractResponse.data) {
+              // Merge totalInterestPaid into contract data
+              contractData = {
+                ...contractData,
+                totalInterestPaid: customerContractResponse.data.totalInterestPaid,
+              };
+            }
+          } catch (error) {
+            console.error('Error fetching totalInterestPaid:', error);
+            // Continue even if this fails, just don't show totalInterestPaid
+          }
+        }
+        
+        setContractDetail(contractData);
       } else {
         showError('Error', response.error || 'Failed to load installment contract details');
         setTimeout(() => navigation.goBack(), 2000);
@@ -199,7 +218,7 @@ const InstallmentContractDetailScreen = ({ navigation, route }) => {
             {contractDetail.startAt && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Start Date:</Text>
-                <Text style={styles.infoValue}>{formatDateTimeForDisplay(contractDetail.startAt)}</Text>
+                <Text style={styles.infoValue}>{formatDateForDisplay(contractDetail.startAt)}</Text>
               </View>
             )}
 
@@ -214,6 +233,13 @@ const InstallmentContractDetailScreen = ({ navigation, route }) => {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Total Debt Paid:</Text>
                 <Text style={styles.infoValue}>{formatPrice(contractDetail.totalDebtPaid || 0)}</Text>
+              </View>
+            )}
+
+            {contractDetail.totalInterestPaid !== undefined && contractDetail.totalInterestPaid !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Total Interest Paid:</Text>
+                <Text style={styles.infoValue}>{formatPrice(contractDetail.totalInterestPaid || 0)}</Text>
               </View>
             )}
 
