@@ -18,7 +18,9 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useAuth } from '../../contexts/AuthContext';
 import { USER_ROLES } from '../../constants/roles';
-import depositStorageService from '../../services/storage/depositStorageService';
+import depositService from '../../services/depositService';
+import { getQuotationById } from '../../services/quotationService';
+import { ArrowLeft, Plus, Search, FileText } from 'lucide-react-native';
 
 const DepositManagementScreen = ({ navigation }) => {
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
@@ -27,14 +29,12 @@ const DepositManagementScreen = ({ navigation }) => {
   const isDealerManager = userRole === USER_ROLES.DEALER_MANAGER;
   
   // State management
-  const [activeTab, setActiveTab] = useState('available'); // available, pre_order
   const [deposits, setDeposits] = useState([]);
   const [filteredDeposits, setFilteredDeposits] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
 
   // Load deposits on mount and focus
   useEffect(() => {
@@ -49,18 +49,18 @@ const DepositManagementScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterDeposits();
-  }, [deposits, searchQuery, selectedStatus, activeTab]);
+  }, [deposits, searchQuery, selectedStatus]);
 
   const loadDeposits = async () => {
     try {
       setLoading(true);
       
-      // Load deposits from storage
-      let allDeposits = await depositStorageService.getDeposits();
+      // TODO: When API list endpoint is available, replace with:
+      // const result = await depositService.getDeposits();
+      // For now, deposits must be loaded via their IDs from another source
+      // (e.g., from quotations or stored deposit IDs)
       
-      // Do not seed mock data
-      
-      setDeposits(allDeposits);
+      setDeposits([]);
       setLoading(false);
     } catch (error) {
       console.error('Error loading deposits:', error);
@@ -69,11 +69,86 @@ const DepositManagementScreen = ({ navigation }) => {
     }
   };
 
+  // Map API deposit response to UI deposit format
+  const mapApiDepositToUIDeposit = async (apiDeposit) => {
+    try {
+      // API response: { id, depositPercent, depositAmount, holdDay, status, quotationId }
+      let deposit = {
+        id: apiDeposit.id?.toString() || '',
+        apiDepositId: apiDeposit.id?.toString() || null, // Store API ID for reference
+        depositAmount: apiDeposit.depositAmount || 0,
+        depositPercentage: apiDeposit.depositPercent || 0,
+        holdDay: apiDeposit.holdDay || null,
+        quotationId: apiDeposit.quotationId || null,
+        // Map status from API to UI format
+        status: mapApiStatusToUI(apiDeposit.status),
+      };
+
+      // If deposit has quotationId, fetch quotation details for customer/vehicle info
+      if (deposit.quotationId) {
+        const quotationResult = await getQuotationById(deposit.quotationId);
+        if (quotationResult.success && quotationResult.data) {
+          const quotation = quotationResult.data;
+          // Extract customer and vehicle info from quotation
+          deposit.customerName = quotation.customerName || quotation.customer?.name || 'N/A';
+          deposit.customerPhone = quotation.customerPhone || quotation.customer?.phone || 'N/A';
+          deposit.customerEmail = quotation.customerEmail || quotation.customer?.email || '';
+          deposit.vehicleModel = quotation.vehicleModel || quotation.items?.[0]?.model || 'N/A';
+          deposit.vehicleColor = quotation.vehicleColor || quotation.items?.[0]?.color || 'N/A';
+          deposit.vehiclePrice = quotation.totalAmount || quotation.items?.[0]?.price || 0;
+          
+          // Calculate remaining amount
+          deposit.remainingAmount = deposit.vehiclePrice - deposit.depositAmount;
+          
+          // Extract dates
+          deposit.depositDate = deposit.holdDay || quotation.createdAt;
+          deposit.expectedDeliveryDate = quotation.expectedDeliveryDate;
+        }
+      } else {
+        // If no quotation, use defaults
+        deposit.customerName = 'N/A';
+        deposit.customerPhone = 'N/A';
+        deposit.vehicleModel = 'N/A';
+        deposit.vehicleColor = 'N/A';
+        deposit.vehiclePrice = 0;
+        deposit.remainingAmount = 0;
+        deposit.depositDate = deposit.holdDay || new Date().toISOString();
+      }
+
+      // Created date
+      deposit.createdAt = deposit.holdDay || deposit.depositDate || new Date().toISOString();
+
+      return deposit;
+    } catch (error) {
+      console.error('Error mapping deposit:', error);
+      return null;
+    }
+  };
+
+  // Map API status to UI status format
+  const mapApiStatusToUI = (apiStatus) => {
+    const statusMap = {
+      'PENDING': 'pending',
+      'HOLDING': 'holding',
+      'APPLIED': 'applied',
+      'EXPIRED': 'expired',
+    };
+    return statusMap[apiStatus?.toUpperCase()] || 'pending';
+  };
+
+  // Map UI status to API status format
+  const mapUIStatusToAPI = (uiStatus) => {
+    const statusMap = {
+      'pending': 'PENDING',
+      'holding': 'HOLDING',
+      'applied': 'APPLIED',
+      'expired': 'EXPIRED',
+    };
+    return statusMap[uiStatus?.toLowerCase()] || 'PENDING';
+  };
+
   const filterDeposits = () => {
     let filtered = deposits;
-
-    // Filter by tab (type)
-    filtered = filtered.filter(d => d.type === activeTab);
 
     // Filter by status
     if (selectedStatus !== 'all') {
@@ -84,17 +159,17 @@ const DepositManagementScreen = ({ navigation }) => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(d =>
-        d.customerName.toLowerCase().includes(query) ||
-        d.customerPhone.includes(searchQuery) ||
-        d.vehicleModel.toLowerCase().includes(query) ||
-        d.id.toLowerCase().includes(query)
+        (d.customerName && d.customerName.toLowerCase().includes(query)) ||
+        (d.customerPhone && d.customerPhone.includes(searchQuery)) ||
+        (d.vehicleModel && d.vehicleModel.toLowerCase().includes(query)) ||
+        (d.id && d.id.toString().toLowerCase().includes(query))
       );
     }
 
-    // Sort by newest first (createdAt desc; fallback to depositDate)
+    // Sort by newest first (holdDay desc)
     filtered = filtered.sort((a, b) => {
-      const aTime = new Date(a.createdAt || a.depositDate || 0).getTime();
-      const bTime = new Date(b.createdAt || b.depositDate || 0).getTime();
+      const aTime = new Date(a.holdDay || a.createdAt || 0).getTime();
+      const bTime = new Date(b.holdDay || b.createdAt || 0).getTime();
       return bTime - aTime;
     });
 
@@ -109,20 +184,20 @@ const DepositManagementScreen = ({ navigation }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return COLORS.WARNING;
-      case 'confirmed': return COLORS.SUCCESS;
-      case 'completed': return COLORS.TEXT.SECONDARY;
-      case 'cancelled': return COLORS.ERROR;
+      case 'pending': return COLORS.WARNING; // Chờ khách trả cọc
+      case 'holding': return COLORS.SUCCESS; // Đã trả cọc xong
+      case 'applied': return COLORS.PRIMARY; // Đã áp dụng
+      case 'expired': return COLORS.ERROR; // Đã hết hạn
       default: return COLORS.TEXT.SECONDARY;
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Đã xác nhận';
-      case 'completed': return 'Hoàn thành';
-      case 'cancelled': return 'Đã hủy';
+      case 'pending': return 'Pending';
+      case 'holding': return 'Holding';
+      case 'applied': return 'Applied';
+      case 'expired': return 'Expired';
       default: return 'Unknown';
     }
   };
@@ -136,15 +211,13 @@ const DepositManagementScreen = ({ navigation }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('vi-VN');
+    return new Date(dateString).toLocaleDateString('en-US');
   };
 
-  const handleAddDeposit = () => {
-    setShowAddModal(true);
-  };
 
-  const handleViewDeposit = (deposit) => {
-    navigation.navigate('DepositDetail', { 
+
+  const handleEditDeposit = (deposit) => {
+    navigation.navigate('EditDeposit', { 
       deposit,
       onDepositUpdate: handleDepositUpdate,
     });
@@ -154,30 +227,19 @@ const DepositManagementScreen = ({ navigation }) => {
     // Reload deposits to get latest data
     await loadDeposits();
     
-    // If deposit was confirmed, switch to 'confirmed' filter
-    if (updatedDeposit && updatedDeposit.status === 'confirmed') {
-      setSelectedStatus('confirmed');
+    // If deposit status changed, switch to that status filter
+    if (updatedDeposit && updatedDeposit.status) {
+      setSelectedStatus(updatedDeposit.status);
     }
   };
 
-  const handleCreateAvailableDeposit = () => {
-    setShowAddModal(false);
-    navigation.navigate('CreateDepositAvailable');
-  };
-
-  const handleCreatePreOrder = () => {
-    setShowAddModal(false);
-    navigation.navigate('CreatePreOrder');
-  };
 
   const renderDepositCard = ({ item }) => {
-    const isPreOrder = item.type === 'pre_order';
-    const isCompleted = item.status === 'completed';
+    const isCompleted = item.status === 'applied' || item.status === 'expired';
 
     return (
       <TouchableOpacity
         style={styles.depositCard}
-        onPress={() => handleViewDeposit(item)}
         activeOpacity={0.8}
       >
         <LinearGradient
@@ -190,26 +252,10 @@ const DepositManagementScreen = ({ navigation }) => {
           <View style={styles.cardHeader}>
             <View style={styles.depositInfo}>
               <Text style={styles.depositId}>#{item.id}</Text>
-              <Text style={styles.customerName}>{item.customerName}</Text>
-              <Text style={styles.customerPhone}>{item.customerPhone}</Text>
+              <Text style={styles.customerName}>{item.customerName || 'N/A'}</Text>
+              <Text style={styles.customerPhone}>{item.customerPhone || 'N/A'}</Text>
             </View>
             <View style={styles.statusBadges}>
-              {isPreOrder && (
-                <View style={[styles.typeBadge, { backgroundColor: COLORS.PRIMARY }]}>
-                  <Text style={styles.badgeText}>Pre-order</Text>
-                </View>
-              )}
-              {/* Notification state badges for pre-order */}
-              {isPreOrder && item.notificationStatus === 'notified' && (
-                <View style={[styles.typeBadge, { backgroundColor: '#F59E0B' }]}>
-                  <Text style={styles.badgeText}>Đã gửi thông báo</Text>
-                </View>
-              )}
-              {isPreOrder && item.notificationStatus === 'acknowledged' && (
-                <View style={[styles.typeBadge, { backgroundColor: '#10B981' }]}>
-                  <Text style={styles.badgeText}>Staff đã xác nhận</Text>
-                </View>
-              )}
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                 <Text style={styles.badgeText}>{getStatusText(item.status)}</Text>
               </View>
@@ -219,47 +265,43 @@ const DepositManagementScreen = ({ navigation }) => {
           {/* Vehicle Info */}
           <View style={styles.vehicleSection}>
             <View style={styles.vehicleInfo}>
-              <Text style={styles.vehicleModel}>{item.vehicleModel}</Text>
-              <Text style={styles.vehicleColor}>Màu: {item.vehicleColor}</Text>
+              <Text style={styles.vehicleModel}>{item.vehicleModel || 'N/A'}</Text>
+              <Text style={styles.vehicleColor}>Color: {item.vehicleColor || 'N/A'}</Text>
             </View>
-            <Text style={styles.vehiclePrice}>{formatCurrency(item.vehiclePrice)}</Text>
+            {item.vehiclePrice > 0 && (
+              <Text style={styles.vehiclePrice}>{formatCurrency(item.vehiclePrice)}</Text>
+            )}
           </View>
 
           {/* Deposit Amount */}
           <View style={styles.depositAmountSection}>
             <View style={styles.depositAmountCard}>
-              <Text style={styles.depositAmountLabel}>Đã đặt cọc</Text>
+              <Text style={styles.depositAmountLabel}>Deposit Paid</Text>
               <Text style={styles.depositAmountValue}>{formatCurrency(item.depositAmount)}</Text>
-              <Text style={styles.depositPercentage}>{item.depositPercentage}% tổng giá</Text>
+              <Text style={styles.depositPercentage}>{item.depositPercentage}% of total</Text>
             </View>
             <View style={styles.remainingAmountCard}>
-              <Text style={styles.remainingAmountLabel}>Còn lại</Text>
-              <Text style={styles.remainingAmountValue}>{formatCurrency(item.remainingAmount)}</Text>
+              <Text style={styles.remainingAmountLabel}>Remaining</Text>
+              <Text style={styles.remainingAmountValue}>{formatCurrency(item.remainingAmount || 0)}</Text>
             </View>
           </View>
 
           {/* Delivery Info */}
           <View style={styles.deliveryInfo}>
             <View style={styles.deliveryRow}>
-              <Text style={styles.deliveryLabel}>Ngày đặt cọc:</Text>
-              <Text style={styles.deliveryValue}>{formatDate(item.depositDate)}</Text>
+              <Text style={styles.deliveryLabel}>Deposit Date:</Text>
+              <Text style={styles.deliveryValue}>{formatDate(item.depositDate || item.holdDay)}</Text>
             </View>
-            <View style={styles.deliveryRow}>
-              <Text style={styles.deliveryLabel}>Dự kiến giao xe:</Text>
-              <Text style={styles.deliveryValue}>{formatDate(item.expectedDeliveryDate)}</Text>
-            </View>
-            {isPreOrder && item.manufacturerOrderId && (
+            {item.expectedDeliveryDate && (
               <View style={styles.deliveryRow}>
-                <Text style={styles.deliveryLabel}>Mã đơn hãng:</Text>
-                <Text style={styles.deliveryValueHighlight}>{item.manufacturerOrderId}</Text>
+                <Text style={styles.deliveryLabel}>Expected Delivery:</Text>
+                <Text style={styles.deliveryValue}>{formatDate(item.expectedDeliveryDate)}</Text>
               </View>
             )}
-            {item.finalPaymentType && (
+            {item.quotationId && (
               <View style={styles.deliveryRow}>
-                <Text style={styles.deliveryLabel}>Hình thức thanh toán:</Text>
-                <Text style={styles.deliveryValue}>
-                  {item.finalPaymentType === 'full' ? 'Trả full' : `Trả góp ${item.installmentMonths} tháng`}
-                </Text>
+                <Text style={styles.deliveryLabel}>Quotation ID:</Text>
+                <Text style={styles.deliveryValueHighlight}>#{item.quotationId}</Text>
               </View>
             )}
           </View>
@@ -269,10 +311,10 @@ const DepositManagementScreen = ({ navigation }) => {
             <View style={styles.actionIndicator}>
               <Text style={styles.actionText}>
                 {item.status === 'pending' 
-                  ? '⏳ Chờ xác nhận đặt cọc'
-                  : isPreOrder
-                  ? '📦 Chờ xe về từ hãng'
-                  : '🚗 Xe sẵn sàng - Chờ thanh toán'}
+                  ? '⏳ Waiting for deposit payment'
+                  : item.status === 'holding'
+                  ? '✅ Deposit received - Awaiting processing'
+                  : '🚗 Processing'}
               </Text>
             </View>
           )}
@@ -281,46 +323,14 @@ const DepositManagementScreen = ({ navigation }) => {
     );
   };
 
-  const renderTabs = () => (
-    <View style={styles.tabContainer}>
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'available' && styles.activeTab]}
-        onPress={() => setActiveTab('available')}
-      >
-        <Text style={styles.tabIcon}>🚗</Text>
-        <Text style={[styles.tabText, activeTab === 'available' && styles.activeTabText]}>
-          Xe có sẵn
-        </Text>
-        <View style={[styles.tabCount, activeTab === 'available' && styles.activeTabCount]}>
-          <Text style={[styles.tabCountText, activeTab === 'available' && styles.activeTabCountText]}>
-            {deposits.filter(d => d.type === 'available').length}
-          </Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'pre_order' && styles.activeTab]}
-        onPress={() => setActiveTab('pre_order')}
-      >
-        <Text style={styles.tabIcon}>📦</Text>
-        <Text style={[styles.tabText, activeTab === 'pre_order' && styles.activeTabText]}>
-          Pre-order
-        </Text>
-        <View style={[styles.tabCount, activeTab === 'pre_order' && styles.activeTabCount]}>
-          <Text style={[styles.tabCountText, activeTab === 'pre_order' && styles.activeTabCountText]}>
-            {deposits.filter(d => d.type === 'pre_order').length}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
 
   const renderStatusFilter = () => {
     const statusOptions = [
-      { key: 'all', label: 'Tất cả', count: deposits.filter(d => d.type === activeTab).length },
-      { key: 'pending', label: 'Chờ xác nhận', count: deposits.filter(d => d.type === activeTab && d.status === 'pending').length },
-      { key: 'confirmed', label: 'Đã xác nhận', count: deposits.filter(d => d.type === activeTab && d.status === 'confirmed').length },
-      { key: 'completed', label: 'Hoàn thành', count: deposits.filter(d => d.type === activeTab && d.status === 'completed').length },
+      { key: 'all', label: 'All', count: deposits.length },
+      { key: 'pending', label: 'Pending', count: deposits.filter(d => d.status === 'pending').length },
+      { key: 'holding', label: 'Holding', count: deposits.filter(d => d.status === 'holding').length },
+      { key: 'applied', label: 'Applied', count: deposits.filter(d => d.status === 'applied').length },
+      { key: 'expired', label: 'Expired', count: deposits.filter(d => d.status === 'expired').length },
     ];
 
     return (
@@ -362,90 +372,6 @@ const DepositManagementScreen = ({ navigation }) => {
     );
   };
 
-  const renderAddModal = () => (
-    <Modal
-      visible={showAddModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowAddModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.addModalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Chọn loại đặt cọc</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowAddModal(false)}
-            >
-              <Text style={styles.closeIcon}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalBody}>
-            {/* Available Vehicle Deposit */}
-            <TouchableOpacity
-              style={styles.depositTypeCard}
-              onPress={handleCreateAvailableDeposit}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={COLORS.GRADIENT.BLUE}
-                style={styles.depositTypeGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.depositTypeIconContainer}>
-                  <Text style={styles.depositTypeIcon}>🚗</Text>
-                </View>
-                <Text style={styles.depositTypeTitle}>Xe có sẵn</Text>
-                <Text style={styles.depositTypeDescription}>
-                  Đặt cọc để giành slot xe đang có sẵn tại đại lý
-                </Text>
-                <View style={styles.depositTypeFeatures}>
-                  <Text style={styles.featureItem}>✓ Xe sẵn sàng giao ngay</Text>
-                  <Text style={styles.featureItem}>✓ Không phải chờ đợi lâu</Text>
-                  <Text style={styles.featureItem}>✓ Chọn màu xe có sẵn</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Pre-order Deposit */}
-            <TouchableOpacity
-              style={styles.depositTypeCard}
-              onPress={handleCreatePreOrder}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={COLORS.GRADIENT.PURPLE}
-                style={styles.depositTypeGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.depositTypeIconContainer}>
-                  <Text style={styles.depositTypeIcon}>📦</Text>
-                </View>
-                <Text style={styles.depositTypeTitle}>Pre-order</Text>
-                <Text style={styles.depositTypeDescription}>
-                  Đặt cọc để lấy xe mới từ hãng sản xuất
-                </Text>
-                <View style={styles.depositTypeFeatures}>
-                  <Text style={styles.featureItem}>✓ Đặt xe mới từ hãng</Text>
-                  <Text style={styles.featureItem}>✓ Chọn màu theo ý muốn</Text>
-                  <Text style={styles.featureItem}>✓ Xe mới 100%</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  const getTabDescription = () => {
-    return activeTab === 'available'
-      ? 'Xe đang có sẵn tại đại lý'
-      : 'Xe đặt từ hãng sản xuất';
-  };
 
   return (
     <View style={styles.container}>
@@ -456,35 +382,32 @@ const DepositManagementScreen = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
-            <Text style={styles.headerTitleText}>Quản lý đặt cọc</Text>
+            <Text style={styles.headerTitleText}>Deposit Management</Text>
             <Text style={styles.headerSubtitle}>
-              {deposits.length} khoản đặt cọc
+              {deposits.length} deposits
             </Text>
           </View>
           {!isDealerManager && (
             <TouchableOpacity
               style={styles.addButton}
-              onPress={handleAddDeposit}
+              onPress={() => navigation.navigate('CreateDeposit')}
             >
-              <Text style={styles.addIcon}>+</Text>
+              <Plus size={24} color={COLORS.TEXT.WHITE} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Tabs */}
-      {renderTabs()}
-
       {/* Search */}
       <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={20} color={COLORS.TEXT.SECONDARY} />
           <TextInput
             style={styles.searchInput}
-            placeholder={`Tìm kiếm ${activeTab === 'available' ? 'xe có sẵn' : 'pre-order'}...`}
+            placeholder="Search deposits..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -499,14 +422,13 @@ const DepositManagementScreen = ({ navigation }) => {
       <View style={styles.content}>
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>
-            {activeTab === 'available' ? 'Xe có sẵn' : 'Pre-order'} ({filteredDeposits.length})
+            Deposit List ({filteredDeposits.length})
           </Text>
-          <Text style={styles.listDescription}>{getTabDescription()}</Text>
         </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Đang tải...</Text>
+            <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : (
           <FlatList
@@ -520,39 +442,19 @@ const DepositManagementScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>
-                  {activeTab === 'available' ? '🚗' : '📦'}
-                </Text>
-                <Text style={styles.emptyTitle}>Không có đặt cọc</Text>
+                <FileText size={64} color={COLORS.TEXT.SECONDARY} />
+                <Text style={styles.emptyTitle}>No Deposits</Text>
                 <Text style={styles.emptySubtitle}>
                   {searchQuery 
-                    ? 'Thử tìm kiếm khác' 
-                    : activeTab === 'available'
-                    ? 'Chưa có khách hàng đặt cọc xe có sẵn'
-                    : 'Chưa có pre-order nào'
+                    ? 'Try a different search' 
+                    : 'No deposits yet'
                   }
                 </Text>
-                {!isDealerManager && (
-                  <TouchableOpacity
-                    style={styles.emptyAddButton}
-                    onPress={handleAddDeposit}
-                  >
-                    <LinearGradient
-                      colors={COLORS.GRADIENT.BLUE}
-                      style={styles.emptyAddButtonGradient}
-                    >
-                      <Text style={styles.emptyAddButtonText}>+ Tạo đặt cọc mới</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
               </View>
             }
           />
         )}
       </View>
-
-      {/* Add Deposit Modal */}
-      {renderAddModal()}
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -595,11 +497,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     flex: 1,
     alignItems: 'center',
@@ -622,64 +519,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
-
-  // Tabs
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SIZES.PADDING.LARGE,
-    gap: SIZES.PADDING.SMALL,
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    gap: SIZES.PADDING.XSMALL,
-  },
-  activeTab: {
-    backgroundColor: COLORS.SURFACE,
-  },
-  tabIcon: {
-    fontSize: 18,
-  },
-  tabText: {
-    fontSize: SIZES.FONT.SMALL,
-    fontWeight: '600',
-    color: COLORS.TEXT.WHITE,
-  },
-  activeTabText: {
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: 'bold',
-  },
-  tabCount: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    paddingHorizontal: SIZES.PADDING.XSMALL,
-    paddingVertical: 1,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  activeTabCount: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  tabCountText: {
-    fontSize: SIZES.FONT.XSMALL,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-  },
-  activeTabCountText: {
-    color: COLORS.TEXT.WHITE,
-  },
 
   // Search section
   searchSection: {
@@ -694,10 +533,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
     marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -824,11 +660,6 @@ const styles = StyleSheet.create({
   statusBadges: {
     flexDirection: 'row',
     gap: SIZES.PADDING.XSMALL,
-  },
-  typeBadge: {
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: SIZES.PADDING.XSMALL,
-    borderRadius: SIZES.RADIUS.SMALL,
   },
   statusBadge: {
     paddingHorizontal: SIZES.PADDING.SMALL,
@@ -961,98 +792,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Add Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  addModalContent: {
-    backgroundColor: COLORS.SURFACE,
-    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
-    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SIZES.PADDING.LARGE,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-  },
-  modalTitle: {
-    fontSize: SIZES.FONT.LARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.BACKGROUND.SECONDARY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-  },
-  modalBody: {
-    padding: SIZES.PADDING.LARGE,
-    gap: SIZES.PADDING.LARGE,
-  },
-
-  // Deposit Type Cards (in modal)
-  depositTypeCard: {
-    borderRadius: SIZES.RADIUS.LARGE,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  depositTypeGradient: {
-    padding: SIZES.PADDING.LARGE,
-    alignItems: 'center',
-  },
-  depositTypeIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  depositTypeIcon: {
-    fontSize: 40,
-  },
-  depositTypeTitle: {
-    fontSize: SIZES.FONT.XLARGE,
-    fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  depositTypeDescription: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    textAlign: 'center',
-    opacity: 0.9,
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
-  depositTypeFeatures: {
-    alignItems: 'flex-start',
-    width: '100%',
-  },
-  featureItem: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    marginBottom: SIZES.PADDING.XSMALL,
-    opacity: 0.9,
-  },
-
   // Loading and Empty States
   loadingContainer: {
     paddingVertical: SIZES.PADDING.XXXLARGE,
@@ -1066,10 +805,6 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.XXXLARGE,
     alignItems: 'center',
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
-  },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -1080,20 +815,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
-    marginBottom: SIZES.PADDING.LARGE,
-  },
-  emptyAddButton: {
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    overflow: 'hidden',
-  },
-  emptyAddButtonGradient: {
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.LARGE,
-  },
-  emptyAddButtonText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 });
 

@@ -9,47 +9,112 @@ import CustomTabBar from '../components/common/CustomTabBar';
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import VerifyCodeScreen from '../screens/auth/VerifyCodeScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import EVMAdminHomeScreen from '../screens/home/EVMAdminHomeScreen';
 import EVMStaffHomeScreen from '../screens/home/EVMStaffHomeScreen';
 import DealerManagerHomeScreen from '../screens/home/ManagerHomeScreen';
 import DealerStaffHomeScreen from '../screens/home/EmployeeHomeScreen';
+import AllCategoriesScreen from '../screens/home/AllCategoriesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import CatalogScreen from '../screens/catalog/CatalogScreen';
 import VehicleDetailScreen from '../screens/vehicle/VehicleDetailScreen';
 import CompareScreen from '../screens/compare/CompareScreen';
 import CreateQuotationScreen from '../screens/quotation/CreateQuotationScreen';
 import QuotationDetailScreen from '../screens/quotation/QuotationDetailScreen';
+import DealerManagerQuotationScreen from '../screens/quotation/DealerManagerQuotationScreen';
+import DealerManagerQuotationDetailScreen from '../screens/quotation/DealerManagerQuotationDetailScreen';
 import QuotationManagementScreen from '../screens/quotation/QuotationManagementScreen';
+import EditQuotationScreen from '../screens/quotation/EditQuotationScreen';
 import ContractScreen from '../screens/contract/ContractScreen';
 import CustomerManagementScreen from '../screens/customer/CustomerManagementScreen';
-import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
-import OrderManagementScreen from '../screens/order/OrderManagementScreen';
+import CustomerDetailScreen from '../screens/customer/CustomerDetailScreen';
+import CreateCustomerScreen from '../screens/customer/CreateCustomerScreen';
+import EditCustomerScreen from '../screens/customer/EditCustomerScreen';
+import OrderManagementScreen from '../screens/orderrestockmanager/OrderManagementScreen';
+import CreateOrderRestockScreen from '../screens/orderrestockmanager/CreateOrderRestockScreen';
 import AllocationManagementScreen from '../screens/allocation/AllocationManagementScreen';
 import InventoryManagementScreen from '../screens/inventory/InventoryManagementScreen';
+import AddInventoryScreen from '../screens/inventory/AddInventoryScreen';
+import EditInventoryScreen from '../screens/inventory/EditInventoryScreen';
+import InventoryDetailScreen from '../screens/inventory/InventoryDetailScreen';
 import DealerManagementScreen from '../screens/dealer/DealerManagementScreen';
+import DealerStaffManagementScreen from '../screens/dealer/DealerStaffManagementScreen';
+import CreateDealerStaffScreen from '../screens/dealer/CreateDealerStaffScreen';
+import EditDealerStaffScreen from '../screens/dealer/EditDealerStaffScreen';
 import PricingManagementScreen from '../screens/pricing/PricingManagementScreen';
 import RetailPricingScreen from '../screens/pricing/RetailPricingScreen';
 import AddProductScreen from '../screens/product/AddProductScreen';
 import EditProductScreen from '../screens/product/EditProductScreen';
 import ProductDetailScreen from '../screens/product/ProductDetailScreen';
 import ProductManagementScreen from '../screens/product/ProductManagementScreen';
-import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
-import EditPromotionScreen from '../screens/promotion/EditPromotionScreen';
-import PromotionDetailScreen from '../screens/promotion/PromotionDetailScreen';
-import DealerPromotionManagementScreen from '../screens/promotion/DealerPromotionManagementScreen';
-import AddDealerPromotionScreen from '../screens/promotion/AddDealerPromotionScreen';
-import EditDealerPromotionScreen from '../screens/promotion/EditDealerPromotionScreen';
-import DealerPromotionDetailScreen from '../screens/promotion/DealerPromotionDetailScreen';
 import CustomerDebtManagementScreen from '../screens/debt/CustomerDebtManagementScreen';
 import ManufacturerDebtManagementScreen from '../screens/debt/ManufacturerDebtManagementScreen';
 import InstallmentManagementScreen from '../screens/installment/InstallmentManagementScreen';
 import InstallmentDetailScreen from '../screens/installment/InstallmentDetailScreen';
+import InstallmentPlanManagementScreen from '../screens/installment/InstallmentPlanManagementScreen';
+import InstallmentPlanDetailScreen from '../screens/installment/InstallmentPlanDetailScreen';
+import CreateInstallmentPlanScreen from '../screens/installment/CreateInstallmentPlanScreen';
+import StaffInstallmentPlanListScreen from '../screens/installment/StaffInstallmentPlanListScreen';
+import ChooseInstallmentPlanScreen from '../screens/installment/ChooseInstallmentPlanScreen';
+import CreateInstallmentContractScreen from '../screens/installment/CreateInstallmentContractScreen';
+import InstallmentContractManagementScreen from '../screens/installment/InstallmentContractManagementScreen';
+import InstallmentContractDetailScreen from '../screens/installment/InstallmentContractDetailScreen';
+import EditInstallmentContractScreen from '../screens/installment/EditInstallmentContractScreen';
+import InstallmentPaymentScreen from '../screens/installment/InstallmentPaymentScreen';
+import InstallmentPaymentDetailScreen from '../screens/installment/InstallmentPaymentDetailScreen';
+import EditInstallmentPaymentScreen from '../screens/installment/EditInstallmentPaymentScreen';
 import DepositManagementScreen from '../screens/deposit/DepositManagementScreen';
-import CreateDepositAvailableScreen from '../screens/deposit/CreateDepositAvailableScreen';
-import CreatePreOrderScreen from '../screens/deposit/CreatePreOrderScreen';
-import DepositDetailScreen from '../screens/deposit/DepositDetailScreen';
+import CreateDepositScreen from '../screens/deposit/CreateDepositScreen';
+import EditDepositScreen from '../screens/deposit/EditDepositScreen';
 import PreOrderTasksScreen from '../screens/evm/PreOrderTasksScreen';
 import StaffManagementScreen from '../screens/staff/StaffManagementScreen';
+import WarehouseManagementScreen from '../screens/warehouse/WarehouseManagementScreen';
+import WarehouseDetailScreen from '../screens/warehouse/WarehouseDetailScreen';
+import AddWarehouseScreen from '../screens/warehouse/AddWarehouseScreen';
+import EditWarehouseScreen from '../screens/warehouse/EditWarehouseScreen';
+import DiscountManagementScreen from '../screens/discount/DiscountManagementScreen';
+import AddDiscountScreen from '../screens/discount/AddDiscountScreen';
+import EditDiscountScreen from '../screens/discount/EditDiscountScreen';
+import DiscountDetailScreen from '../screens/discount/DiscountDetailScreen';
+import PromotionManagementScreen from '../screens/promotion/PromotionManagementScreen';
+import AddPromotionScreen from '../screens/promotion/AddPromotionScreen';
+import EditPromotionScreen from '../screens/promotion/EditPromotionScreen';
+import OrderRestockManagementScreen from '../screens/order/OrderRestockManagementScreen';
+import OrderRestockDetailScreen from '../screens/order/OrderRestockDetailScreen';
+import UpdateWarehouseItemScreen from '../screens/order/UpdateWarehouseItemScreen';
+import OrderRestockDetailManagerScreen from '../screens/orderrestockmanager/OrderRestockDetailManagerScreen';
+import PricePolicyManagementScreen from '../screens/pricepolicy/PricePolicyManagementScreen';
+import AddPricePolicyScreen from '../screens/pricepolicy/AddPricePolicyScreen';
+import EditPricePolicyScreen from '../screens/pricepolicy/EditPricePolicyScreen';
+import PricePolicyDetailScreen from '../screens/pricepolicy/PricePolicyDetailScreen';
+import StockManagementScreen from '../screens/stock/StockManagementScreen';
+import CreateStockScreen from '../screens/stock/CreateStockScreen';
+import EditStockScreen from '../screens/stock/EditStockScreen';
+import StockDetailScreen from '../screens/stock/StockDetailScreen';
+import StaffStockListScreen from '../screens/stock/StaffStockListScreen';
+import StaffStockDetailScreen from '../screens/stock/StaffStockDetailScreen';
+import StockPromotionManagementScreen from '../screens/stockpromotion/StockPromotionManagementScreen';
+import StockPromotionDetailScreen from '../screens/stockpromotion/StockPromotionDetailScreen';
+import CreateStockPromotionScreen from '../screens/stockpromotion/CreateStockPromotionScreen';
+import EditStockPromotionScreen from '../screens/stockpromotion/EditStockPromotionScreen';
+import DriveTrialManagementScreen from '../screens/drivetrial/DriveTrialManagementScreen';
+import DriveTrialDetailScreen from '../screens/drivetrial/DriveTrialDetailScreen';
+import CustomerContractManagementScreen from '../screens/contract/CustomerContractManagementScreen';
+import CreateCustomerContractScreen from '../screens/contract/CreateCustomerContractScreen';
+import EditCustomerContractScreen from '../screens/contract/EditCustomerContractScreen';
+import CustomerContractDetailScreen from '../screens/contract/CustomerContractDetailScreen';
+import CreditLineManagementScreen from '../screens/creditline/CreditLineManagementScreen';
+import CreateCreditLineScreen from '../screens/creditline/CreateCreditLineScreen';
+import CreditLineDetailScreen from '../screens/creditline/CreditLineDetailScreen';
+import EVMStaffCreditLineManagementScreen from '../screens/creditline/EVMStaffCreditLineManagementScreen';
+import EVMStaffCreditLineDetailScreen from '../screens/creditline/EVMStaffCreditLineDetailScreen';
+import EVMStaffCreditLineEditScreen from '../screens/creditline/EVMStaffCreditLineEditScreen';
+import DealerManagerCreditLineScreen from '../screens/creditline/DealerManagerCreditLineScreen';
+import ReportsScreen from '../screens/reports/ReportsScreen';
+import DealerManagerDashboardScreen from '../screens/dashboard/DealerManagerDashboardScreen';
+import ContractFullPaymentScreen from '../screens/contract/ContractFullPaymentScreen';
 
 // Import loading component
 import LoadingScreen from '../components/common/LoadingScreen';
@@ -125,6 +190,9 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
         ) : (
           // Main Stack - when user is authenticated, show tab navigator
@@ -132,6 +200,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="Main" 
               component={MainTabNavigator} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AllCategories" 
+              component={AllCategoriesScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 
@@ -160,6 +233,16 @@ const AppNavigator = () => {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
+          name="DealerManagerQuotation" 
+          component={DealerManagerQuotationScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="DealerManagerQuotationDetail" 
+          component={DealerManagerQuotationDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
           name="Contract" 
           component={ContractScreen} 
           options={{ headerShown: false }}
@@ -170,23 +253,38 @@ const AppNavigator = () => {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
+          name="EditQuotation" 
+          component={EditQuotationScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
           name="CustomerManagement" 
           component={CustomerManagementScreen} 
           options={{ headerShown: false }}
         />
-            <Stack.Screen
-              name="B2BPromotionManagement"
-              component={PromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="PromotionManagement"
-              component={PromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
+        <Stack.Screen 
+          name="CustomerDetail" 
+          component={CustomerDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CreateCustomer" 
+          component={CreateCustomerScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditCustomer" 
+          component={EditCustomerScreen} 
+          options={{ headerShown: false }}
+        />
             <Stack.Screen
               name="OrderManagement"
               component={OrderManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CreateOrderRestock"
+              component={CreateOrderRestockScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -200,8 +298,38 @@ const AppNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="DealerManagement"
-              component={DealerManagementScreen}
+              name="AddInventory"
+              component={AddInventoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditInventory"
+              component={EditInventoryScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InventoryDetail"
+              component={InventoryDetailScreen}
+              options={{ headerShown: false }}
+            />
+             <Stack.Screen
+               name="DealerManagement"
+               component={DealerManagementScreen}
+               options={{ headerShown: false }}
+             />
+             <Stack.Screen
+               name="DealerStaffManagement"
+               component={DealerStaffManagementScreen}
+               options={{ headerShown: false }}
+             />
+            <Stack.Screen
+              name="CreateDealerStaff"
+              component={CreateDealerStaffScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditDealerStaff"
+              component={EditDealerStaffScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -229,6 +357,26 @@ const AppNavigator = () => {
           component={StaffManagementScreen} 
           options={{ headerShown: false }}
         />
+        <Stack.Screen 
+          name="WarehouseManagement" 
+          component={WarehouseManagementScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="WarehouseDetail" 
+          component={WarehouseDetailScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="AddWarehouse" 
+          component={AddWarehouseScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EditWarehouse" 
+          component={EditWarehouseScreen} 
+          options={{ headerShown: false }}
+        />
             <Stack.Screen 
               name="AddProduct"
               component={AddProductScreen}
@@ -242,41 +390,6 @@ const AppNavigator = () => {
             <Stack.Screen
               name="ProductDetail"
               component={ProductDetailScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="B2CPromotionManagement"
-              component={DealerPromotionManagementScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="AddB2BPromotion"
-              component={AddPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="EditB2BPromotion"
-              component={EditPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="B2BPromotionDetail"
-              component={PromotionDetailScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="AddB2CPromotion"
-              component={AddDealerPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="EditB2CPromotion"
-              component={EditDealerPromotionScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="B2CPromotionDetail"
-              component={DealerPromotionDetailScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -300,23 +413,283 @@ const AppNavigator = () => {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="InstallmentPlanManagement"
+              component={InstallmentPlanManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CreateInstallmentPlan"
+              component={CreateInstallmentPlanScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentPlanDetail"
+              component={InstallmentPlanDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="StaffInstallmentPlanList"
+              component={StaffInstallmentPlanListScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ChooseInstallmentPlan"
+              component={ChooseInstallmentPlanScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="CreateInstallmentContract"
+              component={CreateInstallmentContractScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentContractManagement"
+              component={InstallmentContractManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentContractDetail"
+              component={InstallmentContractDetailScreen}
+              options={{ headerShown: false }}
+                        />
+            <Stack.Screen
+              name="EditInstallmentContract"
+              component={EditInstallmentContractScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentPayment"
+              component={InstallmentPaymentScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="InstallmentPaymentDetail"
+              component={InstallmentPaymentDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditInstallmentPayment"
+              component={EditInstallmentPaymentScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="DepositManagement"
               component={DepositManagementScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="CreateDepositAvailable"
-              component={CreateDepositAvailableScreen}
+              name="CreateDeposit"
+              component={CreateDepositScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="CreatePreOrder"
-              component={CreatePreOrderScreen}
+              name="EditDeposit"
+              component={EditDepositScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DiscountManagement" 
+              component={DiscountManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AddDiscount" 
+              component={AddDiscountScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditDiscount" 
+              component={EditDiscountScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DiscountDetail" 
+              component={DiscountDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="PromotionManagement" 
+              component={PromotionManagementScreen} 
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="DepositDetail"
-              component={DepositDetailScreen}
+              name="AddPromotion"
+              component={AddPromotionScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditPromotion"
+              component={EditPromotionScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PricePolicyManagement"
+              component={PricePolicyManagementScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AddPricePolicy"
+              component={AddPricePolicyScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditPricePolicy"
+              component={EditPricePolicyScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="PricePolicyDetail"
+              component={PricePolicyDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="OrderRestockManagement" 
+              component={OrderRestockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockPromotionManagement" 
+              component={StockPromotionManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockPromotionDetail" 
+              component={StockPromotionDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateStockPromotion" 
+              component={CreateStockPromotionScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditStockPromotion" 
+              component={EditStockPromotionScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="OrderRestockDetail" 
+              component={OrderRestockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="UpdateWarehouseItem" 
+              component={UpdateWarehouseItemScreen} 
+              options={{ headerShown: false }}
+            />
+          <Stack.Screen 
+            name="OrderRestockDetailManager" 
+            component={OrderRestockDetailManagerScreen} 
+            options={{ headerShown: false }}
+          />
+            <Stack.Screen 
+              name="StockManagement" 
+              component={StockManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateStock" 
+              component={CreateStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditStock" 
+              component={EditStockScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StockDetail" 
+              component={StockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StaffStockList" 
+              component={StaffStockListScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="StaffStockDetail" 
+              component={StaffStockDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialManagement" 
+              component={DriveTrialManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DriveTrialDetail" 
+              component={DriveTrialDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CustomerContractManagement" 
+              component={CustomerContractManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateCustomerContract" 
+              component={CreateCustomerContractScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CustomerContractDetail" 
+              component={CustomerContractDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="ContractFullPayment" 
+              component={ContractFullPaymentScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditCustomerContract" 
+              component={EditCustomerContractScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreditLineManagement" 
+              component={CreditLineManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreateCreditLine" 
+              component={CreateCreditLineScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CreditLineDetail" 
+              component={CreditLineDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineManagement" 
+              component={EVMStaffCreditLineManagementScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineDetail" 
+              component={EVMStaffCreditLineDetailScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EVMStaffCreditLineEdit" 
+              component={EVMStaffCreditLineEditScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DealerManagerCreditLine" 
+              component={DealerManagerCreditLineScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Reports" 
+              component={ReportsScreen} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="DealerManagerDashboard" 
+              component={DealerManagerDashboardScreen} 
               options={{ headerShown: false }}
             />
           </>

@@ -13,6 +13,11 @@ export const login = async (email, password) => {
       email,
       password,
     });
+    console.log("=== AUTH API LOGIN ===");
+    console.log("response:", response);
+    console.log("response.data:", response.data);
+    console.log("response.data.data:", response.data.data);
+    console.log("response.data keys:", Object.keys(response.data || {}));
     return response.data; 
   } catch (error) {
     console.error("Login error:", error.response?.data || error.message);
@@ -40,20 +45,116 @@ export const refreshToken = async (refreshToken) => {
 };
 
 /**
+ * Get profile by staff ID
+ * @param {number|string} staffId - Staff identifier
+ * @returns {Promise<Object>} Profile response
+ */
+export const getProfile = async (staffId) => {
+  try {
+    const response = await api.get(`/auth/profile/${staffId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get profile error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
  * Logout user account
- * @param {string} accessToken - Current access token
+ * @param {string} accessToken - Current access token (optional, handled by interceptor)
  * @returns {Promise<Object>} Logout response
  */
-export const logout = async (accessToken) => {
+export const logout = async () => {
   try {
-    const response = await api.post("/auth/logout", {}, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    const response = await api.post("/auth/logout");
     return response.data;
   } catch (error) {
     console.error("Logout error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Request password reset via email
+ * @param {string} email - User email address
+ * @returns {Promise<Object>} Response with statusCode, message, and data
+ */
+export const forgetPassword = async (email) => {
+  try {
+    const response = await api.post("/auth/forget-password", {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Forget password error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Verify reset code
+ * @param {Object} payload
+ * @param {string|number} payload.code
+ * @param {string} payload.email
+ */
+export const verifyResetCode = async ({ code, email }) => {
+  try {
+    const response = await api.post("/auth/verify", { code, email });
+    return response.data;
+  } catch (error) {
+    console.error("Verify code error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Update password after verification
+ * @param {Object} payload
+ * @param {string} payload.email
+ * @param {string} payload.newPassword
+ */
+export const updatePassword = async ({ email, newPassword }) => {
+  try {
+    const response = await api.patch("/auth/update-password", {
+      email,
+      newPassword,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Update password error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Generic PATCH helper for edit/update operations
+ * @param {string} url - Endpoint path (e.g., "/users/123")
+ * @param {Object} data - Partial resource to update
+ * @param {Object} [config] - Axios config overrides
+ * @returns {Promise<Object>} Response payload
+ */
+export const patch = async (url, data, config = {}) => {
+  try {
+    const response = await api.patch(url, data, config);
+    return response.data;
+  } catch (error) {
+    console.error("PATCH error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Generic DELETE helper for delete operations
+ * @param {string} url - Endpoint path (e.g., "/users/123")
+ * @param {Object} [config] - Axios config overrides
+ * @returns {Promise<Object>} Response payload
+ */
+export const remove = async (url, config = {}) => {
+  try {
+    const response = await api.delete(url, config);
+    return response.data;
+  } catch (error) {
+    console.error("DELETE error:", error.response?.data || error.message);
     throw error;
   }
 };

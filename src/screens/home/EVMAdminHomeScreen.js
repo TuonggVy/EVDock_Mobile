@@ -10,19 +10,79 @@ import {
   Image,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
+import { Bell, ChartColumnIncreasing, UserRound, ChevronRight, CircleDollarSign, Building2, CarFront, Warehouse, Users, TicketPercent, Gift, PackageOpen, RefreshCcw, NotepadText, CreditCard, Search } from 'lucide-react-native';
+import reportService from '../../services/reportService';
+import useUserProfile from '../../hooks/useUserProfile';
 
 const EVMAdminHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { profile } = useUserProfile();
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Quick Stats state
+  const [quickStats, setQuickStats] = useState({
+    totalAgencies: 0,
+    totalWarehouses: 0,
+    totalMotorbikes: 0,
+    totalRevenue: 0,
+    loading: true,
+  });
   
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
   const fadeAnim = useState(new Animated.Value(1))[0];
   const slideAnim = useState(new Animated.Value(0))[0];
+
+  // Load Quick Stats
+  useEffect(() => {
+    loadQuickStats();
+    
+    // Refresh stats when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadQuickStats();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadQuickStats = async () => {
+    try {
+      setQuickStats(prev => ({ ...prev, loading: true }));
+      const agencyId = user?.agencyId || null;
+
+      // Fetch all stats in parallel
+      const [
+        agenciesRes,
+        warehousesRes,
+        motorbikesRes,
+        revenueRes,
+      ] = await Promise.all([
+        reportService.getTotalAgencies(),
+        reportService.getTotalWarehouses(),
+        reportService.getTotalMotorbikes(),
+        reportService.getTotalContractRevenue(agencyId),
+      ]);
+
+      setQuickStats({
+        totalAgencies: agenciesRes?.data?.totalAgencies || agenciesRes?.data || 0,
+        totalWarehouses: warehousesRes?.data?.totalWarehouses || warehousesRes?.data || 0,
+        totalMotorbikes: motorbikesRes?.data?.totalMotorbikes || motorbikesRes?.data || 0,
+        totalRevenue: revenueRes?.data?.totalContractRevenue || 0,
+        loading: false,
+      });
+    } catch (error) {
+      console.error('Error loading quick stats:', error);
+      setQuickStats(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   // Auto-slide effect with smooth transitions
   useEffect(() => {
@@ -90,44 +150,85 @@ const EVMAdminHomeScreen = ({ navigation }) => {
     return 'Good evening';
   };
 
-  const categoryCards = [
+  const allCategoryCards = [
     {
-      title: 'Pricing',
-      gradient: COLORS.GRADIENT.BLUE,
-      icon: '💰',
-      onPress: () => navigation.navigate('PricingManagement'),
-    },
-    {
-      title: 'Dealers',
-      gradient: COLORS.GRADIENT.PINK,
-      icon: '🏢',
+      title: 'Agencies',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Building2 color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('DealerManagement'),
     },
     {
       title: 'Vehicles',
-      gradient: COLORS.GRADIENT.GREEN,
-      icon: '🚗',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CarFront color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('VehicleManagement'),
     },
     {
+      title: 'Warehouse',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Warehouse color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('WarehouseManagement'),
+    },
+    {
       title: 'Staff',
-      gradient: COLORS.GRADIENT.ORANGE,
-      icon: '👥',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Users color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('StaffManagement'),
     },
     {
+      title: 'Discount',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <TicketPercent color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DiscountManagement'),
+    },
+    {
       title: 'Promotions',
-      gradient: COLORS.GRADIENT.PINK_PURPLE,
-      icon: '🎁',
-      onPress: () => navigation.navigate('B2BPromotionManagement'),
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Gift color="#A1D9FF" size={50} />,
+      onPress: () => navigation.navigate('PromotionManagement'),
+    },
+    {
+      title: 'Inventory',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <PackageOpen color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('InventoryManagement'),
+    },
+    {
+      title: 'Order Restock',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <RefreshCcw color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('OrderRestockManagement'),
     },
     {
       title: 'Reports',
-      gradient: COLORS.GRADIENT.PURPLE,
-      icon: '📊',
-      onPress: () => Alert.alert('Tính năng', 'Báo cáo toàn diện - Sắp ra mắt'),
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('Reports'),
+    },
+    {
+      title: 'Price Policy',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CircleDollarSign color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('PricePolicyManagement'),
+    },
+    {
+      title: 'Credit Line',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CreditCard color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('CreditLineManagement'),
     },
   ];
+
+  // Filter category cards based on search query
+  const categoryCards = allCategoryCards.filter(card => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return card.title.toLowerCase().includes(query);
+  });
+
+  // Display only first 5 cards on home screen
+  const displayedCards = categoryCards.slice(0, 5);
+  const hasMoreCards = categoryCards.length > 5;
 
 
   return (
@@ -137,23 +238,8 @@ const EVMAdminHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Admin'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Admin'}</Text>
             <Text style={styles.roleText}>EVM Administrator</Text>
-          </View>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>📊</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>🔔</Text>
-              <View style={styles.notificationDot} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Profile')}
-            >
-              <Text style={styles.iconText}>👤</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -162,21 +248,37 @@ const EVMAdminHomeScreen = ({ navigation }) => {
       <View style={styles.topSection}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Search system, dealers..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+            >
+              <Text style={styles.clearButtonText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Category Cards */}
         <View style={styles.categoriesContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-            {categoryCards.map((category, index) => (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.categoriesScroll}
+            contentContainerStyle={styles.categoriesScrollContent}
+          >
+            {displayedCards.map((category, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.categoryCard}
+                activeOpacity={0.85}
                 onPress={category.onPress}
               >
                 <LinearGradient
@@ -190,6 +292,15 @@ const EVMAdminHomeScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             ))}
+            {hasMoreCards && (
+              <TouchableOpacity
+                style={styles.seeAllCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('AllCategories', { categoryCards: categoryCards })}
+              >
+                <ChevronRight color={COLORS.TEXT.PRIMARY} size={25} />
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -235,20 +346,50 @@ const EVMAdminHomeScreen = ({ navigation }) => {
           <View style={styles.statsContainer}>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>15</Text>
-                <Text style={styles.statLabel}>Đại lý</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalAgencies}</Text>
+                    <Text style={styles.statLabel}>Đại lý</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>1,234</Text>
-                <Text style={styles.statLabel}>Xe trong kho</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalMotorbikes.toLocaleString()}</Text>
+                    <Text style={styles.statLabel}>Xe trong kho</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>$2.5M</Text>
-                <Text style={styles.statLabel}>Doanh thu tháng</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>
+                      {quickStats.totalRevenue >= 1000000 
+                        ? `$${(quickStats.totalRevenue / 1000000).toFixed(1)}M`
+                        : quickStats.totalRevenue >= 1000
+                        ? `$${(quickStats.totalRevenue / 1000).toFixed(1)}K`
+                        : `$${quickStats.totalRevenue.toLocaleString()}`}
+                    </Text>
+                    <Text style={styles.statLabel}>Doanh thu</Text>
+                  </>
+                )}
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>98.5%</Text>
-                <Text style={styles.statLabel}>Tỷ lệ hoàn thành</Text>
+                {quickStats.loading ? (
+                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                ) : (
+                  <>
+                    <Text style={styles.statNumber}>{quickStats.totalWarehouses}</Text>
+                    <Text style={styles.statLabel}>Kho</Text>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -308,32 +449,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
-  headerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
-    position: 'relative',
-  },
-  iconText: {
-    fontSize: SIZES.FONT.LARGE,
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.PRIMARY,
-  },
 
   /* ---------- search & categories (trên, nền đen) ---------- */
   searchContainer: {
@@ -360,6 +475,15 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
+  clearButton: {
+    padding: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: 'bold',
+  },
   logoutText: {
     marginLeft: SIZES.PADDING.SMALL,
     color: COLORS.ERROR,
@@ -371,6 +495,9 @@ const styles = StyleSheet.create({
   },
   categoriesScroll: {
     paddingVertical: SIZES.PADDING.SMALL,
+  },
+  categoriesScrollContent: {
+    alignItems: 'center',
   },
   categoryCard: {
     width: 120,
@@ -398,6 +525,20 @@ const styles = StyleSheet.create({
     right: -10,
     fontSize: 50,
     opacity: 0.3,
+  },
+  seeAllCard: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    marginRight: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   /* ---------- banner & activities & stats (dưới, nền trắng) ---------- */

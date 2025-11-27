@@ -1,4 +1,5 @@
 import storageService from './storage/storageService';
+import axiosInstance from './api/axiosInstance';
 
 // Local storage keys (kept internal to this module to avoid global churn)
 const STORAGE_KEY_ORDERS = '@EVDock:Orders';
@@ -166,6 +167,71 @@ export const orderService = {
       return { success: false, error: 'Không thể cập nhật đơn hàng' };
     }
   },
+
+  // Create order restock via API
+  createOrderRestock: async (orderData) => {
+    try {
+      const requestData = {
+        quantity: parseInt(orderData.quantity) || 0,
+        pricePolicyId: parseInt(orderData.pricePolicyId) || 1,
+        discountId: parseInt(orderData.discountId) || 1,
+        promotionId: parseInt(orderData.promotionId) || 1,
+        warehouseId: parseInt(orderData.warehouseId) || 1,
+        motorbikeId: parseInt(orderData.motorbikeId) || 1,
+        colorId: parseInt(orderData.colorId) || 1,
+        agencyId: parseInt(orderData.agencyId) || 1,
+      };
+
+      console.log('Creating order restock with data:', JSON.stringify(requestData, null, 2));
+
+      const response = await axiosInstance.post('/order-restock', requestData);
+      
+      // Response format: { statusCode: 201, message: "...", data: { id: 7, ... } }
+      console.log('📦 [OrderService] Raw API Response:', {
+        statusCode: response.data?.statusCode,
+        message: response.data?.message,
+        hasData: !!response.data?.data,
+        fullResponse: response.data
+      });
+      
+      // Response format: { data: { id: 7, basePrice, quantity, ... } }
+      // Try response.data.data first (nested), then response.data (direct)
+      const responseData = response.data?.data || response.data;
+      const orderId = responseData?.id || responseData?.orderId;
+      
+      console.log('✅ [OrderService] Order created successfully:', {
+        orderId,
+        status: responseData?.status,
+        quantity: responseData?.quantity,
+        subtotal: responseData?.subtotal,
+        extractedData: responseData
+      });
+      
+      // Log the ID clearly
+      if (orderId) {
+        console.log('🆔 [OrderService] ✅ Order ID từ response:', orderId, '(type:', typeof orderId, ')');
+      } else {
+        console.error('❌ [OrderService] KHÔNG TÌM THẤY orderId trong response!');
+        console.error('❌ [OrderService] Response structure:', JSON.stringify(response.data, null, 2));
+        console.error('❌ [OrderService] responseData:', JSON.stringify(responseData, null, 2));
+      }
+      
+      return {
+        success: true,
+        data: responseData,
+        orderId: orderId,
+        message: response.data.message || `Tạo đơn hàng thành công${orderId ? ` (ID: ${orderId})` : ''}`
+      };
+    } catch (error) {
+      console.error('Error creating order restock:', error);
+      console.error('Error details:', error.response?.data);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Không thể tạo đơn hàng',
+        message: 'Không thể tạo đơn hàng'
+      };
+    }
+  },
 };
 
 // Allocation Service (EVM Staff)
@@ -259,4 +325,3 @@ export const warehouseService = {
 };
 
 export default { orderService, allocationService, warehouseService };
-

@@ -11,11 +11,13 @@ import {
   RefreshControl,
   Modal,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Funnel, Pencil, Trash2, X, ArrowLeft, Plus, Search, Car } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
-import { vehicleService } from '../../services/vehicleService';
+import motorbikeService from '../../services/motorbikeService';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 
@@ -29,11 +31,18 @@ const ProductManagementScreen = ({ navigation, route }) => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedVersion, setSelectedVersion] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [versions, setVersions] = useState([{ id: 'all', name: 'All', icon: '🚗' }]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({
+    modelFilters: [],
+    makeFromFilter: []
+  });
+  const [selectedFilters, setSelectedFilters] = useState({
+    model: 'all',
+    makeFrom: 'all'
+  });
 
   // Removed local mock; products will be loaded from manufacturer vehicles (storage / later BE)
 
@@ -44,76 +53,160 @@ const ProductManagementScreen = ({ navigation, route }) => {
     loadProducts();
   }, []);
 
-  // Load versions from catalog (vehicleService)
+  // Refresh products when screen comes into focus (after editing)
   useEffect(() => {
-    const loadVersions = async () => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProducts();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Load filter options from motorbike filters API
+  useEffect(() => {
+    const loadFilterOptions = async () => {
       try {
-        const res = await vehicleService.getVersions();
-        if (res?.success && Array.isArray(res.data)) {
-          setVersions(res.data);
+        console.log('Loading filter options...');
+        const res = await motorbikeService.getMotorbikeFilters();
+        console.log('Filter API response:', res);
+        
+        if (res?.success && res.data) {
+          console.log('Filter data:', res.data);
+          setFilterOptions({
+            modelFilters: res.data.modelFilters || [],
+            makeFromFilter: res.data.makeFromFilter || []
+          });
+        } else {
+          console.log('No filter data received or API failed, using fallback data');
+          // Fallback data based on the API response structure you provided
+          setFilterOptions({
+            modelFilters: [
+              { model: "Model X" },
+              { model: "Model IX" },
+              { model: "Model Y" }
+            ],
+            makeFromFilter: [
+              { makeFrom: "Vietnam" }
+            ]
+          });
         }
       } catch (e) {
-        // keep default
+        console.error('Error loading filter options:', e);
       }
     };
-    loadVersions();
+    loadFilterOptions();
   }, []);
 
-  // Filter products when search or category changes
+  // Filter products when search changes (local filtering)
   useEffect(() => {
     filterProducts();
-  }, [searchQuery, selectedVersion, products]);
+  }, [searchQuery, products]);
+
+  // Load products when filters change (API filtering)
+  useEffect(() => {
+    loadProducts();
+  }, [selectedFilters]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      // In VehicleManagement mode, show manufacturer vehicles from vehicleService
-      if (isVehicleManagement) {
-        const res = await vehicleService.getAllVehicles();
-        const items = Array.isArray(res?.data) ? res.data : [];
-        // Map to local card structure; hide stock/status elsewhere
-        const mapped = items.map(v => ({
-          id: v.id,
-          name: v.name,
-          category: v.model,
-          version: v.version,
-          price: v.price,
-          status: undefined,
-          image: v.image,
-          description: v.description,
-          specifications: {
-            model: v.model,
-            version: v.version,
-          },
-          model: v.model,
-          colors: v.colors,
-          createdAt: v.createdAt,
-        }));
-        setProducts(mapped);
-        setLoading(false);
-        return;
-      }
-      // In non-VehicleManagement usage, also show manufacturer vehicles (no stock fields)
-      const res = await vehicleService.getAllVehicles();
+      
+      // Use motorbike API with pagination and filters
+      const filters = {
+        limit: 50, // Load more items for management
+        page: 1,
+        // Apply selected filters
+        model: selectedFilters.model !== 'all' ? selectedFilters.model : undefined,
+        makeFrom: selectedFilters.makeFrom !== 'all' ? selectedFilters.makeFrom : undefined,
+      };
+      
+      const res = await motorbikeService.getAllMotorbikes(filters);
       const items = Array.isArray(res?.data) ? res.data : [];
-      const mapped = items.map(v => ({
-        id: v.id,
-        name: v.name,
-        category: v.model,
-        version: v.version,
-        price: v.price,
-        status: undefined,
-        image: v.image,
-        description: v.description,
-        specifications: {
-          model: v.model,
-          version: v.version,
-        },
-        model: v.model,
-        colors: v.colors,
-        createdAt: v.createdAt,
-      }));
-      setProducts(mapped);
+      
+      // Fetch detailed info including images for each motorbike
+      const productsWithImages = await Promise.all(
+        items.map(async (motorbike) => {
+            try {
+            // Fetch detailed motorbike data including images (same as ProductDetailScreen)
+            const result = await motorbikeService.getMotorbikeById(motorbike.id);
+            
+            console.log(`📸 Motorbike ${motorbike.id} - Result:`, result.success);
+            console.log(`📸 Motorbike ${motorbike.id} - Data:`, result.data);
+            
+            // Get the first product image, or first color image, or use placeholder
+            let imageUri = 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png';
+            
+            if (result.success && result.data) {
+              const data = result.data.data || result.data;
+              console.log(`📸 Motorbike ${motorbike.id} - Extracted data:`, data);
+              console.log(`📸 Motorbike ${motorbike.id} - Images array:`, data.images);
+              console.log(`📸 Motorbike ${motorbike.id} - Colors array:`, data.colors);
+              
+              // Extract images from the response (same as ProductDetailScreen)
+              if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+                imageUri = data.images[0].imageUrl;
+                console.log(`✅ Motorbike ${motorbike.id} - Using image: ${imageUri}`);
+              } else if (data.colors && Array.isArray(data.colors) && data.colors.length > 0) {
+                imageUri = data.colors[0].imageUrl;
+                console.log(`✅ Motorbike ${motorbike.id} - Using color image: ${imageUri}`);
+              } else {
+                console.log(`⚠️ Motorbike ${motorbike.id} - No images found, using placeholder`);
+              }
+            } else {
+              console.log(`❌ Motorbike ${motorbike.id} - Failed to get result or data`);
+            }
+            
+            return {
+              id: motorbike.id,
+              name: motorbike.name,
+              category: motorbike.model,
+              version: motorbike.version,
+              price: motorbike.price,
+              status: motorbike.isDeleted ? 'out_of_stock' : 'available',
+              image: { uri: imageUri },
+              description: motorbike.description,
+              specifications: {
+                model: motorbike.model,
+                version: motorbike.version,
+                makeFrom: motorbike.makeFrom,
+              },
+              model: motorbike.model,
+              makeFrom: motorbike.makeFrom,
+              colors: [],
+              createdAt: new Date().toISOString(),
+              isDeleted: motorbike.isDeleted,
+            };
+          } catch (error) {
+            console.error(`Error loading details for motorbike ${motorbike.id}:`, error);
+            // Return product with placeholder image if detail fetch fails
+            return {
+              id: motorbike.id,
+              name: motorbike.name,
+              category: motorbike.model,
+              version: motorbike.version,
+              price: motorbike.price,
+              status: motorbike.isDeleted ? 'out_of_stock' : 'available',
+              image: { uri: 'https://via.placeholder.com/400x300?text=Motorbike' },
+              description: motorbike.description,
+              specifications: {
+                model: motorbike.model,
+                version: motorbike.version,
+                makeFrom: motorbike.makeFrom,
+              },
+              model: motorbike.model,
+              makeFrom: motorbike.makeFrom,
+              colors: [],
+              createdAt: new Date().toISOString(),
+              isDeleted: motorbike.isDeleted,
+            };
+          }
+        })
+      );
+      
+      // Sort products by ID in descending order (newest first)
+      const sorted = productsWithImages.sort((a, b) => b.id - a.id);
+      
+      setProducts(sorted);
       setLoading(false);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -125,12 +218,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
   const filterProducts = () => {
     let filtered = products;
 
-    // Filter by version
-    if (selectedVersion !== 'all') {
-      filtered = filtered.filter(product => product.version === selectedVersion);
-    }
-
-    // Filter by search query
+    // Filter by search query (local filtering for search)
     if (searchQuery.trim()) {
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -145,6 +233,25 @@ const ProductManagementScreen = ({ navigation, route }) => {
     setRefreshing(true);
     await loadProducts();
     setRefreshing(false);
+  };
+
+  const handleFilterChange = (filterType, value) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+
+  const applyFilters = () => {
+    loadProducts();
+    setShowFilterModal(false);
+  };
+
+  const clearFilters = () => {
+    setSelectedFilters({
+      model: 'all',
+      makeFrom: 'all'
+    });
   };
 
   const handleAddProduct = () => {
@@ -165,15 +272,17 @@ const ProductManagementScreen = ({ navigation, route }) => {
 
   const deleteProduct = async (productId) => {
     try {
-      // TODO: Replace with actual API call
-      // await productService.deleteProduct(productId);
+      const res = await motorbikeService.deleteMotorbike(productId);
       
-      // Mock deletion
-      setProducts(prev => prev.filter(p => p.id !== productId));
-      showInfo('Success', 'Product deleted successfully');
+      if (res.success) {
+        setProducts(prev => prev.filter(p => p.id !== productId));
+        showInfo('Success', 'Motorbike deleted successfully');
+      } else {
+        showInfo('Error', res.message || 'Failed to delete motorbike');
+      }
     } catch (error) {
       console.error('Error deleting product:', error);
-      showInfo('Error', 'Failed to delete product');
+      showInfo('Error', 'Failed to delete motorbike');
     }
   };
 
@@ -247,7 +356,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
         </View>
         
         <View style={styles.productFooter}>
-          <Text style={styles.productPrice}>${item.price.toLocaleString()}</Text>
+          <Text style={styles.productPrice}>{item.price.toLocaleString()} VNĐ</Text>
           {!isVehicleManagement && (
             <Text style={styles.stockText}>Stock: {item.stock}</Text>
           )}
@@ -259,45 +368,142 @@ const ProductManagementScreen = ({ navigation, route }) => {
           style={styles.actionButton}
           onPress={() => handleEditProduct(item)}
         >
-          <Text style={styles.actionIcon}>✏️</Text>
+          <Pencil size={18} color="#009DFF" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDeleteProduct(item)}
         >
-          <Text style={styles.actionIcon}>🗑️</Text>
+          <Trash2 size={18} color="#009DFF" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 
-  const renderCategoryFilter = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.categoryFilter}
-      contentContainerStyle={styles.categoryFilterContent}
-    >
-      {versions.map((ver) => (
-        <TouchableOpacity
-          key={ver.id}
-          style={[
-            styles.categoryChip,
-            selectedVersion === ver.id && styles.selectedCategoryChip
-          ]}
-          onPress={() => setSelectedVersion(ver.id)}
-        >
-          <Text style={styles.categoryIcon}>{ver.icon || '⚡'}</Text>
-          <Text style={[
-            styles.categoryText,
-            selectedVersion === ver.id && styles.selectedCategoryText
-          ]}>
-            {ver.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+  const renderFilterModal = () => {
+    console.log('Rendering filter modal with options:', filterOptions);
+    return (
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter Options</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <X size={18} color={COLORS.TEXT.SECONDARY} />
+              </TouchableOpacity>
+            </View>
+
+          <ScrollView style={styles.modalBody}>
+            {/* Model Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Model</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    selectedFilters.model === 'all' && styles.selectedFilterOption
+                  ]}
+                  onPress={() => handleFilterChange('model', 'all')}
+                >
+                  <Text style={[
+                    styles.filterOptionText,
+                    selectedFilters.model === 'all' && styles.selectedFilterOptionText
+                  ]}>
+                    All Models
+                  </Text>
+                </TouchableOpacity>
+                {filterOptions.modelFilters.map((filter, index) => {
+                  console.log('Rendering model filter:', filter);
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.filterOption,
+                        selectedFilters.model === filter.model && styles.selectedFilterOption
+                      ]}
+                      onPress={() => handleFilterChange('model', filter.model)}
+                    >
+                      <Text style={[
+                        styles.filterOptionText,
+                        selectedFilters.model === filter.model && styles.selectedFilterOptionText
+                      ]}>
+                        {filter.model}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Make From Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Make From</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    selectedFilters.makeFrom === 'all' && styles.selectedFilterOption
+                  ]}
+                  onPress={() => handleFilterChange('makeFrom', 'all')}
+                >
+                  <Text style={[
+                    styles.filterOptionText,
+                    selectedFilters.makeFrom === 'all' && styles.selectedFilterOptionText
+                  ]}>
+                    All Countries
+                  </Text>
+                </TouchableOpacity>
+                {filterOptions.makeFromFilter.map((filter, index) => {
+                  console.log('Rendering makeFrom filter:', filter);
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.filterOption,
+                        selectedFilters.makeFrom === filter.makeFrom && styles.selectedFilterOption
+                      ]}
+                      onPress={() => handleFilterChange('makeFrom', filter.makeFrom)}
+                    >
+                      <Text style={[
+                        styles.filterOptionText,
+                        selectedFilters.makeFrom === filter.makeFrom && styles.selectedFilterOptionText
+                      ]}>
+                        {filter.makeFrom}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={clearFilters}
+            >
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={applyFilters}
+            >
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -308,7 +514,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.headerTitleText}>{isVehicleManagement ? 'Vehicles' : 'Product Management'}</Text>
@@ -318,7 +524,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             style={styles.addButton}
             onPress={handleAddProduct}
           >
-            <Text style={styles.addIcon}>+</Text>
+            <Plus size={18} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
       </View>
@@ -326,7 +532,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
       {/* Search and Filters */}
       <View style={styles.searchSection}>
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={18} color={COLORS.TEXT.SECONDARY} />
           <TextInput
             style={styles.searchInput}
             placeholder={isVehicleManagement ? 'Search vehicles...' : 'Search products...'}
@@ -334,9 +540,13 @@ const ProductManagementScreen = ({ navigation, route }) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <Funnel size={20} color={COLORS.TEXT.SECONDARY} />
+          </TouchableOpacity>
         </View>
-        
-        {renderCategoryFilter()}
       </View>
 
       {/* Products List */}
@@ -349,7 +559,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading products...</Text>
+            <ActivityIndicator size="large" color="#009DFF" />
           </View>
         ) : (
           <FlatList
@@ -363,7 +573,7 @@ const ProductManagementScreen = ({ navigation, route }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🚗</Text>
+                <Car size={64} color={COLORS.TEXT.SECONDARY} />
                 <Text style={styles.emptyTitle}>{isVehicleManagement ? 'No vehicles found' : 'No products found'}</Text>
                 <Text style={styles.emptySubtitle}>
                   {searchQuery ? 'Try adjusting your search' : (isVehicleManagement ? 'Add your first vehicle' : 'Add your first product')}
@@ -373,6 +583,8 @@ const ProductManagementScreen = ({ navigation, route }) => {
           />
         )}
       </View>
+
+      {renderFilterModal()}
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -415,11 +627,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     flex: 1,
     alignItems: 'center',
@@ -438,14 +645,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search section
@@ -466,50 +668,123 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
+  filterButton: {
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
 
-  // Category filter
-  categoryFilter: {
-    marginBottom: SIZES.PADDING.SMALL,
+  // Filter Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  categoryFilterContent: {
-    paddingRight: SIZES.PADDING.LARGE,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  modalContent: {
     backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
     borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: {
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+  },
+  filterSection: {
+    marginBottom: SIZES.PADDING.XLARGE,
+  },
+  filterSectionTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.SMALL,
+  },
+  filterOption: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.SMALL,
-    marginRight: SIZES.PADDING.SMALL,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: '#E0E0E0',
   },
-  selectedCategoryChip: {
+  selectedFilterOption: {
     backgroundColor: COLORS.PRIMARY,
     borderColor: COLORS.PRIMARY,
   },
-  categoryIcon: {
-    fontSize: SIZES.FONT.SMALL,
-    marginRight: SIZES.PADDING.XSMALL,
-  },
-  categoryText: {
+  filterOptionText: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '500',
   },
-  selectedCategoryText: {
+  selectedFilterOptionText: {
+    color: COLORS.TEXT.WHITE,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.LARGE,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: SIZES.PADDING.MEDIUM,
+  },
+  clearButton: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: COLORS.PRIMARY,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: '600',
     color: COLORS.TEXT.WHITE,
   },
 
@@ -642,9 +917,6 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#FFE5E5',
   },
-  actionIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-  },
 
   // Loading and empty states
   loadingContainer: {
@@ -664,7 +936,6 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.PADDING.XXXLARGE,
   },
   emptyIcon: {
-    fontSize: 64,
     marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {

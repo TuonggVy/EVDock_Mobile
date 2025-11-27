@@ -16,18 +16,80 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES, IMAGES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { Bell, ChartColumnIncreasing, Search, UserRound, ChevronRight, Car, CarFront, Gift, Bus, CircleDollarSign, CreditCard, NotepadText, WalletCards, Building2, Users, PackageOpen } from 'lucide-react-native';
+import useUserProfile from '../../hooks/useUserProfile';
+import dashboardService from '../../services/dashboardService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
 const DealerManagerHomeScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  const { profile } = useUserProfile();
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Dashboard stats state
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
   
   // Auto-sliding banner state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerImages = [IMAGES.BANNER_MODELX, IMAGES.BANNER_MODELY, IMAGES.BANNER_MODELV];
   const fadeAnim = useState(new Animated.Value(1))[0];
   const slideAnim = useState(new Animated.Value(0))[0];
+
+  // Load dashboard stats
+  useEffect(() => {
+    loadDashboardStats();
+
+    // Reload when screen comes into focus
+    const unsubscribe = navigation?.addListener('focus', () => {
+      loadDashboardStats();
+    });
+
+    return unsubscribe;
+  }, [navigation, user?.agencyId]);
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoadingStats(true);
+      // Get agencyId from AsyncStorage or user object
+      const storedAgencyId = await AsyncStorage.getItem('agencyId');
+      const userAgencyId = user?.agencyId;
+      const agencyId = storedAgencyId || userAgencyId;
+
+      if (!agencyId) {
+        console.warn('No agencyId found for loading dashboard stats');
+        setLoadingStats(false);
+        return;
+      }
+
+      const [totalCustomerRes, totalRevenueRes] = await Promise.all([
+        dashboardService.getTotalCustomer(agencyId),
+        dashboardService.getTotalRevenue(agencyId),
+      ]);
+
+      setTotalCustomers(totalCustomerRes?.data?.totalCustomers || 0);
+      setTotalRevenue(totalRevenueRes?.data?.totalRevenue || 0);
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const formatRevenue = (value) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(2)}M VNĐ`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)}K VNĐ`;
+    }
+    return `${value.toLocaleString('vi-VN')} VNĐ`;
+  };
 
   // Auto-slide effect with smooth transitions
   useEffect(() => {
@@ -92,50 +154,79 @@ const DealerManagerHomeScreen = ({ navigation }) => {
     return 'Good evening';
   };
 
-  const categoryCards = [
+  const allCategoryCards = [
     {
       title: 'Catalogs',
-      gradient: COLORS.GRADIENT.BLUE,
-      icon: '🚗',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CarFront color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('Catalog'),
     },
     {
-      title: 'Promotions',
-      gradient: COLORS.GRADIENT.PINK,
-      icon: '🎁',
-      onPress: () => navigation.navigate('B2CPromotionManagement'),
+      title: 'Customer Contracts',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('CustomerContractManagement'),
     },
     {
-      title: 'Orders',
-      gradient: COLORS.GRADIENT.PURPLE,
-      icon: '🚛',
+      title: 'Stock Promotion Management',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Gift color="#A1D9FF" size={50} />,
+      onPress: () => navigation.navigate('StockPromotionManagement'),
+    },
+    {
+      title: 'Orders Restock',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Bus color="#A1D9FF" size={60} />,
       onPress: () => navigation.navigate('OrderManagement'),
     },
     {
-      title: 'Retail Pricing',
-      gradient: COLORS.GRADIENT.WARNING,
-      icon: '💵',
-      onPress: () => navigation.navigate('RetailPricing'),
+      title: 'Installment Plan',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('InstallmentPlanManagement'),
     },
     {
-      title: 'Deposits',
-      gradient: COLORS.GRADIENT.GREEN,
-      icon: '💳',
-      onPress: () => navigation.navigate('DepositManagement'),
+      title: 'Quotations',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <NotepadText color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerQuotation'),
     },
     {
-      title: 'Customer Debt',
-      gradient: COLORS.GRADIENT.ORANGE,
-      icon: '💰',
-      onPress: () => navigation.navigate('CustomerDebtManagement'),
+      title: 'Dealer Staff',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <Users color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerStaffManagement'),
     },
     {
-      title: 'Manufacturer Debt',
-      gradient: COLORS.GRADIENT.GREEN,
-      icon: '🏭',
-      onPress: () => navigation.navigate('ManufacturerDebtManagement'),
+      title: 'Stock Management',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <PackageOpen color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('StockManagement'),
+    },
+    {
+      title: 'Credit Line',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <CreditCard color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerCreditLine'),
+    },
+    {
+      title: 'Reports',
+      gradient: ['#302F32', '#302F32', '#302F32'],
+      icon: <ChartColumnIncreasing color="#A1D9FF" size={60} />,
+      onPress: () => navigation.navigate('DealerManagerDashboard'),
     },
   ];
+
+  // Filter category cards based on search query
+  const categoryCards = allCategoryCards.filter(card => {
+    if (!searchQuery.trim()) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return card.title.toLowerCase().includes(searchLower);
+  });
+
+  // Display only first 5 cards on home screen
+  const displayedCards = categoryCards.slice(0, 5);
+  const hasMoreCards = categoryCards.length > 5;
 
 
   return (
@@ -145,23 +236,8 @@ const DealerManagerHomeScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name || 'Manager'}</Text>
+            <Text style={styles.userName}>{profile?.fullname || profile?.username || user?.name || 'Manager'}</Text>
             <Text style={styles.roleText}>Dealer Manager</Text>
-          </View>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>📊</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>🔔</Text>
-              <View style={styles.notificationDot} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('Profile')}
-            >
-              <Text style={styles.iconText}>👤</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -170,21 +246,37 @@ const DealerManagerHomeScreen = ({ navigation }) => {
       <View style={styles.topSection}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIcon}><Search /></Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search dealer, staff..."
+            placeholder="Search categories..."
             placeholderTextColor={COLORS.TEXT.SECONDARY}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+            >
+              <Text style={styles.clearButtonText}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Category Cards */}
         <View style={styles.categoriesContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-            {categoryCards.map((category, index) => (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.categoriesScroll}
+            contentContainerStyle={styles.categoriesScrollContent}
+          >
+            {displayedCards.map((category, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.categoryCard}
+                activeOpacity={0.85}
                 onPress={category.onPress}
               >
                 <LinearGradient
@@ -198,6 +290,15 @@ const DealerManagerHomeScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             ))}
+            {hasMoreCards && (
+              <TouchableOpacity
+                style={styles.seeAllCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('AllCategories', { categoryCards: categoryCards })}
+              >
+                <ChevronRight color={COLORS.TEXT.PRIMARY} size={25} />
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -243,20 +344,16 @@ const DealerManagerHomeScreen = ({ navigation }) => {
           <View style={styles.statsContainer}>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>8</Text>
-                <Text style={styles.statLabel}>Nhân viên</Text>
+                <Text style={styles.statNumber}>
+                  {loadingStats ? '...' : totalCustomers.toLocaleString('vi-VN')}
+                </Text>
+                <Text style={styles.statLabel}>Tổng khách hàng</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>45</Text>
-                <Text style={styles.statLabel}>Đơn hàng hôm nay</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>$125,000</Text>
-                <Text style={styles.statLabel}>Doanh thu tháng</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>92%</Text>
-                <Text style={styles.statLabel}>Tỷ lệ hoàn thành</Text>
+                <Text style={styles.statNumber}>
+                  {loadingStats ? '...' : formatRevenue(totalRevenue)}
+                </Text>
+                <Text style={styles.statLabel}>Tổng doanh thu</Text>
               </View>
             </View>
           </View>
@@ -329,32 +426,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
-  headerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
-    position: 'relative',
-  },
-  iconText: {
-    fontSize: SIZES.FONT.LARGE,
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.PRIMARY,
-  },
 
   /* ---------- search & categories (trên, nền đen) ---------- */
   content: {
@@ -384,6 +455,15 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
+  clearButton: {
+    padding: SIZES.PADDING.XSMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  clearButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+    fontWeight: 'bold',
+  },
   logoutText: {
     marginLeft: SIZES.PADDING.SMALL,
     color: COLORS.ERROR,
@@ -394,6 +474,9 @@ const styles = StyleSheet.create({
   },
   categoriesScroll: {
     paddingVertical: SIZES.PADDING.SMALL,
+  },
+  categoriesScrollContent: {
+    alignItems: 'center',
   },
   categoryCard: {
     width: 120,
@@ -421,6 +504,20 @@ const styles = StyleSheet.create({
     right: -10,
     fontSize: 50,
     opacity: 0.3,
+  },
+  seeAllCard: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    marginRight: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   /* ---------- banner & activities & stats (dưới, nền trắng) ---------- */

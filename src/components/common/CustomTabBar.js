@@ -19,8 +19,9 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   }, [state.index]);
 
   return (
-    <View style={styles.tabBar}>
-      {state.routes.map((route, index) => {
+    <View style={styles.tabBarWrapper}>
+      <View style={styles.tabBar}>
+        {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 
@@ -45,7 +46,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 
         const backgroundColor = animatedValues[index].interpolate({
           inputRange: [0, 1],
-          outputRange: ['transparent', COLORS.PRIMARY],
+          outputRange: ['transparent', "#009DFF"],
         });
 
         const iconColor = animatedValues[index].interpolate({
@@ -75,7 +76,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 ]}
               >
                 <IconComponent
-                  size={24}
+                  size={20}
                   color={isFocused ? COLORS.TEXT.WHITE : COLORS.TEXT.SECONDARY}
                   strokeWidth={isFocused ? 2.5 : 2}
                 />
@@ -84,18 +85,22 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           </TouchableOpacity>
         );
       })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  tabBarWrapper: {
+    backgroundColor: '#FFFFFF',
+  },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: COLORS.SURFACE,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#000000',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    // borderTopLeftRadius: 24,
+    // borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
@@ -105,27 +110,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    height: 80,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    height: 60,
   },
   iconWrapper: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     // Tạo một container cố định để icon scale từ giữa
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',

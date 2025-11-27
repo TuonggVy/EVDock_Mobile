@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,33 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import usePayment from '../../hooks/usePayment';
 import { formatPaymentAmount, getPaymentInstructions } from '../../utils/paymentUtils';
 import installmentStorageService from '../../services/storage/installmentStorageService';
+import { quotationService } from '../../services/quotationService';
+import motorbikeService from '../../services/motorbikeService';
+import customerContractService from '../../services/customerContractService';
+import { useAuth } from '../../contexts/AuthContext';
+import { ArrowLeft, Pencil } from 'lucide-react-native';
 
 const QuotationDetailScreen = ({ navigation, route }) => {
   const { quotation, onQuotationUpdate } = route.params;
+  const { user } = useAuth();
+  
+  // Local state for detail data
+  const [quotationDetail, setQuotationDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [motorbikeDetails, setMotorbikeDetails] = useState(null);
+  const [configurations, setConfigurations] = useState({
+    appearance: null,
+    configuration: null,
+    battery: null,
+    safeFeature: null,
+  });
+  const [currentVehicleImage, setCurrentVehicleImage] = useState(null);
   
   // Local state for modals
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -27,6 +46,8 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   const [selectedPaymentType, setSelectedPaymentType] = useState(null);
   const [installmentMonths, setInstallmentMonths] = useState(12);
   const [paymentData, setPaymentData] = useState(null);
+  const [depositInfo, setDepositInfo] = useState(null);
+  const [hasCustomerContract, setHasCustomerContract] = useState(false);
 
   // Payment hook
   const { 
@@ -35,6 +56,136 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     createPayment, 
     processPaymentCompletion 
   } = usePayment();
+
+  // Load quotation detail from API
+  useEffect(() => {
+    loadQuotationDetail();
+  }, []);
+
+  // Reload quotation detail when screen comes into focus (e.g., after creating deposit)
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshDeposit = route.params?.refreshDeposit;
+      
+      if (refreshDeposit) {
+        // Reload quotation detail to get updated deposit info
+        loadQuotationDetail();
+        // Clear the refresh flag
+        navigation.setParams({ refreshDeposit: false, depositId: null });
+      } else {
+        // Always reload quotation detail when screen comes into focus
+        loadQuotationDetail();
+      }
+    }, [route.params?.refreshDeposit])
+  );
+
+  const loadQuotationDetail = async () => {
+    if (!quotation?.id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await quotationService.getQuotationById(parseInt(quotation.id));
+      if (response.success) {
+        const detail = response.data?.data || response.data;
+        setQuotationDetail(detail);
+        
+        // Load deposit from quotation detail response
+        if (detail.deposit) {
+          setDepositInfo(detail.deposit);
+        }
+        
+        // Check if quotation already has a customer contract
+        try {
+          await checkExistingCustomerContract(detail);
+        } catch (e) {
+          // Silent fail for contract check to avoid blocking UI
+        }
+        
+        // Load motorbike details including configurations
+        if (detail.motorbikeId) {
+          loadMotorbikeDetails(detail.motorbikeId, detail.colorId);
+        }
+      } else {
+        Alert.alert('Error', response.error || 'Failed to load quotation details');
+      }
+    } catch (error) {
+      console.error('Error loading quotation detail:', error);
+      Alert.alert('Error', 'Failed to load quotation details. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkExistingCustomerContract = async (detail) => {
+    const quoteId = detail?.id || quotation?.id || detail?.quotationId || quotation?.quotationId;
+    if (!quoteId) {
+      setHasCustomerContract(false);
+      return;
+    }
+
+    // 1) If backend returns customerContractId in quotation detail, verify via detail endpoint
+    const customerContractId = detail?.customerContractId || detail?.contractId || detail?.customerContract?.id;
+    if (customerContractId) {
+      const resp = await customerContractService.getCustomerContractDetail(Number(customerContractId));
+      if (resp.success) {
+        const contract = resp.data;
+        const contractQuotationId = contract?.quotationId;
+        setHasCustomerContract(Boolean(contractQuotationId && Number(contractQuotationId) === Number(quoteId)));
+        return;
+      }
+    }
+
+    // 2) Fallback: list contracts by agency and find by quotationId
+    const agencyId = user?.agencyId ? Number(user.agencyId) : null;
+    if (!agencyId) {
+      setHasCustomerContract(false);
+      return;
+    }
+    const listResp = await customerContractService.getCustomerContracts(agencyId, { page: 1, limit: 1000 });
+    if (listResp.success && Array.isArray(listResp.data)) {
+      const exists = listResp.data.some(c => Number(c?.quotationId) === Number(quoteId));
+      setHasCustomerContract(exists);
+    } else {
+      setHasCustomerContract(false);
+    }
+  };
+
+  const loadMotorbikeDetails = async (motorbikeId, colorId) => {
+    if (!motorbikeId) return;
+    
+    try {
+      const response = await motorbikeService.getMotorbikeById(parseInt(motorbikeId));
+      if (response.success) {
+        const data = response.data?.data || response.data;
+        setMotorbikeDetails(data);
+        
+        // Extract configurations from motorbike details
+        setConfigurations({
+          appearance: data.appearance || null,
+          configuration: data.configuration || null,
+          battery: data.battery || null,
+          safeFeature: data.safeFeature || null,
+        });
+        
+        // Load image based on selected color
+        if (colorId && data.colors && Array.isArray(data.colors) && data.colors.length > 0) {
+          const selectedColorItem = data.colors.find(c => c.color?.id === colorId || c.id === colorId);
+          if (selectedColorItem && selectedColorItem.imageUrl) {
+            setCurrentVehicleImage({ uri: selectedColorItem.imageUrl });
+          } else if (data.images && data.images.length > 0) {
+            setCurrentVehicleImage({ uri: data.images[0].imageUrl });
+          }
+        } else if (data.images && data.images.length > 0) {
+          setCurrentVehicleImage({ uri: data.images[0].imageUrl });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading motorbike details:', error);
+    }
+  };
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -45,26 +196,33 @@ const QuotationDetailScreen = ({ navigation, route }) => {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
   };
 
+  // Get the actual quotation data (from API or params)
+  const getQuotationData = () => {
+    return quotationDetail || quotation;
+  };
+
   const handleShare = async () => {
     try {
-      const vehicle = quotation.vehicle || {
-        name: quotation.vehicleModel || 'Model không xác định',
-        selectedColor: 'Đen'
+      const quote = getQuotationData();
+      const vehicle = quote.vehicle || quote.motorbike || {
+        name: quote.vehicleModel || 'Unknown Model',
+        selectedColor: 'Black'
       };
-      const pricing = quotation.pricing || { totalPrice: quotation.totalAmount || 0 };
+      const colorName = quote.color?.colorType || vehicle.selectedColor || 'Black';
+      const pricing = quote.pricing || { totalPrice: quote.totalAmount || quote.finalPrice || 0 };
       
-      const message = `Báo giá ${quotation.id || 'N/A'}\n\nXe: ${vehicle.name}\nMàu: ${vehicle.selectedColor}\nTổng tiền: ${formatPrice(pricing.totalPrice)}`;
+      const message = `Quotation ${quote.id || 'N/A'}\n\nVehicle: ${vehicle.name}\nColor: ${colorName}\nTotal: ${formatPrice(pricing.totalPrice)}`;
       
       await Share.share({
         message,
-        title: `Báo giá ${quotation.id || 'N/A'}`,
+        title: `Quotation ${quote.id || 'N/A'}`,
       });
     } catch (error) {
       console.error('Error sharing quotation:', error);
@@ -72,7 +230,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   };
 
   const handlePrint = () => {
-    Alert.alert('In báo giá', 'Tính năng in báo giá sẽ được triển khai');
+    Alert.alert('Print Quotation', 'Print quotation feature will be implemented');
   };
 
   // Payment functions
@@ -86,25 +244,41 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     setShowPaymentTypeModal(false);
     
     try {
+      const quote = getQuotationData();
       const payment = await createPayment({
-        ...quotation,
+        ...quote,
         paymentType,
         installmentMonths: paymentType === 'installment' ? installmentMonths : null,
       });
       setPaymentData(payment);
       setShowPaymentModal(true);
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tạo thanh toán. Vui lòng thử lại.');
+      Alert.alert('Error', 'Failed to create payment. Please try again.');
     }
   };
 
-  const handleContractView = () => {
-    navigation.navigate('Contract', { quotation });
+  const handleContractView = (fromFullPayment = false) => {
+    const quote = getQuotationData();
+    const quotationId = quote.id || quote.quotationId;
+    if (quotationId) {
+      // Check if quotation has deposit (depositId exists) - convert to boolean
+      const hasDeposit = Boolean(depositInfo && depositInfo.id);
+      const quotationType = quote.type?.toUpperCase();
+      navigation.navigate('CreateCustomerContract', { 
+        quotationId: quotationId.toString(),
+        fromDeposit: hasDeposit, // Set flag if quotation has deposit
+        fromFullPayment: fromFullPayment, // Set flag if coming from Full Payment button
+        quotationType: quotationType, // Pass quotation type to check if PRE_ORDER
+      });
+    } else {
+      Alert.alert('Error', 'Quotation ID not found');
+    }
   };
 
   const processPayment = async () => {
     try {
-      await processPaymentCompletion(quotation.id, {
+      const quote = getQuotationData();
+      await processPaymentCompletion(quote.id, {
         paymentType: selectedPaymentType,
         installmentMonths: selectedPaymentType === 'installment' ? installmentMonths : null,
       });
@@ -112,34 +286,24 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       setShowPaymentModal(false);
       setPaymentData(null);
       
-      // Update quotation status to paid and payment type
-      quotation.status = 'paid';
-      quotation.paymentType = selectedPaymentType;
-      if (selectedPaymentType === 'installment') {
-        quotation.installmentMonths = installmentMonths;
-      }
-      
       // Create installment plan if payment type is installment
       if (selectedPaymentType === 'installment') {
         try {
           const installment = await installmentStorageService.createInstallment({
-            quotationId: quotation.id,
-            customerId: quotation.customerId || `C${Date.now()}`,
-            customerName: quotation.customerName,
-            customerPhone: quotation.customerPhone,
-            vehicleModel: quotation.vehicleModel || quotation.vehicle?.name,
-            totalAmount: quotation.pricing?.totalPrice || quotation.totalAmount,
+            quotationId: quote.id,
+            customerId: quote.customerId || quote.customer?.id || `C${Date.now()}`,
+            customerName: quote.customerName || quote.customer?.name,
+            customerPhone: quote.customerPhone || quote.customer?.phone,
+            vehicleModel: quote.vehicleModel || quote.vehicle?.name || quote.motorbike?.name,
+            totalAmount: quote.pricing?.totalPrice || quote.totalAmount || quote.finalPrice,
             installmentMonths: installmentMonths,
             interestRate: 6.0,
             startDate: new Date().toISOString(),
             createdBy: 'Dealer Staff',
-            dealerId: quotation.dealerId || 'dealer001',
+            dealerId: quote.dealerId || 'dealer001',
           });
           
           console.log('✅ Installment plan created:', installment.id);
-          
-          // Save installment ID to quotation
-          quotation.installmentId = installment.id;
         } catch (installmentError) {
           console.error('Error creating installment plan:', installmentError);
           // Don't fail the payment if installment creation fails
@@ -148,15 +312,15 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       
       // Notify parent screen about the update
       if (onQuotationUpdate) {
-        onQuotationUpdate(quotation);
+        onQuotationUpdate({ ...quote, status: 'paid', paymentType: selectedPaymentType });
       }
       
       const paymentMessage = selectedPaymentType === 'installment'
-        ? `Báo giá đã được thanh toán thành công!\n\n✅ Kế hoạch trả góp ${installmentMonths} tháng đã được tạo\n✅ Khách hàng đã được thêm vào danh sách\n\n📅 Xem chi tiết trả góp tại màn hình "Quản lý trả góp"`
-        : 'Báo giá đã được thanh toán thành công!\n\nKhách hàng đã được tự động thêm vào danh sách khách hàng đã mua xe.';
+        ? `Quotation has been paid successfully!\n\n✅ ${installmentMonths} month installment plan created\n✅ Customer added to list\n\n📅 View installment details in "Installment Management"`
+        : 'Quotation has been paid successfully!\n\nCustomer has been automatically added to the list of customers who purchased a vehicle.';
       
       Alert.alert(
-        'Thanh toán thành công',
+        'Payment Successful',
         paymentMessage,
         [
           {
@@ -169,7 +333,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         ]
       );
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể xử lý thanh toán. Vui lòng thử lại.');
+      Alert.alert('Error', 'Failed to process payment. Please try again.');
     }
   };
 
@@ -179,9 +343,10 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     }
     
     // Fallback for demo
+    const quote = getQuotationData();
     const fallbackData = {
-      quotationId: quotation.id,
-      amount: quotation.pricing?.totalPrice || quotation.totalAmount || 0,
+      quotationId: quote.id,
+      amount: quote.pricing?.totalPrice || quote.totalAmount || quote.finalPrice || 0,
       merchant: 'EVDock',
       timestamp: new Date().toISOString()
     };
@@ -189,50 +354,109 @@ const QuotationDetailScreen = ({ navigation, route }) => {
     return JSON.stringify(fallbackData);
   };
 
+  const handleBackPress = () => {
+    // If coming from CreateDeposit, navigate to QuotationManagement instead of going back
+    if (route.params?.fromCreateDeposit) {
+      navigation.navigate('QuotationManagement');
+    } else {
+      navigation.goBack();
+    }
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => navigation.goBack()}
+        onPress={handleBackPress}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={styles.backButtonText}><ArrowLeft color="#FFFFFF" size={18} /></Text>
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Chi Tiết Báo Giá</Text>
+      <Text style={styles.headerTitle}>Quotation Details</Text>
       <View style={styles.placeholder} />
     </View>
   );
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return COLORS.WARNING;
-      case 'approved': return COLORS.SUCCESS;
-      case 'rejected': return COLORS.ERROR;
-      case 'expired': return COLORS.TEXT.SECONDARY;
+    switch (status?.toUpperCase()) {
+      case 'DRAFT': return COLORS.WARNING;
+      case 'ACCEPTED': return COLORS.SUCCESS;
+      case 'REJECTED': return COLORS.ERROR;
+      case 'EXPIRED': return COLORS.TEXT.SECONDARY;
+      case 'REVERSED': return COLORS.PRIMARY;
       default: return COLORS.TEXT.SECONDARY;
     }
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case 'pending': return 'Chờ thanh toán';
-      case 'paid': return 'Đã thanh toán';
-      case 'rejected': return 'Từ chối';
-      case 'expired': return 'Hết hạn';
-      default: return 'Không xác định';
+    switch (status?.toUpperCase()) {
+      case 'DRAFT': return 'Draft';
+      case 'ACCEPTED': return 'Accepted';
+      case 'REJECTED': return 'Rejected';
+      case 'EXPIRED': return 'Expired';
+      case 'REVERSED': return 'Reversed';
+      default: return 'Unknown';
     }
   };
 
-  const renderQuotationInfo = () => (
-    <View style={styles.section}>
-      <View style={styles.quotationHeader}>
-        <Text style={styles.quotationId}>Báo giá: {quotation.id || 'N/A'}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(quotation.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(quotation.status)}</Text>
+  const renderQuotationInfo = () => {
+    const quote = getQuotationData();
+    const createDate = quote.createDate || quote.createdAt;
+    const validUntil = quote.validUntil;
+    const type = quote.type;
+    const deposit = quote.deposit;
+    
+    const getTypeText = (type) => {
+      switch (type) {
+        case 'AT_STORE': return 'At Store';
+        case 'ORDER': return 'Order';
+        case 'PRE_ORDER': return 'Pre-Order';
+        default: return type || 'N/A';
+      }
+    };
+    
+    return (
+      <View style={styles.section}>
+        <View style={styles.quotationHeader}>
+          <View>
+            <Text style={styles.quotationId}>Quotation: {quote.id || 'N/A'}</Text>
+            {quote.quoteCode && (
+              <Text style={styles.quoteCode}>{quote.quoteCode}</Text>
+            )}
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(quote.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(quote.status)}</Text>
+          </View>
         </View>
+        <Text style={styles.createdDate}>Created: {formatDate(createDate)}</Text>
+        {type && (
+          <Text style={styles.createdDate}>Type: {getTypeText(type)}</Text>
+        )}
+        {validUntil && (
+          <Text style={styles.createdDate}>Valid Until: {formatDate(validUntil)}</Text>
+        )}
       </View>
-      <Text style={styles.createdDate}>Ngày tạo: {formatDate(quotation.createdAt)}</Text>
-    </View>
-  );
+    );
+  };
+
+  const getDepositStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return COLORS.WARNING;
+      case 'HOLDING': return COLORS.SUCCESS;
+      case 'APPLIED': return COLORS.PRIMARY;
+      case 'EXPIRED': return COLORS.ERROR;
+      default: return COLORS.TEXT.SECONDARY;
+    }
+  };
+
+  const getDepositStatusText = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'PENDING': return 'Pending';
+      case 'HOLDING': return 'Holding';
+      case 'APPLIED': return 'Applied';
+      case 'EXPIRED': return 'Expired';
+      default: return 'Unknown';
+    }
+  };
 
   const getVehicleImage = (vehicleImage) => {
     if (!vehicleImage) {
@@ -248,13 +472,55 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   };
 
   const renderVehicleInfo = () => {
-    // Handle both old structure (quotation.vehicle) and new structure (direct properties)
-    const vehicle = quotation.vehicle || {
-      name: quotation.vehicleModel || 'Model không xác định',
-      model: quotation.vehicleModel || 'Model không xác định',
-      image: quotation.vehicleImage || 'banner-modely.png',
-      selectedColor: 'Đen',
-      price: quotation.totalAmount || 0,
+    const quote = getQuotationData();
+    
+    // Helper function to format spec key
+    const formatSpecKey = (key) => {
+      return key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    };
+    
+    // Helper function to format spec value based on key
+    const formatSpecValue = (key, value) => {
+      if (key.toLowerCase().includes('distance') || key.toLowerCase().includes('limit')) {
+        return `${value} mm`;
+      } else if (key.toLowerCase().includes('weight')) {
+        return `${value} kg`;
+      } else if (key.toLowerCase().includes('storage')) {
+        return `${value} L`;
+      } else if (key.toLowerCase().includes('capacity') && typeof value === 'number') {
+        return `${value} people`;
+      }
+      return value;
+    };
+    
+    // Get first few specs from any available configuration
+    const getFirstSpecs = () => {
+      const allConfigs = [
+        configurations.battery,
+        configurations.configuration,
+        configurations.appearance,
+        configurations.safeFeature,
+      ].filter(Boolean);
+      
+      if (allConfigs.length === 0) return [];
+      
+      // Get first 4 key-value pairs from first available config
+      const firstConfig = allConfigs[0];
+      const entries = Object.entries(firstConfig).filter(
+        ([key]) => key !== 'electricMotorbikeId' && key !== 'id'
+      );
+      return entries.slice(0, 4);
+    };
+    
+    const specs = getFirstSpecs();
+    
+    // Handle both old structure (quote.vehicle) and new API structure (quote.motorbike)
+    const vehicle = motorbikeDetails || quote.vehicle || quote.motorbike || {
+      name: quote.vehicleModel || 'Unknown Model',
+      model: quote.vehicleModel || 'Unknown Model',
+      image: quote.vehicleImage || 'banner-modely.png',
+      selectedColor: 'Black',
+      price: quote.totalAmount || 0,
       specifications: {
         battery: '75 kWh',
         motor: 'Dual Motor AWD',
@@ -266,30 +532,67 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       }
     };
 
+    // Get color from new API structure
+    const colorName = quote.color?.colorType || vehicle.selectedColor || 'Black';
+    
+    // Use currentVehicleImage if available, otherwise fallback
+    const displayImage = currentVehicleImage || (typeof vehicle.image === 'string' ? getVehicleImage(vehicle.image) : vehicle.image);
+
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Thông Tin Xe</Text>
+        <Text style={styles.sectionTitle}>Vehicle Information</Text>
         <View style={styles.vehicleCard}>
           <Image 
-            source={typeof vehicle.image === 'string' ? getVehicleImage(vehicle.image) : vehicle.image} 
+            source={displayImage} 
             style={styles.vehicleImage} 
           />
           <View style={styles.vehicleDetails}>
-            <Text style={styles.vehicleName}>{vehicle.name || 'Model không xác định'}</Text>
-            <Text style={styles.vehicleModel}>{vehicle.model || 'Model không xác định'}</Text>
-            <Text style={styles.selectedColor}>Màu: {vehicle.selectedColor || 'Đen'}</Text>
-            <View style={styles.specsRow}>
-              <Text style={styles.specText}>Battery: {vehicle.specifications?.battery || '75 kWh'}</Text>
-              <Text style={styles.specText}>Motor: {vehicle.specifications?.motor || 'Dual Motor AWD'}</Text>
-            </View>
-            <View style={styles.specsRow}>
-              <Text style={styles.specText}>Weight: {vehicle.specifications?.weight || '2,000 kg'}</Text>
-              <Text style={styles.specText}>Max Load: {vehicle.specifications?.maxLoad || '500 kg'}</Text>
-            </View>
-            <View style={styles.specsRow}>
-              <Text style={styles.specText}>Charging: {vehicle.specifications?.chargingTime || '8 hours'}</Text>
-              <Text style={styles.specText}>Price: {formatPrice(vehicle.price || 0)}</Text>
-            </View>
+            <Text style={styles.vehicleName}>{vehicle.name || 'Unknown Model'}</Text>
+            <Text style={styles.vehicleModel}>{vehicle.model || 'Unknown Model'}</Text>
+            {(vehicle.makeFrom || vehicle.version) && (
+              <View style={styles.specsRow}>
+                {vehicle.makeFrom && <Text style={styles.specText}>Origin: {vehicle.makeFrom}</Text>}
+                {vehicle.version && <Text style={styles.specText}>Version: {vehicle.version}</Text>}
+              </View>
+            )}
+            <Text style={styles.selectedColor}>Color: {colorName}</Text>
+            {specs.length > 0 ? (
+              <>
+                {specs.slice(0, 2).length > 0 && (
+                  <View style={styles.specsRow}>
+                    {specs.slice(0, 2).map(([key, value]) => (
+                      <Text key={key} style={styles.specText}>
+                        {formatSpecKey(key)}: {formatSpecValue(key, value)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+                {specs.length > 2 && specs.slice(2, 4).length > 0 && (
+                  <View style={styles.specsRow}>
+                    {specs.slice(2, 4).map(([key, value]) => (
+                      <Text key={key} style={styles.specText}>
+                        {formatSpecKey(key)}: {formatSpecValue(key, value)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {vehicle.specifications && (
+                  <>
+                    <View style={styles.specsRow}>
+                      <Text style={styles.specText}>Battery: {vehicle.specifications?.battery || '-'}</Text>
+                      <Text style={styles.specText}>Motor: {vehicle.specifications?.motor || '-'}</Text>
+                    </View>
+                    <View style={styles.specsRow}>
+                      <Text style={styles.specText}>Weight: {vehicle.specifications?.weight || '-'}</Text>
+                      <Text style={styles.specText}>Max Load: {vehicle.specifications?.maxLoad || '-'}</Text>
+                    </View>
+                  </>
+                )}
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -297,33 +600,48 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   };
 
   const renderCustomerInfo = () => {
+    const quote = getQuotationData();
     // Handle both old structure (quotation.customer) and new structure (direct properties)
-    const customer = quotation.customer || {
-      name: quotation.customerName || 'Khách hàng',
-      email: quotation.customerEmail || 'N/A',
-      phone: quotation.customerPhone || 'N/A',
-      address: quotation.customerAddress || null
+    const customer = quote.customer || {
+      name: quote.customerName || 'Customer',
+      email: quote.customerEmail || 'N/A',
+      phone: quote.customerPhone || 'N/A',
+      address: quote.customerAddress || null,
+      dob: null,
+      credentialId: null
     };
 
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Thông Tin Khách Hàng</Text>
+        <Text style={styles.sectionTitle}>Customer Information</Text>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Tên:</Text>
-            <Text style={styles.infoValue}>{customer.name || 'Khách hàng'}</Text>
+            <Text style={styles.infoLabel}>Name:</Text>
+            <Text style={styles.infoValue}>{customer.name || 'Customer'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Email:</Text>
             <Text style={styles.infoValue}>{customer.email || 'N/A'}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Điện thoại:</Text>
+            <Text style={styles.infoLabel}>Phone:</Text>
             <Text style={styles.infoValue}>{customer.phone || 'N/A'}</Text>
           </View>
+          {customer.credentialId && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>ID Number:</Text>
+              <Text style={styles.infoValue}>{customer.credentialId}</Text>
+            </View>
+          )}
+          {customer.dob && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Date of Birth:</Text>
+              <Text style={styles.infoValue}>{formatDate(customer.dob)}</Text>
+            </View>
+          )}
           {customer.address && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Địa chỉ:</Text>
+              <Text style={styles.infoLabel}>Address:</Text>
               <Text style={styles.infoValue}>{customer.address}</Text>
             </View>
           )}
@@ -334,30 +652,86 @@ const QuotationDetailScreen = ({ navigation, route }) => {
 
 
   const renderPricing = () => {
-    const pricing = quotation.pricing || {
-      basePrice: quotation.totalAmount || 0,
-      colorPrice: 0,
-      promotionDiscount: 0,
-      totalPrice: quotation.totalAmount || 0
-    };
+    const quote = getQuotationData();
+    
+    // Use new API structure: basePrice, promotionPrice, finalPrice
+    const basePrice = quote.basePrice || 0;
+    const promotionPrice = quote.promotionPrice || 0;
+    const finalPrice = quote.finalPrice || 0;
 
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Bảng Giá</Text>
+        <Text style={styles.sectionTitle}>Pricing</Text>
         <View style={styles.pricingContainer}>
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Giá cơ bản:</Text>
-            <Text style={styles.pricingValue}>{formatPrice(pricing.basePrice || 0)}</Text>
+            <Text style={styles.pricingLabel}>Base Price:</Text>
+            <Text style={styles.pricingValue}>{formatPrice(basePrice)}</Text>
           </View>
-          {(pricing.promotionDiscount || 0) > 0 && (
+          {promotionPrice > 0 && (
             <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>Giảm giá khuyến mãi:</Text>
-              <Text style={[styles.pricingValue, styles.discountText]}>-{formatPrice(pricing.promotionDiscount || 0)}</Text>
+              <Text style={styles.pricingLabel}>Promotion Discount:</Text>
+              <Text style={[styles.pricingValue, styles.discountText]}>-{formatPrice(promotionPrice)}</Text>
             </View>
           )}
           <View style={[styles.pricingRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Tổng cộng:</Text>
-            <Text style={styles.totalValue}>{formatPrice(pricing.totalPrice || 0)}</Text>
+            <Text style={styles.totalLabel}>Total:</Text>
+            <Text style={styles.totalValue}>{formatPrice(finalPrice)}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderDeposit = () => {
+    if (!depositInfo) {
+      return null;
+    }
+
+    const quote = getQuotationData();
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Deposit</Text>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              navigation.navigate('EditDeposit', {
+                deposit: depositInfo,
+                quotation: quote,
+                onDepositUpdate: () => {
+                  // Reload quotation detail to get updated deposit
+                  loadQuotationDetail();
+                },
+              });
+            }}
+          >
+            <Pencil size={18} color="#009DFF" />
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.pricingContainer}>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit ID:</Text>
+            <Text style={styles.pricingValue}>#{depositInfo.id}</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit Percent:</Text>
+            <Text style={styles.pricingValue}>{depositInfo.depositPercent}%</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Deposit Amount:</Text>
+            <Text style={styles.pricingValue}>{formatPrice(depositInfo.depositAmount)}</Text>
+          </View>
+          <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Valid Until:</Text>
+            <Text style={styles.pricingValue}>{formatDate(depositInfo.holdDays)}</Text>
+          </View>
+          <View style={[styles.pricingRow, styles.totalRow]}>
+            <Text style={styles.totalLabel}>Status:</Text>
+            <Text style={[styles.totalValue, { color: getDepositStatusColor(depositInfo.status) }]}>
+              {getDepositStatusText(depositInfo.status)}
+            </Text>
           </View>
         </View>
       </View>
@@ -365,44 +739,126 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   };
 
   const renderActionButtons = () => {
-    const isPending = quotation.status === 'pending';
-    const isPaid = quotation.status === 'paid';
+    const quote = getQuotationData();
+    const type = quote.type?.toUpperCase();
+    const status = quote.status?.toUpperCase();
+    const isDraft = status === 'DRAFT';
+    const isAccepted = status === 'ACCEPTED';
+    const depositStatus = depositInfo?.status?.toUpperCase();
+    const isDepositHolding = depositStatus === 'HOLDING';
+    const isDepositApplied = depositStatus === 'APPLIED';
+    const isDepositPending = depositStatus === 'PENDING';
     
-    return (
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={handleShare}
-        >
-          <Text style={styles.shareButtonText}>Chia Sẻ</Text>
-        </TouchableOpacity>
-        
-        {isPending && (
-          <TouchableOpacity
-            style={styles.paymentButton}
-            onPress={handlePayment}
-          >
-            <Text style={styles.paymentButtonText}>Thanh Toán</Text>
-          </TouchableOpacity>
-        )}
-        
-        {isPaid && (
+    // Render buttons based on type
+    const renderButtonsByType = () => {
+      if (isDraft) {
+        return null; // No buttons for draft status
+      }
+
+      // If deposit status is PENDING, don't show any buttons
+      if (depositInfo && isDepositPending) {
+        return null;
+      }
+
+      // If deposit status is HOLDING or APPLIED, show Create Customer Contract button
+      if (depositInfo && (isDepositHolding || isDepositApplied)) {
+        return (
           <TouchableOpacity
             style={styles.contractButton}
             onPress={handleContractView}
           >
-            <Text style={styles.contractButtonText}>Xem Hợp Đồng</Text>
+            <Text style={styles.contractButtonText}>Create Customer Contract</Text>
           </TouchableOpacity>
-        )}
+        );
+      }
+
+      switch (type) {
+        case 'AT_STORE':
+          return (
+            <>
+              {!hasCustomerContract && !depositInfo && (
+                <TouchableOpacity
+                  style={styles.depositButton}
+                  onPress={() => {
+                    const quotationId = quote.id || quote.quotationId;
+                    if (quotationId) {
+                      navigation.navigate('CreateDeposit', { 
+                        quotationId: quotationId.toString(),
+                        quotation: quote, // Pass full quotation object for navigation back
+                      });
+                    } else {
+                      Alert.alert('Error', 'Quotation ID not found');
+                    }
+                  }}
+                >
+                  <Text style={styles.depositButtonText}>Deposit</Text>
+                </TouchableOpacity>
+              )}
+              {!hasCustomerContract && !depositInfo && (
+                <TouchableOpacity
+                  style={styles.fullPaymentButton}
+                  onPress={() => handleContractView(true)}
+                >
+                  <Text style={styles.fullPaymentButtonText}>Full Payment</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          );
         
-        {!isPending && !isPaid && (
-          <TouchableOpacity
-            style={styles.printButton}
-            onPress={handlePrint}
-          >
-            <Text style={styles.printButtonText}>In Báo Giá</Text>
-          </TouchableOpacity>
-        )}
+        case 'ORDER':
+        case 'PRE_ORDER':
+          return (
+            !hasCustomerContract && !depositInfo && (
+              <TouchableOpacity
+                style={styles.depositButton}
+                onPress={() => {
+                  const quotationId = quote.id || quote.quotationId;
+                  if (quotationId) {
+                    navigation.navigate('CreateDeposit', { 
+                      quotationId: quotationId.toString(),
+                      quotation: quote, // Pass full quotation object for navigation back
+                    });
+                  } else {
+                    Alert.alert('Error', 'Quotation ID not found');
+                  }
+                }}
+              >
+                <Text style={styles.depositButtonText}>Deposit</Text>
+              </TouchableOpacity>
+            )
+          );
+        
+        default:
+          return (
+            <TouchableOpacity
+              style={styles.printButton}
+              onPress={handlePrint}
+            >
+              <Text style={styles.printButtonText}>Print Quotation</Text>
+            </TouchableOpacity>
+          );
+      }
+    };
+    
+    const buttons = renderButtonsByType();
+    const extraPrintButton = isAccepted ? (
+      <TouchableOpacity
+        style={styles.printButton}
+        onPress={handlePrint}
+      >
+        <Text style={styles.printButtonText}>Print Quotation</Text>
+      </TouchableOpacity>
+    ) : null;
+    
+    // If no buttons to show, don't render the action buttons container
+    if (!buttons && !extraPrintButton) {
+      return null;
+    }
+    
+    return (
+      <View style={styles.actionButtons}>
+        {buttons}
+        {extraPrintButton}
       </View>
     );
   };
@@ -415,16 +871,17 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       return monthlyPayment;
     };
 
-    const totalAmount = quotation.pricing?.totalPrice || quotation.totalAmount || 0;
+    const quote = getQuotationData();
+    const totalAmount = quote.pricing?.totalPrice || quote.totalAmount || quote.finalPrice || 0;
     const monthlyPayment = calculateMonthlyPayment(totalAmount, installmentMonths);
     const totalPayable = monthlyPayment * installmentMonths;
     const interestAmount = totalPayable - totalAmount;
 
     const installmentOptions = [
-      { months: 6, label: '6 tháng' },
-      { months: 12, label: '12 tháng' },
-      { months: 24, label: '24 tháng' },
-      { months: 36, label: '36 tháng' },
+      { months: 6, label: '6 months' },
+      { months: 12, label: '12 months' },
+      { months: 24, label: '24 months' },
+      { months: 36, label: '36 months' },
     ];
 
     return (
@@ -438,7 +895,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
           <View style={styles.paymentTypeModalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn hình thức thanh toán</Text>
+              <Text style={styles.modalTitle}>Select Payment Method</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowPaymentTypeModal(false)}
@@ -472,13 +929,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentTypeTitle,
                         selectedPaymentType === 'full' && styles.paymentTypeTitleSelected
                       ]}>
-                        Trả full
+                        Full Payment
                       </Text>
                       <Text style={[
                         styles.paymentTypeSubtitle,
                         selectedPaymentType === 'full' && styles.paymentTypeSubtitleSelected
                       ]}>
-                        Thanh toán một lần
+                        One-time payment
                       </Text>
                     </View>
                     {selectedPaymentType === 'full' && (
@@ -494,7 +951,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentDetailLabel,
                         selectedPaymentType === 'full' && styles.paymentDetailLabelSelected
                       ]}>
-                        Tổng thanh toán:
+                        Total Payment:
                       </Text>
                       <Text style={[
                         styles.paymentDetailValue,
@@ -508,7 +965,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentDetailLabel,
                         selectedPaymentType === 'full' && styles.paymentDetailLabelSelected
                       ]}>
-                        Lãi suất:
+                        Interest Rate:
                       </Text>
                       <Text style={[
                         styles.paymentDetailValue,
@@ -527,13 +984,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                       styles.benefitItem,
                       selectedPaymentType === 'full' && styles.benefitItemSelected
                     ]}>
-                      ✓ Không phát sinh lãi suất
+                      ✓ No interest charges
                     </Text>
                     <Text style={[
                       styles.benefitItem,
                       selectedPaymentType === 'full' && styles.benefitItemSelected
                     ]}>
-                      ✓ Nhận xe ngay lập tức
+                      ✓ Receive vehicle immediately
                     </Text>
                   </View>
                 </LinearGradient>
@@ -563,13 +1020,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentTypeTitle,
                         selectedPaymentType === 'installment' && styles.paymentTypeTitleSelected
                       ]}>
-                        Trả góp
+                        Installment
                       </Text>
                       <Text style={[
                         styles.paymentTypeSubtitle,
                         selectedPaymentType === 'installment' && styles.paymentTypeSubtitleSelected
                       ]}>
-                        Thanh toán theo tháng
+                        Monthly payment
                       </Text>
                     </View>
                     {selectedPaymentType === 'installment' && (
@@ -582,7 +1039,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                   {/* Installment Month Selection */}
                   {selectedPaymentType === 'installment' && (
                     <View style={styles.installmentMonthsContainer}>
-                      <Text style={styles.installmentMonthsLabel}>Chọn kỳ hạn:</Text>
+                      <Text style={styles.installmentMonthsLabel}>Select Term:</Text>
                       <View style={styles.installmentMonthsOptions}>
                         {installmentOptions.map((option) => (
                           <TouchableOpacity
@@ -611,7 +1068,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentDetailLabel,
                         selectedPaymentType === 'installment' && styles.paymentDetailLabelSelected
                       ]}>
-                        Trả hàng tháng:
+                        Monthly Payment:
                       </Text>
                       <Text style={[
                         styles.paymentDetailValueHighlight,
@@ -625,7 +1082,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentDetailLabel,
                         selectedPaymentType === 'installment' && styles.paymentDetailLabelSelected
                       ]}>
-                        Tổng thanh toán:
+                        Total Payment:
                       </Text>
                       <Text style={[
                         styles.paymentDetailValue,
@@ -639,13 +1096,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         styles.paymentDetailLabel,
                         selectedPaymentType === 'installment' && styles.paymentDetailLabelSelected
                       ]}>
-                        Lãi suất:
+                        Interest Rate:
                       </Text>
                       <Text style={[
                         styles.paymentDetailValue,
                         selectedPaymentType === 'installment' && styles.paymentDetailValueSelected
                       ]}>
-                        6.0%/năm (~{formatPrice(interestAmount)})
+                        6.0%/year (~{formatPrice(interestAmount)})
                       </Text>
                     </View>
                   </View>
@@ -658,13 +1115,13 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                       styles.benefitItem,
                       selectedPaymentType === 'installment' && styles.benefitItemSelected
                     ]}>
-                      ✓ Thanh toán linh hoạt theo tháng
+                      ✓ Flexible monthly payments
                     </Text>
                     <Text style={[
                       styles.benefitItem,
                       selectedPaymentType === 'installment' && styles.benefitItemSelected
                     ]}>
-                      ✓ Nhận xe ngay, trả dần
+                      ✓ Receive vehicle now, pay gradually
                     </Text>
                   </View>
 
@@ -678,7 +1135,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
                         style={styles.confirmInstallmentButtonGradient}
                       >
                         <Text style={styles.confirmInstallmentButtonText}>
-                          Xác nhận trả góp {installmentMonths} tháng
+                          Confirm {installmentMonths} Month Installment
                         </Text>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -703,7 +1160,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
       <View style={styles.modalOverlay}>
         <View style={styles.paymentModalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Thanh Toán</Text>
+            <Text style={styles.modalTitle}>Payment</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowPaymentModal(false)}
@@ -714,14 +1171,17 @@ const QuotationDetailScreen = ({ navigation, route }) => {
           
           <ScrollView style={styles.modalBody}>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentLabel}>Số tiền cần thanh toán:</Text>
+              <Text style={styles.paymentLabel}>Amount to Pay:</Text>
               <Text style={styles.paymentAmount}>
-                {formatPaymentAmount(quotation.pricing?.totalPrice || quotation.totalAmount || 0)}
+                {(() => {
+                  const quote = getQuotationData();
+                  return formatPaymentAmount(quote.pricing?.totalPrice || quote.totalAmount || quote.finalPrice || 0);
+                })()}
               </Text>
             </View>
             
             <View style={styles.qrSection}>
-              <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
+              <Text style={styles.qrTitle}>Scan QR Code to Pay</Text>
               <View style={styles.qrContainer}>
                 <View style={styles.qrPlaceholder}>
                   <Text style={styles.qrIcon}>📱</Text>
@@ -732,7 +1192,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
             </View>
             
             <View style={styles.paymentInstructions}>
-              <Text style={styles.instructionsTitle}>Hướng dẫn thanh toán:</Text>
+              <Text style={styles.instructionsTitle}>Payment Instructions:</Text>
               {getPaymentInstructions('vnpay').map((instruction, index) => (
                 <Text key={index} style={styles.instructionText}>
                   {index + 1}. {instruction}
@@ -746,7 +1206,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               style={styles.cancelButton}
               onPress={() => setShowPaymentModal(false)}
             >
-              <Text style={styles.cancelButtonText}>Hủy</Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.confirmButton, paymentLoading && styles.disabledButton]}
@@ -754,9 +1214,9 @@ const QuotationDetailScreen = ({ navigation, route }) => {
               disabled={paymentLoading}
             >
               {paymentLoading ? (
-                <ActivityIndicator color={COLORS.TEXT.WHITE} />
+                <ActivityIndicator color="#009DFF" />
               ) : (
-                <Text style={styles.confirmButtonText}>Xác nhận thanh toán</Text>
+                <Text style={styles.confirmButtonText}>Confirm Payment</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -766,6 +1226,17 @@ const QuotationDetailScreen = ({ navigation, route }) => {
   );
 
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#009DFF" />
+          <Text style={styles.loadingText}>Loading quotation details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {renderHeader()}
@@ -774,6 +1245,7 @@ const QuotationDetailScreen = ({ navigation, route }) => {
         {renderVehicleInfo()}
         {renderCustomerInfo()}
         {renderPricing()}
+        {renderDeposit()}
       </ScrollView>
       {renderActionButtons()}
       
@@ -834,6 +1306,28 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.WHITE,
     marginBottom: SIZES.PADDING.SMALL,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.SMALL,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.SMALL,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    borderWidth: 1,
+    borderColor: "#009DFF",
+  },
+  editButtonText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: "#009DFF",
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   quotationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -843,7 +1337,12 @@ const styles = StyleSheet.create({
   quotationId: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
+  },
+  quoteCode: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
   },
   statusBadge: {
     paddingHorizontal: SIZES.PADDING.SMALL,
@@ -892,7 +1391,7 @@ const styles = StyleSheet.create({
   },
   selectedColor: {
     fontSize: SIZES.FONT.SMALL,
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
     fontWeight: '600',
     marginBottom: SIZES.PADDING.SMALL,
   },
@@ -966,13 +1465,14 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#009DFF",
   },
   actionButtons: {
     flexDirection: 'row',
     paddingHorizontal: SIZES.PADDING.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     backgroundColor: COLORS.BACKGROUND.SECONDARY,
+    gap: SIZES.PADDING.SMALL,
   },
   shareButton: {
     flex: 1,
@@ -980,7 +1480,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginRight: SIZES.PADDING.SMALL,
   },
   shareButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -991,16 +1490,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
     borderWidth: 1,
-    borderColor: COLORS.PRIMARY,
+    borderColor: "#FFFFFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   printButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: "#FFFFFF",
   },
   paymentButton: {
     flex: 1,
@@ -1008,7 +1506,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   paymentButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -1017,13 +1514,36 @@ const styles = StyleSheet.create({
   },
   contractButton: {
     flex: 1,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingVertical: SIZES.PADDING.MEDIUM,
     alignItems: 'center',
-    marginLeft: SIZES.PADDING.SMALL,
   },
   contractButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  depositButton: {
+    flex: 1,
+    backgroundColor: "#009DFF",
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  depositButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  fullPaymentButton: {
+    flex: 1,
+    backgroundColor: COLORS.SUCCESS,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+  },
+  fullPaymentButtonText: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
@@ -1363,6 +1883,16 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.WHITE,
   },
 });
 

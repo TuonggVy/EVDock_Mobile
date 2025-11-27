@@ -19,7 +19,7 @@ const DealerAssignmentModal = ({
   dealers = [],
   selectedDealers = [],
   onDealersChange,
-  title = "Dealer Assignment"
+  title = "Agency Assignment"
 }) => {
   const [localSelectedDealers, setLocalSelectedDealers] = useState([]);
 
@@ -103,7 +103,7 @@ const DealerAssignmentModal = ({
           {/* Dealer List */}
           <View style={styles.dealerListContainer}>
             <Text style={styles.dealerCount}>
-              {localSelectedDealers.length} of {dealers?.length || 0} dealers selected
+              {localSelectedDealers.length} of {dealers?.length || 0} agencies selected
             </Text>
             <ScrollView 
               style={styles.dealerList}
@@ -127,7 +127,7 @@ const DealerAssignmentModal = ({
                     </View>
                     <View style={styles.dealerDetails}>
                       <Text style={styles.dealerName}>{dealer.name}</Text>
-                      <Text style={styles.dealerCity}>📍 {dealer.city}</Text>
+                      <Text style={styles.dealerCity}>📍 {dealer.location || dealer.city || 'N/A'}</Text>
                     </View>
                   </View>
                   <View style={[

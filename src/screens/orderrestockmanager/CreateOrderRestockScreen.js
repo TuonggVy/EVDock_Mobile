@@ -1,0 +1,1037 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  Platform,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+} from 'react-native';
+import { COLORS, SIZES } from '../../constants';
+import CustomAlert from '../../components/common/CustomAlert';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native';
+import orderRestockManagerService from '../../services/orderRestockManagerService';
+import warehouseService from '../../services/warehouseService';
+import motorbikeService from '../../services/motorbikeService';
+import promotionService from '../../services/promotionService';
+import { discountService } from '../../services/discountService';
+import { useAuth } from '../../contexts/AuthContext';
+
+const CreateOrderRestockScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const [warehouses, setWarehouses] = useState([]);
+  const [motorbikes, setMotorbikes] = useState([]);
+  const [motorbikeColors, setMotorbikeColors] = useState([]);
+  const [generalPromotions, setGeneralPromotions] = useState([]); // Promotions for all motorbikes
+  const [motorbikePromotions, setMotorbikePromotions] = useState([]); // Promotions for specific motorbike
+  const [agencyDiscounts, setAgencyDiscounts] = useState([]); // Agency-specific discounts
+  const [systemDiscounts, setSystemDiscounts] = useState([]); // System-wide discounts for motorbike
+  const [discounts, setDiscounts] = useState([]); // Combined and filtered discounts
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  
+  // List of orderItems to be created
+  const [orderItemsList, setOrderItemsList] = useState([]);
+  
+  // Current orderItem being filled in the form
+  const [orderItem, setOrderItem] = useState({
+    quantity: '',
+    warehouseId: '',
+    motorbikeId: '',
+    colorId: '',
+    discountId: '',
+    promotionId: '',
+  });
+
+  const { alertConfig, hideAlert, showSuccess, showError } = useCustomAlert();
+
+  useEffect(() => {
+    loadOptions();
+  }, []);
+
+  useEffect(() => {
+    if (orderItem.motorbikeId) {
+      fetchMotorbikeColors();
+      fetchMotorbikePromotions();
+      
+      // Clear promotion only if it's motorbike-specific (not in general promotions)
+      // General promotions work for all motorbikes, so keep them selected
+      if (orderItem.promotionId) {
+        const isGeneralPromotion = generalPromotions.some(p => String(p.id) === String(orderItem.promotionId));
+        if (!isGeneralPromotion) {
+          // It's a motorbike-specific promotion, clear it when motorbike changes
+          setOrderItem(prev => ({ ...prev, promotionId: '' }));
+        }
+      }
+    } else {
+      setMotorbikePromotions([]);
+      // Clear motorbike-specific promotions when no motorbike is selected
+      if (orderItem.promotionId) {
+        const isGeneralPromotion = generalPromotions.some(p => String(p.id) === String(orderItem.promotionId));
+        if (!isGeneralPromotion) {
+          setOrderItem(prev => ({ ...prev, promotionId: '' }));
+        }
+      }
+    }
+  }, [orderItem.motorbikeId]);
+
+  useEffect(() => {
+    if (orderItem.motorbikeId) {
+      fetchSystemDiscounts();
+    } else {
+      setSystemDiscounts([]);
+    }
+  }, [orderItem.motorbikeId]);
+
+  useEffect(() => {
+    if (orderItem.motorbikeId) {
+      fetchAgencyDiscounts();
+    } else {
+      // Load all agency discounts when no motorbike selected
+      fetchAgencyDiscounts();
+    }
+  }, [orderItem.motorbikeId, user?.agencyId]);
+
+  useEffect(() => {
+    filterDiscounts();
+  }, [orderItem.quantity, orderItem.motorbikeId, agencyDiscounts, systemDiscounts]);
+
+  useEffect(() => {
+    // Clear promotion if it becomes incompatible
+    if (!orderItem.promotionId) return;
+    const allPromotions = [...generalPromotions, ...motorbikePromotions];
+    const selectedPromo = allPromotions.find(p => String(p.id) === String(orderItem.promotionId));
+    if (!selectedPromo) return;
+    const now = new Date();
+    const withinTime = (!selectedPromo.startAt || new Date(selectedPromo.startAt) <= now)
+      && (!selectedPromo.endAt || new Date(selectedPromo.endAt) >= now);
+    
+    const hasValidMotorbikeId = orderItem.motorbikeId && String(orderItem.motorbikeId).trim() !== '';
+    const motorbikeOk = !selectedPromo.motorbikeId
+      || (hasValidMotorbikeId && Number(selectedPromo.motorbikeId) === Number(orderItem.motorbikeId));
+    
+    if (!withinTime || !motorbikeOk) {
+      setOrderItem(prev => ({ ...prev, promotionId: '' }));
+    }
+  }, [orderItem.motorbikeId, orderItem.promotionId, generalPromotions, motorbikePromotions]);
+
+  const loadOptions = async () => {
+    try {
+      setLoading(true);
+
+      // Load warehouses
+      const warehousesResponse = await warehouseService.getWarehousesList();
+      if (warehousesResponse.success) {
+        const warehousesList = warehousesResponse.data || [];
+        setWarehouses(warehousesList);
+        if (warehousesList.length > 0 && !orderItem.warehouseId) {
+          setOrderItem(prev => ({
+            ...prev,
+            warehouseId: String(warehousesList[0].id),
+          }));
+        }
+      }
+
+      // Load motorbikes
+      const motorbikesResponse = await motorbikeService.getAllMotorbikes({ limit: 100 });
+      if (motorbikesResponse.success) {
+        setMotorbikes(motorbikesResponse.data || []);
+      }
+
+      // Load general promotions (for all motorbikes)
+      const promotionsResponse = await promotionService.getAgencyPromotions(1, 100);
+      if (promotionsResponse.success) {
+        const now = new Date();
+        const activePromos = (promotionsResponse.data || []).filter(p => {
+          const statusOk = (p.status || 'ACTIVE') === 'ACTIVE';
+          const startOk = !p.startAt || new Date(p.startAt) <= now;
+          const endAt = p.endAt ? new Date(p.endAt) : null;
+          const endInclusive = endAt ? new Date(endAt.getTime() + 24*60*60*1000 - 1) : null;
+          const endOk = !endInclusive || endInclusive >= now;
+          return statusOk && startOk && endOk;
+        });
+        setGeneralPromotions(activePromos);
+      }
+
+      // Agency discounts will be loaded by useEffect when component mounts
+    } catch (error) {
+      console.error('Error loading options:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMotorbikeColors = async () => {
+    try {
+      setMotorbikeColors([]);
+      if (!orderItem.motorbikeId) return;
+      const res = await motorbikeService.getMotorbikeById(parseInt(orderItem.motorbikeId));
+      const payload = res?.data?.data || res?.data;
+      const colors = Array.isArray(payload?.colors) ? payload.colors : [];
+      const mapped = colors.map(item => ({
+        id: item?.color?.id,
+        colorType: item?.color?.colorType,
+        imageUrl: item?.imageUrl,
+      })).filter(c => c.id && c.colorType);
+      setMotorbikeColors(mapped);
+      if (mapped.length > 0) {
+        setOrderItem(prev => ({ ...prev, colorId: String(mapped[0].id) }));
+      } else {
+        setOrderItem(prev => ({ ...prev, colorId: '' }));
+      }
+    } catch (e) {
+      console.error('Error loading colors for motorbike:', e);
+      setMotorbikeColors([]);
+      setOrderItem(prev => ({ ...prev, colorId: '' }));
+    }
+  };
+
+  const fetchMotorbikePromotions = async () => {
+    try {
+      if (!orderItem.motorbikeId) {
+        setMotorbikePromotions([]);
+        return;
+      }
+      const response = await promotionService.getAgencyPromotionsWithMotorbike(
+        parseInt(orderItem.motorbikeId),
+        1,
+        100
+      );
+      if (response.success) {
+        const now = new Date();
+        const activePromos = (response.data || []).filter(p => {
+          const statusOk = (p.status || 'ACTIVE') === 'ACTIVE';
+          const startOk = !p.startAt || new Date(p.startAt) <= now;
+          const endAt = p.endAt ? new Date(p.endAt) : null;
+          const endInclusive = endAt ? new Date(endAt.getTime() + 24*60*60*1000 - 1) : null;
+          const endOk = !endInclusive || endInclusive >= now;
+          return statusOk && startOk && endOk;
+        });
+        setMotorbikePromotions(activePromos);
+      } else {
+        setMotorbikePromotions([]);
+      }
+    } catch (e) {
+      console.error('Error loading promotions for motorbike:', e);
+      setMotorbikePromotions([]);
+    }
+  };
+
+  const fetchAgencyDiscounts = async () => {
+    try {
+      if (!user?.agencyId) return;
+      
+      const motorbikeId = orderItem.motorbikeId ? parseInt(orderItem.motorbikeId) : undefined;
+      const response = await discountService.getAgencyDiscounts(
+        parseInt(user.agencyId),
+        1,
+        200,
+        undefined, // type
+        motorbikeId // motorbikeId filter
+      );
+      
+      if (response.success) {
+        setAgencyDiscounts(response.data || []);
+      } else {
+        console.warn('⚠️ [CreateOrderRestock] Cannot load agency discounts:', response.error);
+        setAgencyDiscounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading agency discounts:', error);
+      setAgencyDiscounts([]);
+    }
+  };
+
+  const fetchSystemDiscounts = async () => {
+    try {
+      if (!orderItem.motorbikeId) {
+        setSystemDiscounts([]);
+        return;
+      }
+      
+      const response = await discountService.getMotorbikeDiscounts(
+        parseInt(orderItem.motorbikeId),
+        1,
+        200
+      );
+      
+      if (response.success) {
+        setSystemDiscounts(response.data || []);
+      } else {
+        console.warn('⚠️ [CreateOrderRestock] Cannot load system discounts:', response.error);
+        setSystemDiscounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading system discounts:', error);
+      setSystemDiscounts([]);
+    }
+  };
+
+  const filterDiscounts = () => {
+    const now = new Date();
+    const qty = parseInt(orderItem.quantity) || 0;
+    const selectedMotorbikeId = orderItem.motorbikeId ? Number(orderItem.motorbikeId) : null;
+    
+    // Combine agency and system discounts
+    const allDiscounts = [...agencyDiscounts, ...systemDiscounts];
+    
+    // Remove duplicates by ID (in case same discount appears in both lists)
+    const uniqueDiscounts = Array.from(
+      new Map(allDiscounts.map(d => [d.id, d])).values()
+    );
+    
+    const filtered = uniqueDiscounts.filter(d => {
+      const statusOk = (d.status || 'ACTIVE') === 'ACTIVE';
+      const startOk = !d.startAt || new Date(d.startAt) <= now;
+      const dEnd = d.endAt ? new Date(d.endAt) : null;
+      const endInclusive = dEnd ? new Date(dEnd.getTime() + 24*60*60*1000 - 1) : null;
+      const endOk = !endInclusive || endInclusive >= now;
+      const qtyOk = !d.min_quantity || qty === 0 || qty >= Number(d.min_quantity);
+      // For system discounts, motorbikeId should match. For agency discounts, motorbikeId filter is already applied by API
+      const motorbikeOk = !d.motorbikeId || (selectedMotorbikeId && Number(d.motorbikeId) === selectedMotorbikeId);
+      return statusOk && startOk && endOk && motorbikeOk && qtyOk;
+    });
+    
+    setDiscounts(filtered);
+    if (orderItem.discountId && !filtered.find(d => String(d.id) === String(orderItem.discountId))) {
+      setOrderItem(prev => ({ ...prev, discountId: '' }));
+    }
+  };
+
+  const handleAddItem = () => {
+    // Validate current item before adding
+    if (!orderItem.quantity || !orderItem.motorbikeId || !orderItem.colorId) {
+      showError('Error', 'Please fill in quantity, motorbike, and color');
+      return;
+    }
+
+    const motorbike = motorbikes.find(mb => String(mb.id) === String(orderItem.motorbikeId));
+    const color = motorbikeColors.find(c => String(c.id) === String(orderItem.colorId));
+    const discount = discounts.find(d => String(d.id) === String(orderItem.discountId));
+    const allPromotions = [...generalPromotions, ...motorbikePromotions];
+    const promotion = allPromotions.find(p => String(p.id) === String(orderItem.promotionId));
+
+    // Create item object with display info
+    const newItem = {
+      id: Date.now(), // Temporary ID for list management
+      quantity: parseInt(orderItem.quantity) || 0,
+      motorbikeId: parseInt(orderItem.motorbikeId),
+      colorId: parseInt(orderItem.colorId),
+      discountId: orderItem.discountId ? parseInt(orderItem.discountId) : null,
+      promotionId: orderItem.promotionId ? parseInt(orderItem.promotionId) : null,
+      // Display info
+      motorbikeName: motorbike?.name || motorbike?.model || `Motorbike ${orderItem.motorbikeId}`,
+      colorName: color?.colorType || `Color ${orderItem.colorId}`,
+      discountName: discount?.name || discount?.description || null,
+      promotionName: promotion?.name || null,
+    };
+
+    setOrderItemsList(prev => [...prev, newItem]);
+
+    // Reset form
+    setOrderItem({
+      quantity: '',
+      warehouseId: orderItem.warehouseId, // Keep warehouse if was set
+      motorbikeId: '',
+      colorId: '',
+      discountId: '',
+      promotionId: '',
+    });
+    setMotorbikeColors([]);
+  };
+
+  const handleRemoveItem = (itemId) => {
+    setOrderItemsList(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const clearForm = () => {
+    setOrderItem({
+      quantity: '',
+      warehouseId: '',
+      motorbikeId: '',
+      colorId: '',
+      discountId: '',
+      promotionId: '',
+    });
+    setMotorbikeColors([]);
+  };
+
+  const handleCreateOrder = async () => {
+    if (orderItemsList.length === 0) {
+      showError('Error', 'Please add at least one order item');
+      return;
+    }
+
+    if (!user?.agencyId) {
+      showError('Error', 'Agency information not found');
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      // API expects: { orderItems: [{ quantity, motorbikeId, colorId, discountId?, promotionId? }], agencyId }
+      const orderRestockData = {
+        agencyId: parseInt(user.agencyId),
+        orderItems: orderItemsList.map(item => ({
+          quantity: item.quantity,
+          motorbikeId: item.motorbikeId,
+          colorId: item.colorId,
+          ...(item.discountId ? { discountId: item.discountId } : {}),
+          ...(item.promotionId ? { promotionId: item.promotionId } : {}),
+        }))
+      };
+
+      console.log('Creating order restock with data:', orderRestockData);
+
+      const response = await orderRestockManagerService.createOrderRestock(orderRestockData);
+      
+      if (response.success) {
+        const orderData = response.data || {};
+        const orderId = response.orderId || orderData.id;
+        
+        if (orderId) {
+          showSuccess('Success', `Order #${orderId} has been created successfully!`);
+        } else {
+          showSuccess('Success', response.message || 'Order has been created successfully!');
+        }
+        navigation.goBack();
+      } else {
+        showError('Error', response.error || 'Unable to create order');
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+      showError('Error', 'Unable to create order');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Create New Order</Text>
+          <View style={styles.headerActions} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#009DFF" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create New Order</Text>
+        <View style={styles.headerActions} />
+      </View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.contentContainer}
+        >
+          <View style={styles.formSection}>
+            {/* Order Items List */}
+            {orderItemsList.length > 0 && (
+              <View style={styles.itemsListSection}>
+                <Text style={styles.sectionTitle}>Order Items ({orderItemsList.length})</Text>
+                {orderItemsList.map((item, index) => (
+                  <View key={item.id} style={styles.itemCard}>
+                    <View style={styles.itemCardContent}>
+                      <Text style={styles.itemCardTitle}>Item #{index + 1}</Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Motorbike: </Text>
+                        {item.motorbikeName}
+                      </Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Color: </Text>
+                        {item.colorName}
+                      </Text>
+                      <Text style={styles.itemCardText}>
+                        <Text style={styles.itemCardLabel}>Quantity: </Text>
+                        {item.quantity}
+                      </Text>
+                      {item.discountName && (
+                        <Text style={styles.itemCardText}>
+                          <Text style={styles.itemCardLabel}>Discount: </Text>
+                          {item.discountName}
+                        </Text>
+                      )}
+                      {item.promotionName && (
+                        <Text style={styles.itemCardText}>
+                          <Text style={styles.itemCardLabel}>Promotion: </Text>
+                          {item.promotionName}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveItem(item.id)}
+                    >
+                      <Trash2 size={18} color={COLORS.ERROR} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Add New Item Form */}
+            <View style={styles.addItemSection}>
+              <Text style={styles.sectionTitle}>
+                {orderItemsList.length > 0 ? 'Add Another Item' : 'Add Order Item'}
+              </Text>
+              
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Quantity *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={orderItem.quantity}
+                onChangeText={(text) => setOrderItem({ ...orderItem, quantity: text })}
+                placeholder="Enter quantity"
+                placeholderTextColor={COLORS.TEXT.SECONDARY}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Motorbike *</Text>
+              <View style={styles.vehicleSelector}>
+                {motorbikes.length > 0 ? (
+                  motorbikes.map((mb) => (
+                    <TouchableOpacity
+                      key={mb.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, motorbikeId: String(mb.id), colorId: '' })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.motorbikeId === String(mb.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {mb.name || mb.model || `Motorbike ${mb.id}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Loading motorbikes...</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Color *</Text>
+              <View style={styles.vehicleSelector}>
+                {motorbikeColors.length > 0 ? (
+                  motorbikeColors.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[
+                        styles.vehicleOption,
+                        orderItem.colorId === String(c.id) && styles.selectedVehicleOption
+                      ]}
+                      onPress={() => setOrderItem({ ...orderItem, colorId: String(c.id) })}
+                    >
+                      <Text style={[
+                        styles.vehicleOptionText,
+                        orderItem.colorId === String(c.id) && styles.selectedVehicleOptionText
+                      ]}>
+                        {c.colorType}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noOptionsText}>Select motorbike first to display colors</Text>
+                )}
+              </View>
+            </View>
+
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Discount (optional)</Text>
+              <View style={styles.vehicleSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.vehicleOption,
+                    !orderItem.discountId && styles.selectedVehicleOption
+                  ]}
+                  onPress={() => setOrderItem({ ...orderItem, discountId: '' })}
+                >
+                  <Text style={[
+                    styles.vehicleOptionText,
+                    !orderItem.discountId && styles.selectedVehicleOptionText
+                  ]}>
+                    None
+                  </Text>
+                </TouchableOpacity>
+                {discounts.length > 0 ? (
+                  discounts.map((disc) => {
+                    // Check if discount is from system (priority) or agency
+                    const isSystemDiscount = systemDiscounts.some(sd => sd.id === disc.id);
+                    const isAgencyDiscount = !isSystemDiscount && agencyDiscounts.some(ad => ad.id === disc.id);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={disc.id}
+                        style={[
+                          styles.vehicleOption,
+                          isAgencyDiscount && styles.agencyDiscountOption,
+                          isSystemDiscount && styles.systemDiscountOption,
+                          orderItem.discountId === String(disc.id) && styles.selectedVehicleOption
+                        ]}
+                        onPress={() => setOrderItem({ ...orderItem, discountId: String(disc.id) })}
+                      >
+                        <View style={styles.discountOptionContent}>
+                          <Text style={[
+                            styles.vehicleOptionText,
+                            orderItem.discountId === String(disc.id) && styles.selectedVehicleOptionText
+                          ]}>
+                            {disc.name || disc.description || `Discount ${disc.id}`}
+                          </Text>
+                          {disc.valueType && disc.value !== undefined && (
+                            <Text style={styles.discountValue}>
+                              {promotionService.formatValue(disc.value, disc.valueType)}
+                            </Text>
+                          )}
+                          {disc.min_quantity && (
+                            <Text style={styles.discountMinQty}>
+                              Min: {disc.min_quantity} units
+                            </Text>
+                          )}
+                          {isAgencyDiscount && (
+                            <Text style={styles.discountBadge}>Agency Discount</Text>
+                          )}
+                          {isSystemDiscount && (
+                            <Text style={styles.discountBadge}>System Discount</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.noOptionsText}>
+                    {orderItem.motorbikeId 
+                      ? 'No discount codes available for this motorbike' 
+                      : 'Select a motorbike to see available discounts'}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Promotion (optional)</Text>
+              <View style={styles.vehicleSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.vehicleOption,
+                    !orderItem.promotionId && styles.selectedVehicleOption
+                  ]}
+                  onPress={() => setOrderItem({ ...orderItem, promotionId: '' })}
+                >
+                  <Text style={[
+                    styles.vehicleOptionText,
+                    !orderItem.promotionId && styles.selectedVehicleOptionText
+                  ]}>
+                    None
+                  </Text>
+                </TouchableOpacity>
+                {(() => {
+                  const allPromotions = [...generalPromotions, ...motorbikePromotions];
+                  if (allPromotions.length > 0) {
+                    return (
+                      <>
+                        {/* General promotions (for all motorbikes) */}
+                        {generalPromotions.length > 0 && (
+                          <>
+                            {generalPromotions.map((promo) => (
+                              <TouchableOpacity
+                                key={`general-${promo.id}`}
+                                style={[
+                                  styles.vehicleOption,
+                                  styles.generalPromotionOption,
+                                  orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
+                                ]}
+                                onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
+                              >
+                                <View style={styles.promotionOptionContent}>
+                                  <Text style={[
+                                    styles.vehicleOptionText,
+                                    orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
+                                  ]}>
+                                    {promo.name || `Promotion ${promo.id}`}
+                                  </Text>
+                                  {promo.valueType && promo.value !== undefined && (
+                                    <Text style={styles.promotionValue}>
+                                      {promotionService.formatValue(promo.value, promo.valueType)}
+                                    </Text>
+                                  )}
+                                  <Text style={styles.promotionBadge}>All Motorbikes</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                        {/* Motorbike-specific promotions */}
+                        {motorbikePromotions.length > 0 && (
+                          <>
+                            {motorbikePromotions.map((promo) => (
+                              <TouchableOpacity
+                                key={`motorbike-${promo.id}`}
+                                style={[
+                                  styles.vehicleOption,
+                                  styles.motorbikePromotionOption,
+                                  orderItem.promotionId === String(promo.id) && styles.selectedVehicleOption
+                                ]}
+                                onPress={() => setOrderItem({ ...orderItem, promotionId: String(promo.id) })}
+                              >
+                                <View style={styles.promotionOptionContent}>
+                                  <Text style={[
+                                    styles.vehicleOptionText,
+                                    orderItem.promotionId === String(promo.id) && styles.selectedVehicleOptionText
+                                  ]}>
+                                    {promo.name || `Promotion ${promo.id}`}
+                                  </Text>
+                                  {promo.valueType && promo.value !== undefined && (
+                                    <Text style={styles.promotionValue}>
+                                      {promotionService.formatValue(promo.value, promo.valueType)}
+                                    </Text>
+                                  )}
+                                  <Text style={styles.promotionBadge}>This Motorbike</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    );
+                  } else {
+                    return (
+                      <Text style={styles.noOptionsText}>
+                        {orderItem.motorbikeId 
+                          ? 'No promotions available for this motorbike' 
+                          : 'Select a motorbike to see available promotions'}
+                      </Text>
+                    );
+                  }
+                })()}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.addItemButton}
+              onPress={handleAddItem}
+            >
+              <Plus size={18} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.addItemButtonText}>Add Item</Text>
+            </TouchableOpacity>
+            </View>
+
+            {/* Submit Button */}
+            {orderItemsList.length > 0 && (
+              <TouchableOpacity
+                style={[styles.submitButton, creating && styles.submitButtonDisabled]}
+                onPress={handleCreateOrder}
+                disabled={creating}
+              >
+                {creating ? (
+                  <ActivityIndicator size="small" color={COLORS.TEXT.WHITE} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Create Order ({orderItemsList.length} items)</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        showCancel={alertConfig.showCancel}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: Platform.OS === 'ios' ? SIZES.PADDING.XLARGE : SIZES.PADDING.XXXLARGE + 5,
+    paddingBottom: SIZES.PADDING.MEDIUM,
+    backgroundColor: COLORS.BACKGROUND.PRIMARY,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: SIZES.FONT.XXLARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerActions: {
+    width: 40,
+    alignItems: 'flex-end',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: COLORS.SURFACE,
+    borderTopLeftRadius: SIZES.RADIUS.XXLARGE,
+    borderTopRightRadius: SIZES.RADIUS.XXLARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+    overflow: 'hidden',
+  },
+  contentContainer: {
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  formSection: {
+    padding: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.XXXLARGE,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  inputGroup: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  inputLabel: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.SMALL,
+    fontWeight: '600',
+  },
+  textInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  vehicleSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.PADDING.SMALL,
+  },
+  vehicleOption: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    minWidth: '45%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  selectedVehicleOption: {
+    borderColor: '#009DFF',
+    backgroundColor: 'rgba(0,157,255,0.12)',
+  },
+  vehicleOptionText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  selectedVehicleOptionText: {
+    color: '#009DFF',
+  },
+  noOptionsText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    textAlign: 'center',
+    padding: SIZES.PADDING.MEDIUM,
+    fontStyle: 'italic',
+  },
+  submitButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    alignItems: 'center',
+    marginTop: SIZES.PADDING.LARGE,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  itemsListSection: {
+    marginBottom: SIZES.PADDING.LARGE,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  itemCard: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.MEDIUM,
+    marginBottom: SIZES.PADDING.SMALL,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.PRIMARY,
+  },
+  itemCardContent: {
+    flex: 1,
+  },
+  itemCardTitle: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.PRIMARY,
+    marginBottom: SIZES.PADDING.XSMALL,
+  },
+  itemCardText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: 2,
+  },
+  itemCardLabel: {
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  removeButton: {
+    padding: SIZES.PADDING.SMALL,
+    marginLeft: SIZES.PADDING.SMALL,
+  },
+  addItemSection: {
+    marginBottom: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.MEDIUM,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BORDER.PRIMARY,
+  },
+  addItemButton: {
+    backgroundColor: '#009DFF',
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.PADDING.SMALL,
+    marginTop: SIZES.PADDING.MEDIUM,
+  },
+  addItemButtonText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+  },
+  promotionOptionContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  generalPromotionOption: {
+    borderColor: '#4CAF50',
+    borderWidth: 1.5,
+  },
+  motorbikePromotionOption: {
+    borderColor: '#FF9800',
+    borderWidth: 1.5,
+  },
+  promotionBadge: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  promotionValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#009DFF',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  discountOptionContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  agencyDiscountOption: {
+    borderColor: '#4CAF50',
+    borderWidth: 1.5,
+  },
+  systemDiscountOption: {
+    borderColor: '#FF9800',
+    borderWidth: 1.5,
+  },
+  discountBadge: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 4,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  discountValue: {
+    fontSize: SIZES.FONT.SMALL,
+    color: '#009DFF',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  discountMinQty: {
+    fontSize: SIZES.FONT.XSMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginTop: 2,
+  },
+});
+
+export default CreateOrderRestockScreen;
+

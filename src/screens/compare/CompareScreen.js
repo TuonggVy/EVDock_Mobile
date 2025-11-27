@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,15 @@ import {
   Dimensions,
   SafeAreaView,
   Platform,
-  Alert,
+  ActivityIndicator,
+  Modal,
+  BackHandler,
 } from 'react-native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES } from '../../constants';
 import { formatPrice, getStockStatus } from '../../services/vehicleService';
+import motorbikeService from '../../services/motorbikeService';
+import { Ruler, Settings, Battery, Shield, ArrowLeft, Plus, Search, MoreVertical, Home, Car } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +26,9 @@ const CompareScreen = ({ navigation, route }) => {
   const [compareVehicles, setCompareVehicles] = useState(
     selectedVehicle ? [selectedVehicle] : initialCompareVehicles
   );
+  const [vehicleDetails, setVehicleDetails] = useState({});
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Update compareVehicles when new vehicles are added from catalog
   useEffect(() => {
@@ -29,10 +37,59 @@ const CompareScreen = ({ navigation, route }) => {
     }
   }, [initialCompareVehicles]);
 
-  const handleBack = () => {
-    // Go back to the previous screen in the navigation stack
-    navigation.goBack();
-  };
+  // Load motorbike details for all vehicles
+  useEffect(() => {
+    const loadVehicleDetails = async () => {
+      if (compareVehicles.length === 0) return;
+      
+      setLoadingDetails(true);
+      try {
+        const detailsPromises = compareVehicles.map(async (vehicle) => {
+          const response = await motorbikeService.getMotorbikeById(vehicle.id);
+          if (response.success) {
+            const data = response.data?.data || response.data;
+            return { vehicleId: vehicle.id, details: data };
+          }
+          return { vehicleId: vehicle.id, details: null };
+        });
+        
+        const results = await Promise.all(detailsPromises);
+        const detailsMap = {};
+        results.forEach(({ vehicleId, details }) => {
+          detailsMap[vehicleId] = details;
+        });
+        setVehicleDetails(detailsMap);
+      } catch (error) {
+        console.error('Error loading vehicle details:', error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    
+    loadVehicleDetails();
+  }, [compareVehicles]);
+
+  const handleBack = useCallback(() => {
+    const primaryVehicle = compareVehicles[0] || selectedVehicle;
+    if (primaryVehicle) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 1,
+          routes: [
+            { name: 'Catalog' },
+            { name: 'VehicleDetail', params: { vehicle: primaryVehicle, fromCompare: true } },
+          ],
+        })
+      );
+    } else {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Catalog' }],
+        })
+      );
+    }
+  }, [navigation, compareVehicles, selectedVehicle]);
 
   const handleAddVehicle = () => {
     // Navigate to catalog to select another vehicle
@@ -46,20 +103,40 @@ const CompareScreen = ({ navigation, route }) => {
     setCompareVehicles(prev => prev.filter(v => v.id !== vehicleId));
   };
 
-  const handleClearAll = () => {
-    Alert.alert(
-      'Clear Comparison',
-      'Are you sure you want to clear all vehicles from comparison?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear All', 
-          style: 'destructive',
-          onPress: () => setCompareVehicles([])
-        },
-      ]
+  const handleNavigateEmployeeHome = () => {
+    setShowMenu(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+      })
     );
   };
+
+  const handleNavigateCatalog = () => {
+    setShowMenu(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 1,
+        routes: [
+          { name: 'Main', params: { screen: 'Home' } },
+          { name: 'Catalog' },
+        ],
+      })
+    );
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [handleBack])
+  );
 
   const renderVehicleCard = (vehicle, index) => {
     const stockStatus = getStockStatus(vehicle);
@@ -113,7 +190,7 @@ const CompareScreen = ({ navigation, route }) => {
   const renderAddVehicleCard = () => (
     <TouchableOpacity style={styles.addVehicleCard} onPress={handleAddVehicle}>
       <View style={styles.addIconContainer}>
-        <Text style={styles.addIcon}>+</Text>
+        <Text style={styles.addIcon}><Plus color="#FFFFFF" size={18} /></Text>
       </View>
       <Text style={styles.addText}>Choose a vehicle</Text>
     </TouchableOpacity>
@@ -127,18 +204,47 @@ const CompareScreen = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={handleBack}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.backIcon}><ArrowLeft color="#FFFFFF" size={18} /></Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Compare Vehicles</Text>
-        {compareVehicles.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={handleClearAll}
-          >
-            <Text style={styles.clearText}>Clear All</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setShowMenu(true)}
+        >
+          <MoreVertical color={COLORS.TEXT.WHITE} size={20} />
+        </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleNavigateEmployeeHome}
+            >
+              <Home color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Employee Home</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleNavigateCatalog}
+            >
+              <Car color={COLORS.TEXT.PRIMARY} size={20} />
+              <Text style={styles.menuItemText}>Catalog</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Content */}
       <ScrollView 
@@ -148,7 +254,7 @@ const CompareScreen = ({ navigation, route }) => {
       >
         {compareVehicles.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔍</Text>
+            <Text style={styles.emptyIcon}><Search size={60} color="#009DFF" /></Text>
             <Text style={styles.emptyTitle}>No vehicles to compare</Text>
             <Text style={styles.emptySubtitle}>
               Add vehicles from the catalog to start comparing
@@ -168,73 +274,150 @@ const CompareScreen = ({ navigation, route }) => {
             {/* Comparison Table */}
             {compareVehicles.length > 1 && (
               <View style={styles.comparisonTable}>
-                <Text style={styles.tableTitle}>Detailed Comparison</Text>
-                
-                {/* Specifications Table */}
-                <View style={styles.table}>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableHeader}>Specification</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`header-${index}`} style={styles.tableHeader}>
-                        {vehicle.name}
-                      </Text>
-                    ))}
+                {loadingDetails ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#009DFF" />
+                    <Text style={styles.loadingText}>Loading specifications...</Text>
                   </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Price</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`price-${index}`} style={styles.tableValue}>
-                        {formatPrice(vehicle.price, vehicle.currency)}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Battery</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`battery-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.battery || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Motor</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`motor-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.motor || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Range</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`range-${index}`} style={styles.tableValue}>
-                        {vehicle.features?.find(f => f.includes('km range')) || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Weight</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`weight-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.weight || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Max Load</Text>
-                    {compareVehicles.map((vehicle, index) => (
-                      <Text key={`maxload-${index}`} style={styles.tableValue}>
-                        {vehicle.specifications?.maxLoad || 'N/A'}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
+                ) : (
+                  <>
+                    <Text style={styles.tableTitle}>Detailed Comparison</Text>
+                    
+                    {/* Specifications Table */}
+                    <View style={styles.table}>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableHeader}>Specification</Text>
+                        {compareVehicles.map((vehicle, index) => (
+                          <Text key={`header-${index}`} style={styles.tableHeader}>
+                            {vehicle.name}
+                          </Text>
+                        ))}
+                      </View>
+                      
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Price</Text>
+                        {compareVehicles.map((vehicle, index) => (
+                          <Text key={`price-${index}`} style={styles.tableValue}>
+                            {formatPrice(vehicle.price, vehicle.currency)}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Appearance Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.appearance) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Ruler size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Appearance</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['length', 'width', 'height', 'weight', 'undercarriageDistance', 'storageLimit'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.appearance?.[key];
+                                const displayValue = key.includes('Distance') || key.includes('Limit') ? `${value} mm` : 
+                                                    key === 'weight' ? `${value} kg` : 
+                                                    key === 'storageLimit' ? `${value} L` : 
+                                                    `${value}`;
+                                return (
+                                  <Text key={`appearance-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? displayValue : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Configuration Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.configuration) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Settings size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Configuration</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['motorType', 'speedLimit', 'maximumCapacity'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.configuration?.[key];
+                                const displayValue = key.includes('Capacity') ? `${value} people` : `${value}`;
+                                return (
+                                  <Text key={`config-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? displayValue : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Battery Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.battery) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Battery size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Battery</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['type', 'capacity', 'chargeTime', 'chargeType', 'energyConsumption', 'limit'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key === 'limit' ? 'Range Limit' : key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.battery?.[key];
+                                return (
+                                  <Text key={`battery-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? value : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Safe Feature Section */}
+                    {compareVehicles.some(v => vehicleDetails[v.id]?.safeFeature) && (
+                      <View style={styles.sectionContainer}>
+                        <View style={styles.sectionHeader}>
+                          <Shield size={18} color={COLORS.TEXT.WHITE} />
+                          <Text style={styles.sectionTitle}>Safe Features</Text>
+                        </View>
+                        <View style={styles.table}>
+                          {['brake', 'lock'].map((key) => (
+                            <View key={key} style={styles.tableRow}>
+                              <Text style={styles.tableLabel}>
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              </Text>
+                              {compareVehicles.map((vehicle) => {
+                                const value = vehicleDetails[vehicle.id]?.safeFeature?.[key];
+                                return (
+                                  <Text key={`safe-${key}-${vehicle.id}`} style={styles.tableValue}>
+                                    {value !== undefined ? value : 'N/A'}
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -280,14 +463,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.TEXT.WHITE,
   },
-  clearButton: {
-    paddingHorizontal: SIZES.PADDING.SMALL,
-    paddingVertical: 4,
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: SIZES.RADIUS.ROUND,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.ERROR,
-    fontWeight: '600',
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: SIZES.PADDING.XXXLARGE + 60,
+    paddingRight: SIZES.PADDING.LARGE,
+  },
+  menuContainer: {
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.LARGE,
+    paddingVertical: SIZES.PADDING.XSMALL,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingVertical: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
+  },
+  menuItemText: {
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.PRIMARY,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.PRIMARY,
+    marginHorizontal: SIZES.PADDING.SMALL,
   },
 
   // Scroll View
@@ -321,7 +539,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.PADDING.LARGE,
   },
   browseButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     paddingHorizontal: SIZES.PADDING.LARGE,
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderRadius: SIZES.RADIUS.MEDIUM,
@@ -406,7 +624,7 @@ const styles = StyleSheet.create({
   vehiclePrice: {
     fontSize: SIZES.FONT.MEDIUM,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SECONDARY,
     marginBottom: 4,
   },
   stockRow: {
@@ -514,6 +732,30 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.WHITE,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.PADDING.LARGE,
+  },
+  loadingText: {
+    marginTop: SIZES.PADDING.MEDIUM,
+    fontSize: SIZES.FONT.MEDIUM,
+    color: COLORS.TEXT.SECONDARY,
+  },
+  sectionContainer: {
+    marginTop: SIZES.PADDING.LARGE,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  sectionTitle: {
+    fontSize: SIZES.FONT.LARGE,
+    fontWeight: 'bold',
+    color: COLORS.TEXT.WHITE,
+    marginLeft: SIZES.PADDING.SMALL,
   },
 });
 

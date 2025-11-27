@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,78 +6,178 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  UserCircle, 
+  Building, 
+  Building2, 
+  Briefcase, 
+  Calendar,
+  Settings,
+  Bell,
+  Lock,
+  HelpCircle,
+  Camera,
+  ArrowLeft,
+  ChevronRight,
+  LogOut
+} from 'lucide-react-native';
+import { getProfile } from '../../services/api/authApi';
 
 const { width } = Dimensions.get('window');
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { alertConfig, hideAlert, showConfirm, showInfo } = useCustomAlert();
+  const [profileData, setProfileData] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const showInfoRef = useRef(showInfo);
+
+  useEffect(() => {
+    showInfoRef.current = showInfo;
+  }, [showInfo]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    let isActive = true;
+
+    const fetchProfile = async () => {
+      setIsProfileLoading(true);
+      try {
+        const response = await getProfile(user.id);
+        const profile = response?.data ?? response;
+        if (isActive) {
+          setProfileData(profile || null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error.response?.data || error.message);
+        if (isActive) {
+          const message =
+            error.response?.data?.message || "Unable to load profile information.";
+          showInfoRef.current("Error", message);
+        }
+      } finally {
+        if (isActive) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id]);
 
   const handleLogout = () => {
     showConfirm(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
+      'Logout',
+      'Are you sure you want to logout?',
       logout
     );
   };
 
   const getRoleDisplayName = (role) => {
     switch (role) {
-      case 'customer': return 'Khách hàng';
-      case 'employee': return 'Nhân viên đại lý';
-      case 'evm_admin': return 'Quản trị viên EVM';
-      case 'evm_staff': return 'Nhân viên EVM';
-      case 'manager': return 'Quản lý đại lý';
-      default: return 'Người dùng';
+      case 'customer': return 'Customer';
+      case 'employee': return 'Dealer Staff';
+      case 'evm_admin': return 'EVM Admin';
+      case 'evm_staff': return 'EVM Staff';
+      case 'manager': return 'Dealer Manager';
+      default: return 'User';
     }
   };
 
+  const getInfoIcon = (iconName) => {
+    const iconProps = { size: 20, color: COLORS.TEXT.PRIMARY };
+    switch (iconName) {
+      case 'user': return <User {...iconProps} />;
+      case 'mail': return <Mail {...iconProps} />;
+      case 'phone': return <Phone {...iconProps} />;
+      case 'role': return <UserCircle {...iconProps} />;
+      case 'building': return <Building {...iconProps} />;
+      case 'department': return <Building2 {...iconProps} />;
+      case 'briefcase': return <Briefcase {...iconProps} />;
+      case 'calendar': return <Calendar {...iconProps} />;
+      case 'settings': return <Settings {...iconProps} />;
+      case 'bell': return <Bell {...iconProps} />;
+      case 'lock': return <Lock {...iconProps} />;
+      case 'help': return <HelpCircle {...iconProps} />;
+      default: return null;
+    }
+  };
+
+  const formatDate = (value) => {
+    if (!value) return 'Not updated';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  };
+
+  const displayName = profileData?.fullname || user?.name || user?.username || 'User';
+  const displayUsername = profileData?.username || user?.username || 'Not updated';
+  const displayEmail = profileData?.email || user?.email || 'email@example.com';
+  const displayPhone = profileData?.phone || user?.phone || 'Not updated';
+  const displayRole = getRoleDisplayName(user?.role);
+  const displayAgency = profileData?.agencyId != null
+    ? String(profileData.agencyId)
+    : user?.dealerName || user?.company || (user?.agencyId != null ? String(user.agencyId) : 'Not updated');
+  const displayAddress = profileData?.address || 'Not updated';
+  const displayStartDate = formatDate(profileData?.createAt || user?.startDate);
+  const avatarLetter = displayName ? displayName.charAt(0).toUpperCase() : 'U';
+
   const profileSections = [
     {
-      title: 'Thông tin cá nhân',
+      title: 'Personal Information',
       items: [
-        { label: 'Họ tên', value: user?.name || 'Chưa cập nhật', icon: '👤' },
-        { label: 'Email', value: user?.email || 'Chưa cập nhật', icon: '📧' },
-        { label: 'Số điện thoại', value: user?.phone || 'Chưa cập nhật', icon: '📱' },
-        { label: 'Vai trò', value: getRoleDisplayName(user?.role), icon: '🎭' },
+        { label: 'Full Name', value: displayName || 'Not updated', iconName: 'user' },
+        { label: 'Username', value: displayUsername, iconName: 'user' },
+        { label: 'Email', value: displayEmail || 'Not updated', iconName: 'mail' },
+        { label: 'Phone', value: displayPhone, iconName: 'phone' },
+        { label: 'Role', value: displayRole || 'User', iconName: 'role' },
       ],
     },
     {
-      title: 'Thông tin công việc',
+      title: 'Work Information',
       items: [
-        { label: 'Công ty/Đại lý', value: user?.dealerName || user?.company || 'Chưa cập nhật', icon: '🏢' },
-        { label: 'Phòng ban', value: user?.department || 'Chưa cập nhật', icon: '🏛️' },
-        { label: 'Chức vụ', value: user?.position || 'Chưa cập nhật', icon: '💼' },
-        { label: 'Ngày bắt đầu', value: user?.startDate || 'Chưa cập nhật', icon: '📅' },
+        { label: 'Agency ID', value: displayAgency || 'Not updated', iconName: 'building' },
+        { label: 'Address', value: displayAddress, iconName: 'department' },
+        { label: 'Account Created', value: displayStartDate, iconName: 'calendar' },
       ],
     },
   ];
 
   const menuItems = [
     {
-      title: 'Cài đặt tài khoản',
-      icon: '⚙️',
-      onPress: () => showInfo('Tính năng', 'Cài đặt tài khoản - Sắp ra mắt'),
+      title: 'Account Settings',
+      iconName: 'settings',
+      onPress: () => showInfo('Feature', 'Account Settings - Coming Soon'),
     },
     {
-      title: 'Thông báo',
-      icon: '🔔',
-      onPress: () => showInfo('Tính năng', 'Thông báo - Sắp ra mắt'),
+      title: 'Notifications',
+      iconName: 'bell',
+      onPress: () => showInfo('Feature', 'Notifications - Coming Soon'),
     },
     {
-      title: 'Bảo mật',
-      icon: '🔒',
-      onPress: () => showInfo('Tính năng', 'Bảo mật - Sắp ra mắt'),
+      title: 'Security',
+      iconName: 'lock',
+      onPress: () => showInfo('Feature', 'Security - Coming Soon'),
     },
     {
-      title: 'Trợ giúp & Hỗ trợ',
-      icon: '❓',
-      onPress: () => showInfo('Tính năng', 'Trợ giúp - Sắp ra mắt'),
+      title: 'Help & Support',
+      iconName: 'help',
+      onPress: () => showInfo('Feature', 'Help - Coming Soon'),
     },
   ];
 
@@ -87,11 +187,11 @@ const ProfileScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
-            <Text style={styles.headerSubtitle}>Quản lý thông tin tài khoản</Text>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.headerSubtitle}>Manage your account information</Text>
           </View>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
+            <ArrowLeft size={24} color={COLORS.TEXT.WHITE} />
           </TouchableOpacity>
         </View>
       </View>
@@ -102,17 +202,24 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                {avatarLetter}
               </Text>
             </View>
             <TouchableOpacity style={styles.editAvatarButton}>
-              <Text style={styles.editAvatarIcon}>📷</Text>
+              <Camera size={14} color={COLORS.TEXT.WHITE} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.name || 'Người dùng'}</Text>
-          <Text style={styles.userRole}>{getRoleDisplayName(user?.role)}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
+          <Text style={styles.userName}>{displayName}</Text>
+          <Text style={styles.userRole}>{displayRole}</Text>
+          <Text style={styles.userEmail}>{displayEmail}</Text>
         </View>
+
+        {isProfileLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        )}
 
         {/* Profile Sections */}
         {profileSections.map((section, sectionIndex) => (
@@ -122,7 +229,9 @@ const ProfileScreen = ({ navigation }) => {
               {section.items.map((item, itemIndex) => (
                 <View key={itemIndex} style={styles.infoItem}>
                   <View style={styles.infoLeft}>
-                    <Text style={styles.infoIcon}>{item.icon}</Text>
+                    <View style={{ marginRight: SIZES.PADDING.MEDIUM }}>
+                      {getInfoIcon(item.iconName)}
+                    </View>
                     <Text style={styles.infoLabel}>{item.label}</Text>
                   </View>
                   <Text style={styles.infoValue}>{item.value}</Text>
@@ -132,39 +241,15 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         ))}
 
-        {/* Menu Items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài đặt & Tùy chọn</Text>
-          <View style={styles.sectionCard}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItem}
-                onPress={item.onPress}
-              >
-                <View style={styles.menuLeft}>
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
-                  <Text style={styles.menuTitle}>{item.title}</Text>
-                </View>
-                <Text style={styles.menuArrow}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Logout Button */}
         <View style={styles.logoutSection}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutIcon}>🚪</Text>
-            <Text style={styles.logoutText}>Đăng xuất</Text>
+            <LogOut size={20} color={COLORS.TEXT.WHITE} />
+            <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>EVDock Mobile</Text>
-          <Text style={styles.appVersion}>Phiên bản 1.0.0</Text>
-        </View>
+       
       </ScrollView>
 
       <CustomAlert
@@ -216,10 +301,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-  },
   content: {
     flex: 1,
     paddingHorizontal: SIZES.PADDING.LARGE,
@@ -244,7 +325,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: "#009DFF",
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -265,9 +346,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: COLORS.SURFACE,
-  },
-  editAvatarIcon: {
-    fontSize: SIZES.FONT.SMALL,
   },
   userName: {
     fontSize: SIZES.FONT.XXLARGE,
@@ -310,16 +388,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SIZES.PADDING.MEDIUM,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.BACKGROUND.PRIMARY,
+    borderBottomColor: COLORS.BORDER.PRIMARY,
   },
   infoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  infoIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    marginRight: SIZES.PADDING.MEDIUM,
   },
   infoLabel: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -332,37 +406,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
   },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SIZES.PADDING.MEDIUM,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BACKGROUND.PRIMARY,
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    marginRight: SIZES.PADDING.MEDIUM,
-  },
-  menuTitle: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-    flex: 1,
-  },
-  menuArrow: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.SECONDARY,
-  },
   logoutSection: {
     marginBottom: SIZES.PADDING.LARGE,
   },
   logoutButton: {
-    backgroundColor: COLORS.ERROR,
+    backgroundColor: "#009DFF",
     borderRadius: SIZES.RADIUS.LARGE,
     padding: SIZES.PADDING.MEDIUM,
     flexDirection: 'row',
@@ -373,10 +421,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  logoutIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    marginRight: SIZES.PADDING.SMALL,
   },
   logoutText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -396,6 +440,17 @@ const styles = StyleSheet.create({
   appVersion: {
     fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SIZES.PADDING.MEDIUM,
+  },
+  loadingText: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
+    marginLeft: SIZES.PADDING.XSMALL,
   },
 });
 

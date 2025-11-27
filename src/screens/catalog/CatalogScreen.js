@@ -13,16 +13,40 @@ import {
   FlatList,
   RefreshControl,
   Platform,
+  ScrollView,
+  BackHandler,
 } from 'react-native';
-import { COLORS, SIZES } from '../../constants';
-import { vehicleService, formatPrice, getStockStatus } from '../../services/vehicleService';
+import { COLORS, SIZES, USER_ROLES } from '../../constants';
+import { formatPrice, getStockStatus } from '../../services/vehicleService';
 import { dealerCatalogStorageService } from '../../services/storage/dealerCatalogStorageService';
+import { useAuth } from '../../contexts/AuthContext';
+import agencyStockService from '../../services/agencyStockService';
+import motorbikeService from '../../services/motorbikeService';
+import { ArrowLeft, Search, Sparkles, Car } from 'lucide-react-native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 const GAP = 12;
-const H_PADDING = 20;           // ← chỉ dùng chỗ này để căn 2 bên cho toàn bộ list
+const H_PADDING = SIZES.PADDING.LARGE;
 const NUM_COLS = 2;
 const CARD_WIDTH = (width - H_PADDING * 2 - GAP) / NUM_COLS;
+const PLACEHOLDER_IMAGE_URL = 'https://static.vecteezy.com/system/resources/previews/048/092/168/non_2x/gallery-icon-sign-isolated-on-white-free-vector.jpg';
+
+// Icon mapping for version chips
+const getVersionIcon = (iconName) => {
+  let IconComponent = null;
+  if (iconName === 'car') IconComponent = Car;
+  else if (iconName === 'sparkles') IconComponent = Sparkles;
+  
+  if (IconComponent) {
+    return (
+      <View style={{ marginRight: 6 }}>
+        <IconComponent size={12} color={COLORS.TEXT.WHITE} />
+      </View>
+    );
+  }
+  return null;
+};
 
 /** ===== Helpers to avoid duplicate keys ===== */
 const safeKey = (id, fallbackIndex) => {
@@ -44,40 +68,52 @@ const normalizeVersions = (arr = []) => {
       cleaned.push({ ...v, id });
     }
   }
-  return [{ id: 'all', name: 'All Versions', icon: '🚗' }, ...cleaned];
+  return [{ id: 'all', name: 'All Versions', icon: 'car' }, ...cleaned];
 };
 /** ========================================= */
 
 const CatalogScreen = ({ navigation, route }) => {
   const { mode, currentCompareVehicles = [] } = route.params || {};
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVersion, setSelectedVersion] = useState('all');
   const [vehicles, setVehicles] = useState([]);
+  const [availableVehicles, setAvailableVehicles] = useState([]); // Vehicles with stock
+  const [preorderVehicles, setPreorderVehicles] = useState([]); // Vehicles without stock
   const [versions, setVersions] = useState([
-    { id: 'all', name: 'All Versions', icon: '🚗' }, // fallback ban đầu
+    { id: 'all', name: 'All Versions', icon: 'car' }, // fallback ban đầu
   ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!loading) loadVehicles();
-  }, [searchQuery, selectedVersion]);
+  }, [searchQuery, selectedVersion, loading]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      // Prefer dealer catalog storage (new retail flow). Fallback to vehicleService.
-      const [catalog, versionsFromCatalog] = await Promise.all([
-        dealerCatalogStorageService.filterVehicles({ version: 'all', search: '' }),
-        dealerCatalogStorageService.getVersions(),
-      ]);
+      
+      // For Dealer Staff and Dealer Manager with agencyId, load from stock API
+      if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
+        await loadCatalogFromStockAPI();
+      } else {
+        // Fallback to dealer catalog storage for other roles
+        const [catalog, versionsFromCatalog] = await Promise.all([
+          dealerCatalogStorageService.filterVehicles({ version: 'all', search: '' }),
+          dealerCatalogStorageService.getVersions(),
+        ]);
 
-      setVehicles(uniqueById((catalog?.data) || []));
-      setVersions(normalizeVersions(versionsFromCatalog));
+        const catalogVehicles = uniqueById((catalog?.data) || []);
+        setAvailableVehicles(catalogVehicles);
+        setPreorderVehicles([]); // For non-Dealer Staff, no pre-order tab
+        setVehicles(catalogVehicles);
+        setVersions(normalizeVersions(versionsFromCatalog));
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to load vehicle data');
@@ -86,14 +122,150 @@ const CatalogScreen = ({ navigation, route }) => {
     }
   };
 
+  const loadCatalogFromStockAPI = async () => {
+    try {
+      if (!user?.agencyId) {
+        console.log('No agencyId available');
+        return;
+      }
+
+      const agencyId = parseInt(user.agencyId);
+      
+      // Fetch stocks and motorbikes
+      const [stocksResponse, motorbikesResponse] = await Promise.all([
+        agencyStockService.getAgencyStocks(agencyId, { page: 1, limit: 1000 }),
+        motorbikeService.getAllMotorbikes({ limit: 1000 })
+      ]);
+
+      if (!stocksResponse.success || !motorbikesResponse.success) {
+        console.error('Failed to load data');
+        return;
+      }
+
+      const stocks = stocksResponse.data || [];
+      const motorbikes = motorbikesResponse.data || [];
+
+      // Get set of motorbike IDs that have stock
+      const motorbikesWithStock = new Set();
+      stocks.forEach(stock => {
+        if (stock.motorbikeId) {
+          motorbikesWithStock.add(stock.motorbikeId);
+        }
+      });
+
+      // Group stocks by motorbike and aggregate quantities (for Available tab)
+      const motorbikeMap = new Map();
+      
+      stocks.forEach(stock => {
+        const motorbikeId = stock.motorbikeId;
+        if (!motorbikeId) return;
+
+        const motorbike = motorbikes.find(m => m.id === motorbikeId);
+        if (!motorbike) return;
+
+        if (!motorbikeMap.has(motorbikeId)) {
+          motorbikeMap.set(motorbikeId, {
+            id: motorbike.id,
+            name: motorbike.name,
+            model: motorbike.model || motorbike.name,
+            version: motorbike.version || 'N/A',
+            price: stock.price || motorbike.price || 0, // Prioritize stock price over motorbike price
+            currency: 'VND',
+            image: motorbike.images?.[0]?.imageUrl || null,
+            stockCount: 0,
+            quantity: 0, // total quantity across all colors
+            colorStocks: {},
+            inStock: false,
+          });
+        }
+
+        const vehicle = motorbikeMap.get(motorbikeId);
+        const quantity = stock.quantity || 0;
+        vehicle.quantity += quantity;
+        vehicle.stockCount += quantity;
+        
+        // Track color stocks if color info is available
+        if (stock.colorId) {
+          // We'll fetch color details if needed, for now just track by colorId
+          vehicle.colorStocks[stock.colorId] = (vehicle.colorStocks[stock.colorId] || 0) + quantity;
+        }
+      });
+
+      // Convert map to array and set inStock flag (Available vehicles)
+      const availableCatalogVehicles = Array.from(motorbikeMap.values()).map(vehicle => ({
+        ...vehicle,
+        inStock: vehicle.quantity > 0,
+      }));
+
+      // Create Pre-order vehicles (motorbikes without stock)
+      const preorderCatalogVehicles = motorbikes
+        .filter(motorbike => !motorbikesWithStock.has(motorbike.id))
+        .map(motorbike => ({
+          id: motorbike.id,
+          name: motorbike.name,
+          model: motorbike.model || motorbike.name,
+          version: motorbike.version || 'N/A',
+          price: motorbike.price || 0,
+          currency: 'VND',
+          image: motorbike.images?.[0]?.imageUrl || null,
+          stockCount: 0,
+          quantity: 0,
+          colorStocks: {},
+          inStock: false,
+        }));
+
+      // Combine versions from both available and preorder vehicles
+      const versionSet = new Set();
+      [...availableCatalogVehicles, ...preorderCatalogVehicles].forEach(v => {
+        if (v.version && v.version !== 'N/A') {
+          versionSet.add(String(v.version));
+        }
+      });
+      
+      const versionsList = Array.from(versionSet).map(ver => ({ 
+        id: ver, 
+        name: ver, 
+        icon: 'sparkles' 
+      }));
+
+      const uniqueAvailable = uniqueById(availableCatalogVehicles);
+      const uniquePreorder = uniqueById(preorderCatalogVehicles);
+      
+      setAvailableVehicles(uniqueAvailable);
+      setPreorderVehicles(uniquePreorder);
+      
+      // Combine all vehicles (available + preorder) into one list
+      const allVehicles = [...uniqueAvailable, ...uniquePreorder];
+      setVehicles(allVehicles);
+      
+      setVersions(normalizeVersions(versionsList));
+    } catch (error) {
+      console.error('Error loading catalog from stock API:', error);
+      Alert.alert('Error', 'Failed to load catalog data');
+    }
+  };
+
   const loadVehicles = async () => {
     try {
       setRefreshing(true);
-      const res = await dealerCatalogStorageService.filterVehicles({
-        version: selectedVersion,
-        search: searchQuery,
-      });
-      if (res?.success) setVehicles(uniqueById(res.data));
+      
+      // For Dealer Staff and Dealer Manager with agencyId, combine available and preorder vehicles
+      if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
+        // For Dealer Staff, combine available and preorder vehicles
+        const allVehicles = [...availableVehicles, ...preorderVehicles];
+        setVehicles(allVehicles);
+      } else {
+        // Fallback to dealer catalog storage for other roles
+        const res = await dealerCatalogStorageService.filterVehicles({
+          version: selectedVersion,
+          search: searchQuery,
+        });
+        if (res?.success) {
+          const catalogVehicles = uniqueById(res.data);
+          setAvailableVehicles(catalogVehicles);
+          setVehicles(catalogVehicles);
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -104,6 +276,14 @@ const CatalogScreen = ({ navigation, route }) => {
   const onRefresh = useCallback(() => {
     loadData();
   }, []);
+
+  // Update vehicles when available/preorder lists change
+  useEffect(() => {
+    if ((user?.role === USER_ROLES.DEALER_STAFF || user?.role === USER_ROLES.DEALER_MANAGER) && user?.agencyId) {
+      const allVehicles = [...availableVehicles, ...preorderVehicles];
+      setVehicles(allVehicles);
+    }
+  }, [availableVehicles, preorderVehicles, user]);
 
   const filteredVehicles = useMemo(() => {
     const q = (searchQuery || '').toLowerCase();
@@ -132,6 +312,15 @@ const CatalogScreen = ({ navigation, route }) => {
   const renderVehicleCard = ({ item: vehicle }) => {
     const stockStatus = getStockStatus(vehicle);
     const isAlreadySelected = mode === 'compare' && currentCompareVehicles.some(v => v.id === vehicle.id);
+    const isPreorder = !vehicle.inStock && vehicle.quantity === 0;
+    
+    // Determine image source: use placeholder for preorder vehicles without image
+    const getImageSource = () => {
+      if (isPreorder && (!vehicle.image || vehicle.image === null || vehicle.image === '')) {
+        return { uri: PLACEHOLDER_IMAGE_URL };
+      }
+      return typeof vehicle.image === 'string' ? { uri: vehicle.image } : vehicle.image;
+    };
     
     return (
       <TouchableOpacity
@@ -145,13 +334,18 @@ const CatalogScreen = ({ navigation, route }) => {
       >
         <View style={styles.imageWrap}>
           <Image
-            source={typeof vehicle.image === 'string' ? { uri: vehicle.image } : vehicle.image}
+            source={getImageSource()}
             style={styles.cardImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
-          {!vehicle.inStock && (
+          {!vehicle.inStock && vehicle.quantity > 0 && (
             <View style={styles.outOfStockOverlay}>
               <Text style={styles.outOfStockText}>Out of Stock</Text>
+            </View>
+          )}
+          {isPreorder && (
+            <View style={styles.preorderOverlay}>
+              <Text style={styles.preorderText}>Pre-order</Text>
             </View>
           )}
           {isAlreadySelected && (
@@ -178,17 +372,38 @@ const CatalogScreen = ({ navigation, route }) => {
   const keyExtractorVehicle = useCallback((item, index) => `veh-${safeKey(item.id, index)}`, []);
   const keyExtractorVersion = useCallback((v, index) => `ver-${safeKey(v.id, index)}`, []);
 
+  const handleBackToHome = useCallback(() => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Home' } }],
+      })
+    );
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBackToHome();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [handleBackToHome])
+  );
+
 
   const ListEmpty = (
     <View style={styles.emptyWrap}>
       {loading ? (
         <>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+          <ActivityIndicator size="large" color="#009DFF" />
           <Text style={styles.loadingText}>Loading vehicles...</Text>
         </>
       ) : (
         <>
-          <Text style={styles.emptyIcon}>🚗</Text>
+          <Car size={64} color={COLORS.TEXT.SECONDARY} />
           <Text style={styles.emptyTitle}>No vehicles found</Text>
           <Text style={styles.emptySubtitle}>
             Try adjusting your search or filter criteria
@@ -200,39 +415,35 @@ const CatalogScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Fixed Header Section */}
-      <View style={styles.fixedHeader}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Vehicle Catalog</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleBackToHome}>
+          <ArrowLeft size={18} color={COLORS.TEXT.WHITE} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Vehicle Catalog</Text>
+        <View style={styles.headerPlaceholder} />
+      </View>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search vehicles..."
-            placeholderTextColor={COLORS.TEXT.SECONDARY}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-          />
-        </View>
+      <View style={styles.searchContainer}>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search vehicles..."
+          placeholderTextColor={COLORS.TEXT.SECONDARY}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+      </View>
 
-        {/* Filter chips */}
-        <FlatList
+      <View style={styles.versionWrapper}>
+        <ScrollView
           horizontal
-          data={versions}
-          keyExtractor={keyExtractorVersion}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.versionContent}
-          style={styles.versionContainer}
-          renderItem={({ item: version }) => (
+        >
+          {versions.map((version, index) => (
             <TouchableOpacity
+              key={keyExtractorVersion(version, index)}
               onPress={() => setSelectedVersion(version.id)}
               activeOpacity={0.9}
               style={[
@@ -240,7 +451,7 @@ const CatalogScreen = ({ navigation, route }) => {
                 selectedVersion === version.id && styles.versionChipActive,
               ]}
             >
-              {!!version.icon && <Text style={styles.versionChipIcon}>{version.icon}</Text>}
+              {!!version.icon && getVersionIcon(version.icon)}
               <Text
                 numberOfLines={1}
                 style={[
@@ -251,18 +462,16 @@ const CatalogScreen = ({ navigation, route }) => {
                 {version.name}
               </Text>
             </TouchableOpacity>
-          )}
-        />
-
-        {/* Results count */}
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsText}>
-            {filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} found
-          </Text>
-        </View>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Scrollable Content */}
+      <View style={styles.resultsContainer}>
+        <Text style={styles.resultsText}>
+          {filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} found
+        </Text>
+      </View>
+
       <FlatList
         data={filteredVehicles}
         keyExtractor={keyExtractorVehicle}
@@ -286,65 +495,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingTop: 20
   },
 
-  // Fixed Header Section
-  fixedHeader: {
-    backgroundColor: COLORS.BACKGROUND.PRIMARY,
-    paddingHorizontal: H_PADDING,
-    paddingBottom: SIZES.PADDING.SMALL,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-
-  // ======= Header =======
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: SIZES.PADDING.LARGE,
     paddingTop: SIZES.PADDING.MEDIUM,
-    // KHÔNG paddingHorizontal ở đây
     paddingBottom: SIZES.PADDING.MEDIUM,
+    marginTop: SIZES.PADDING.MEDIUM,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  backButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.TEXT.WHITE,
+    paddingHorizontal: SIZES.PADDING.SMALL,
+  },
+  headerPlaceholder: {
+    width: 40,
+    height: 40,
   },
 
-  // ======= Search =======
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingVertical: SIZES.PADDING.SMALL,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.SMALL,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 0,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
@@ -352,57 +551,82 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
 
-  // ======= Versions (compact chips) =======
-  versionContainer: {
-    maxHeight: 44, // KHÔNG padding/margin ngang
-    marginTop: 6,
+  // Tab styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.SURFACE,
+    borderRadius: SIZES.RADIUS.MEDIUM,
+    padding: SIZES.PADDING.XSMALL,
+    marginHorizontal: SIZES.PADDING.LARGE,
+    marginTop: SIZES.PADDING.MEDIUM,
+    gap: SIZES.PADDING.XSMALL,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SIZES.PADDING.SMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  activeTabButton: {
+    backgroundColor: '#009DFF',
+  },
+  tabText: {
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+  },
+  activeTabText: {
+    color: COLORS.TEXT.WHITE,
+  },
+
+  versionWrapper: {
+    marginTop: SIZES.PADDING.MEDIUM,
   },
   versionContent: {
-    paddingHorizontal: 0, // ăn theo listContent
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingBottom: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   versionChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SIZES.PADDING.XSMALL,
+    paddingHorizontal: SIZES.PADDING.MEDIUM,
+    borderRadius: SIZES.RADIUS.SMALL,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    minWidth: 120,
     height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginRight: 6,
   },
   versionChipActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: 'transparent',
-  },
-  versionChipIcon: {
-    fontSize: 12,
-    marginRight: 6,
+    backgroundColor: '#009DFF',
   },
   versionChipText: {
-    fontSize: 12,
-    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
     fontWeight: '600',
-    maxWidth: 120,
+    maxWidth: 140,
   },
   versionChipTextActive: {
     color: COLORS.TEXT.WHITE,
   },
 
-  // ======= Results =======
   resultsContainer: {
-    marginTop: 6,
-    marginBottom: 10,
+    marginTop: SIZES.PADDING.SMALL,
+    marginBottom: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
   },
   resultsText: {
-    fontSize: 12,
+    fontSize: SIZES.FONT.SMALL,
     color: COLORS.TEXT.SECONDARY,
   },
 
-  // ======= List/Grid =======
   listContent: {
-    paddingHorizontal: H_PADDING,
-    paddingTop: SIZES.PADDING.MEDIUM,
+    paddingHorizontal: SIZES.PADDING.LARGE,
+    paddingTop: SIZES.PADDING.SMALL,
     paddingBottom: SIZES.PADDING.XXXLARGE,
   },
   columnWrapper: {
@@ -427,7 +651,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     height: 120,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
   },
   cardImage: {
@@ -441,6 +665,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outOfStockText: {
+    color: COLORS.TEXT.WHITE,
+    fontSize: SIZES.FONT.SMALL,
+    fontWeight: '700',
+  },
+  
+  preorderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preorderText: {
     color: COLORS.TEXT.WHITE,
     fontSize: SIZES.FONT.SMALL,
     fontWeight: '700',
@@ -473,7 +709,7 @@ const styles = StyleSheet.create({
   cardPrice: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SECONDARY,
     marginBottom: 6,
   },
   stockRow: {

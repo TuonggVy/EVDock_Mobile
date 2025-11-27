@@ -1,0 +1,494 @@
+import { API_BASE_URL, API_ENDPOINTS, getHeaders } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ * Agency Service
+ * Handles all agency-related API calls
+ */
+const agencyService = {
+  /**
+   * Get auth token from storage
+   */
+  async getAuthTokenAsync() {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get list of agencies for customer
+   * @param {Object} params - Query parameters (limit, page, location, address)
+   * @returns {Promise<Object>} Response with data array and paginationInfo
+   */
+  async getAgenciesForCustomer(params = {}) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}/agency/list/customer`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Build query string from params
+      const queryParams = new URLSearchParams();
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.page) queryParams.append('page', params.page);
+      if (params.location) queryParams.append('location', params.location);
+      if (params.address) queryParams.append('address', params.address);
+      
+      const queryString = queryParams.toString();
+      const fullUrl = queryString ? `${url}?${queryString}` : url;
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: [],
+          paginationInfo: null,
+        };
+      }
+
+      // Handle response structure: { statusCode, message, data: [...], paginationInfo: {...} }
+      const agenciesData = data.data || [];
+      const paginationInfo = data.paginationInfo || null;
+
+      return {
+        success: true,
+        data: agenciesData,
+        paginationInfo: paginationInfo,
+        message: data.message || 'Agencies loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching agencies for customer:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch agencies',
+        data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
+   * Get list of agencies
+   * @param {Object} params - Query parameters (limit, page, location, address, sort, fetchAll)
+   * @param {boolean} params.fetchAll - If true, automatically fetch all pages. Default: true
+   * @returns {Promise<Object>} Response with data array and paginationInfo
+   */
+  async getAgencies(params = {}) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const baseUrl = `${API_BASE_URL}/agency/list`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // If fetchAll is true (default) or not specified, fetch all pages
+      const fetchAll = params.fetchAll !== false; // Default to true
+      
+      if (fetchAll && !params.page) {
+        // Fetch all pages automatically
+        return await this._fetchAllAgencies(params, token, headers);
+      }
+
+      // Build query string from params
+      const queryParams = new URLSearchParams();
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.page) queryParams.append('page', params.page);
+      if (params.location) queryParams.append('location', params.location);
+      if (params.address) queryParams.append('address', params.address);
+      if (params.sort) queryParams.append('sort', params.sort);
+      
+      const queryString = queryParams.toString();
+      const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: [],
+          paginationInfo: null,
+        };
+      }
+
+      // Handle response structure: { statusCode, message, data: [...], paginationInfo: {...} }
+      const agenciesData = data.data || [];
+      const paginationInfo = data.paginationInfo || null;
+
+      return {
+        success: true,
+        data: agenciesData,
+        paginationInfo: paginationInfo,
+        message: data.message || 'Agencies loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching agencies:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch agencies',
+        data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
+   * Helper method to fetch all pages of agencies
+   * @private
+   */
+  async _fetchAllAgencies(params, token, headers) {
+    try {
+      const allAgencies = [];
+      let currentPage = 1;
+      let totalPages = null;
+      const limit = params.limit || 100; // Use provided limit or default to 100 per page
+
+      while (totalPages === null || currentPage <= totalPages) {
+        // Build query string for current page
+        const queryParams = new URLSearchParams();
+        queryParams.append('limit', limit);
+        queryParams.append('page', currentPage);
+        if (params.location) queryParams.append('location', params.location);
+        if (params.address) queryParams.append('address', params.address);
+        if (params.sort) queryParams.append('sort', params.sort);
+        
+        const queryString = queryParams.toString();
+        const url = `${API_BASE_URL}/agency/list?${queryString}`;
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: headers,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.message || `HTTP error! status: ${response.status}`,
+            data: allAgencies,
+            paginationInfo: null,
+          };
+        }
+
+        // Extract agencies from response
+        const pageAgencies = data.data || [];
+        allAgencies.push(...pageAgencies);
+
+        // Update pagination info from first response
+        if (data.paginationInfo) {
+          totalPages = data.paginationInfo.totalPages || 1;
+        } else {
+          // If no pagination info, assume this is the only page
+          totalPages = 1;
+        }
+
+        // If we got fewer items than the limit, we've reached the last page
+        if (pageAgencies.length < limit) {
+          break;
+        }
+
+        currentPage++;
+
+        // Safety check: if totalPages is still null after first request, break
+        if (totalPages === null) {
+          totalPages = 1;
+          break;
+        }
+      }
+
+      return {
+        success: true,
+        data: allAgencies,
+        paginationInfo: {
+          page: 1,
+          limit: allAgencies.length,
+          total: allAgencies.length,
+          totalPages: 1,
+        },
+        message: 'All agencies loaded successfully',
+      };
+    } catch (error) {
+      console.error('Error fetching all agencies:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch all agencies',
+        data: [],
+        paginationInfo: null,
+      };
+    }
+  },
+
+  /**
+   * Get agency by ID
+   * @param {string|number} agencyId - Agency ID
+   * @returns {Promise<Object>} Agency details
+   */
+  async getAgencyById(agencyId) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      // Use detail endpoint to get full location/address fields
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.DETAIL(agencyId)}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      if (!response.ok) {
+        // Gracefully handle not-found without throwing
+        if (response.status === 404) {
+          return { success: false, error: 'Not found', data: null, status: 404 };
+        }
+        return { success: false, error: `HTTP error! status: ${response.status}`, data: null, status: response.status };
+      }
+
+      const data = await response.json();
+      // Normalize common API response shapes
+      const payload = (data && typeof data === 'object' && 'data' in data)
+        ? data.data
+        : data;
+      return { success: true, data: payload };
+    } catch (error) {
+      // Fail silently up the stack; return a structured error instead of throwing
+      return { success: false, error: error.message || 'Failed to fetch agency', data: null };
+    }
+  },
+
+  /**
+   * Create a new agency
+   * @param {Object} agencyData - Agency data (name, location, address, contactInfo)
+   * @returns {Promise<Object>} Created agency with success status
+   */
+  async createAgency(agencyData) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.BASE}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(agencyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: data,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Agency created successfully',
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error creating agency:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to create agency',
+      };
+    }
+  },
+
+  /**
+   * Update an existing agency
+   * @param {string|number} agencyId - Agency ID
+   * @param {Object} agencyData - Updated agency data
+   * @returns {Promise<Object>} Updated agency with success status
+   */
+  async updateAgency(agencyId, agencyData) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.BY_ID(agencyId)}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify(agencyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: data,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Agency updated successfully',
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error updating agency:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to update agency',
+      };
+    }
+  },
+
+  /**
+   * Update agency status
+   * @param {string|number} agencyId - Agency ID
+   * @param {string} status - New status ('active', 'inactive', etc.)
+   * @returns {Promise<Object>} Success status
+   */
+  async updateAgencyStatus(agencyId, status) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.BY_ID(agencyId)}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify({ status }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: data,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Agency status updated successfully',
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error updating agency status:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to update agency status',
+      };
+    }
+  },
+
+  /**
+   * Delete an agency
+   * @param {string|number} agencyId - Agency ID
+   * @returns {Promise<Object>} Success status
+   */
+  async deleteAgency(agencyId) {
+    try {
+      const token = await this.getAuthTokenAsync();
+      const url = `${API_BASE_URL}${API_ENDPOINTS.AGENCY.BY_ID(agencyId)}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `HTTP error! status: ${response.status}`,
+          data: data,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Agency deleted successfully',
+        data: data,
+      };
+    } catch (error) {
+      console.error('Error deleting agency:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to delete agency',
+      };
+    }
+  },
+};
+
+export default agencyService;

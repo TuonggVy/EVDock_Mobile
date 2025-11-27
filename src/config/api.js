@@ -3,8 +3,8 @@
 
 // Base API URL - Update this when backend is ready
 export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000/api' // Development
-  : 'https://api.evdock.com';   // Production
+  ? 'https://evm-project.onrender.com' // Development - Use actual backend URL
+  : 'https://evm-project.onrender.com';   // Production
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -57,6 +57,45 @@ export const API_ENDPOINTS = {
     BY_ID: (id) => `/orders/${id}`,
     CREATE: '/orders',
     UPDATE: (id) => `/orders/${id}`,
+  },
+
+  // Agency
+  AGENCY: {
+    LIST: '/agency/list',
+    BASE: '/agency',
+    BY_ID: (id) => `/agency/${id}`,
+    DETAIL: (id) => `/agency/detail/${id}`,
+  },
+
+  // Drive Trial
+  DRIVE_TRIAL: {
+    PUBLIC_BOOKING: '/drive-trial/public/booking',
+    LIST: (agencyId) => `/drive-trial/list/${agencyId}`,
+    DETAIL: (bookingId) => `/drive-trial/detail/${bookingId}`,
+    UPDATE: (bookingId) => `/drive-trial/${bookingId}`,
+    DELETE: (bookingId) => `/drive-trial/${bookingId}`,
+  },
+
+  // Deposits
+  DEPOSITS: {
+    CREATE: '/deposit',
+    BY_ID: (depositId) => `/deposit/${depositId}`,
+    UPDATE: (depositId) => `/deposit/${depositId}`,
+    DELETE: (depositId) => `/deposit/${depositId}`,
+  },
+
+  // Email
+  EMAIL: {
+    SEND_CUSTOMER_CONTRACT: (customerContractId) => `/email/customer-contract/${customerContractId}`,
+    SEND_INSTALLMENT_SCHEDULE: (installmentContractId) => `/email/customer/installment-schedule/${installmentContractId}`,
+  },
+
+  // Dashboard
+  DASHBOARD: {
+    TOTAL_CUSTOMER: (agencyId) => `/dashboard/total/customer/${agencyId}`,
+    CHART_CUSTOMER_CONTRACT: (agencyId) => `/dashboard/chart/customer-contract/${agencyId}`,
+    TOTAL_REVENUE: (agencyId) => `/dashboard/total/revenue/${agencyId}`,
+    LIST_STAFF_REVENUE: (agencyId) => `/dashboard/list/staff/revenue/${agencyId}`,
   },
 };
 

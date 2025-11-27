@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import customerManagementService from '../services/customerManagementService';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Custom hook for customer management data and operations
  */
 export const useCustomerManagement = () => {
+  const { user } = useAuth();
+  
   // State for data
   const [customers, setCustomers] = useState([]);
   const [testDriveRequests, setTestDriveRequests] = useState([]);
@@ -26,13 +29,26 @@ export const useCustomerManagement = () => {
 
   /**
    * Load customers data
+   * @param {number} page - Page number (optional, not used when fetchAll is true)
+   * @param {number} limit - Items per page (optional, defaults to 100 when fetchAll is true)
+   * @param {boolean} fetchAll - Whether to fetch all customers (default: true)
    */
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(async (page = 1, limit = 100, fetchAll = true) => {
+    if (!user?.agencyId) {
+      console.warn('No agencyId available, cannot load customers');
+      setErrors(prev => ({ ...prev, customers: 'No agency ID available' }));
+      return;
+    }
+
     setLoading(prev => ({ ...prev, customers: true }));
     setErrors(prev => ({ ...prev, customers: null }));
     
     try {
-      const data = await customerManagementService.getCustomers();
+      const data = await customerManagementService.getCustomers(
+        user.agencyId, 
+        { page, limit }, 
+        fetchAll
+      );
       setCustomers(data);
     } catch (error) {
       setErrors(prev => ({ ...prev, customers: error.message }));
@@ -40,7 +56,7 @@ export const useCustomerManagement = () => {
     } finally {
       setLoading(prev => ({ ...prev, customers: false }));
     }
-  }, []);
+  }, [user?.agencyId]);
 
   /**
    * Load test drive requests
@@ -84,21 +100,51 @@ export const useCustomerManagement = () => {
   const loadAllData = useCallback(async () => {
     await Promise.all([
       loadCustomers(),
-      loadTestDriveRequests(),
-      loadViewingRequests(),
+      // loadTestDriveRequests(),
+      // loadViewingRequests(),
     ]);
-  }, [loadCustomers, loadTestDriveRequests, loadViewingRequests]);
+  }, [loadCustomers]);
 
   /**
    * Add new customer
    */
   const addCustomer = useCallback(async (customerData) => {
     try {
-      const newCustomer = await customerManagementService.addCustomer(customerData);
-      setCustomers(prev => [...prev, newCustomer]);
+      const newCustomer = await customerManagementService.createCustomer(customerData);
+      // Add new customer at the beginning of the list (newest first)
+      setCustomers(prev => [newCustomer, ...prev]);
       return newCustomer;
     } catch (error) {
       console.error('Error adding customer:', error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Update customer
+   */
+  const updateCustomer = useCallback(async (customerId, customerData) => {
+    try {
+      const updatedCustomer = await customerManagementService.updateCustomer(customerId, customerData);
+      setCustomers(prev => 
+        prev.map(customer => customer.id === customerId ? updatedCustomer : customer)
+      );
+      return updatedCustomer;
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Delete customer
+   */
+  const deleteCustomer = useCallback(async (customerId) => {
+    try {
+      await customerManagementService.deleteCustomer(customerId);
+      setCustomers(prev => prev.filter(customer => customer.id !== customerId));
+    } catch (error) {
+      console.error('Error deleting customer:', error);
       throw error;
     }
   }, []);
@@ -228,6 +274,8 @@ export const useCustomerManagement = () => {
     
     // Actions
     addCustomer,
+    updateCustomer,
+    deleteCustomer,
     scheduleTestDrive,
     completeTestDrive,
     scheduleViewing,

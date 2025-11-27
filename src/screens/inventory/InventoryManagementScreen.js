@@ -7,103 +7,51 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
-  Modal,
   Dimensions,
   TextInput,
-  FlatList,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../../constants';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { inventoryService } from '../../services/inventoryService';
-import { vehicleService } from '../../services/vehicleService';
+import warehouseService from '../../services/warehouseService';
+import motorbikeService from '../../services/motorbikeService';
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  PackageSearch,
+  PackageX,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
 const InventoryManagementScreen = ({ navigation }) => {
   const [inventory, setInventory] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [warehouses, setWarehouses] = useState([]);
+  const [motorbikes, setMotorbikes] = useState([]);
   const [activeTab, setActiveTab] = useState('in_stock'); // 'in_stock' or 'out_of_stock'
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-  const [newItem, setNewItem] = useState({
-    vehicleModel: '',
-    color: '',
-    quantity: '',
-    warehouseLocation: '',
-    price: '',
-    description: '',
-  });
-  const [catalogModels, setCatalogModels] = useState([]); // names (derived)
-  const [modelToColors, setModelToColors] = useState({});
+  const [colors, setColors] = useState([]);
 
-  const { alertConfig, hideAlert, showSuccess, showError, showConfirm, showInfo } = useCustomAlert();
-
-  // Derived warehouse locations (no hardcode)
-  const warehouseLocations = Array.from(new Set(
-    (inventory || [])
-      .map((i) => i.warehouseLocation)
-      .filter((v) => typeof v === 'string' && v.trim().length > 0)
-  ));
-
-  // Catalog-backed model/color options
-  const vehicleModels = catalogModels;
-  const availableColors = newItem.vehicleModel ? (modelToColors[newItem.vehicleModel] || []) : [];
+  const { alertConfig, hideAlert, showSuccess, showError, showConfirm } = useCustomAlert();
 
   useEffect(() => {
-    const loadCatalogFromVehicles = async () => {
-      try {
-        const res = await vehicleService.getAllVehicles();
-        if (res?.success) {
-          const list = res.data || [];
-          const nameToColors = {};
-          list.forEach((v) => {
-            const name = v.name || v.model || 'Unknown';
-            if (!nameToColors[name]) nameToColors[name] = new Set();
-            (v.colors || []).forEach((c) => nameToColors[name].add(c));
-          });
-          const names = Object.keys(nameToColors);
-          const map = {};
-          names.forEach((n) => { map[n] = Array.from(nameToColors[n]); });
-          setCatalogModels(names);
-          setModelToColors(map);
-        }
-      } catch (e) {
-        console.error('Error loading catalog options from Vehicles:', e);
-      }
-    };
     loadInventory();
-    loadCatalogFromVehicles();
+    loadWarehouses();
+    loadMotorbikes();
+    loadColors();
   }, []);
 
   // Refresh inventory when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadInventory();
-      // refresh catalog options from Vehicles when screen focused
-      (async () => {
-        try {
-          const res = await vehicleService.getAllVehicles();
-          if (res?.success) {
-            const list = res.data || [];
-            const nameToColors = {};
-            list.forEach((v) => {
-              const name = v.name || v.model || 'Unknown';
-              if (!nameToColors[name]) nameToColors[name] = new Set();
-              (v.colors || []).forEach((c) => nameToColors[name].add(c));
-            });
-            const names = Object.keys(nameToColors);
-            const map = {};
-            names.forEach((n) => { map[n] = Array.from(nameToColors[n]); });
-            setCatalogModels(names);
-            setModelToColors(map);
-          }
-        } catch (e) {
-          // noop
-        }
-      })();
     });
 
     return unsubscribe;
@@ -113,404 +61,281 @@ const InventoryManagementScreen = ({ navigation }) => {
     try {
       const response = await inventoryService.getInventory();
       if (response.success) {
-        setInventory(response.data);
+        // Sort by lastUpdate or stockDate descending (newest first)
+        const sortedData = response.data.sort((a, b) => {
+          const dateA = new Date(a.lastUpdate || a.stockDate || 0);
+          const dateB = new Date(b.lastUpdate || b.stockDate || 0);
+          return dateB - dateA; // Descending order (newest first)
+        });
+        setInventory(sortedData);
       } else {
-        showError('Lỗi', response.error || 'Không thể tải danh sách tồn kho');
+        // Ensure error message is always a string
+        const errorMessage = typeof response.error === 'string' 
+          ? response.error 
+          : (response.error?.message || JSON.stringify(response.error) || 'Unable to load inventory list');
+        showError('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error loading inventory:', error);
-      showError('Lỗi', 'Không thể tải danh sách tồn kho');
+      showError('Error', 'Unable to load inventory list');
     }
   };
 
+  const loadWarehouses = async () => {
+    try {
+      const response = await warehouseService.getWarehousesList();
+      if (response.success) {
+        setWarehouses(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading warehouses:', error);
+    }
+  };
+
+  const loadMotorbikes = async () => {
+    try {
+      // Load all motorbikes with a large limit to ensure all are loaded
+      const response = await motorbikeService.getAllMotorbikes({ limit: 1000 });
+      if (response.success) {
+        setMotorbikes(response.data || []);
+        console.log('Loaded motorbikes count:', (response.data || []).length);
+      } else {
+        console.error('Failed to load motorbikes:', response.error);
+      }
+    } catch (error) {
+      console.error('Error loading motorbikes:', error);
+    }
+  };
+
+  const loadColors = async () => {
+    try {
+      const response = await motorbikeService.getAllColors();
+      if (response.success) {
+        const rawColors = response.data?.data || response.data || [];
+        const normalized = rawColors
+          .map(color => ({
+            id: color?.id || color?.color?.id,
+            name: color?.colorType || color?.color?.colorType || color?.name || `Color ${color?.id || color?.color?.id}`,
+          }))
+          .filter(color => color.id);
+        setColors(normalized);
+      }
+    } catch (error) {
+      console.error('Error loading colors:', error);
+    }
+  };
+
+  const getColorName = (colorId) => {
+    if (!colorId) return 'N/A';
+    const color = colors.find(c => Number(c.id) === Number(colorId));
+    return color?.name || `Color ${colorId}`;
+  };
+
   const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.vehicleModel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.color.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.warehouseLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase());
+    // Ensure proper ID comparison (handle both number and string types)
+    const motorbike = motorbikes.find(m => 
+      Number(m.id) === Number(item.electricMotorbikeId)
+    );
+    const warehouse = warehouses.find(w => 
+      Number(w.id) === Number(item.warehouseId)
+    );
+    const colorName = getColorName(item.colorId);
+    const searchLower = searchQuery.toLowerCase();
     
+    // Filter by search query
+    const matchesSearch = (
+      (motorbike?.name?.toLowerCase().includes(searchLower)) ||
+      (motorbike?.model?.toLowerCase().includes(searchLower)) ||
+      (warehouse?.name?.toLowerCase().includes(searchLower)) ||
+      (warehouse?.location?.toLowerCase().includes(searchLower)) ||
+      (colorName?.toLowerCase().includes(searchLower))
+    );
+    
+    // Filter by tab status
     const matchesTab = activeTab === 'in_stock' 
-      ? (item.status === 'in_stock' || item.status === 'low_stock')
-      : item.status === 'out_of_stock';
+      ? item.quantity > 0  // Còn hàng
+      : item.quantity === 0; // Hết hàng
     
     return matchesSearch && matchesTab;
   });
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'in_stock': return COLORS.SUCCESS;
-      case 'low_stock': return COLORS.WARNING;
-      case 'out_of_stock': return COLORS.ERROR;
-      default: return COLORS.TEXT.SECONDARY;
+  const getStatusMeta = (quantity) => {
+    if (quantity === 0) {
+      return {
+        color: COLORS.ERROR,
+        label: 'Out of Stock',
+        Icon: XCircle,
+      };
     }
-  };
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'in_stock': return 'Còn hàng';
-      case 'low_stock': return 'Sắp hết';
-      case 'out_of_stock': return 'Hết hàng';
-      default: return 'Không xác định';
+    if (quantity <= 10) {
+      return {
+        color: COLORS.WARNING,
+        label: 'Low Stock',
+        Icon: AlertTriangle,
+      };
     }
-  };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'in_stock': return '✅';
-      case 'low_stock': return '⚠️';
-      case 'out_of_stock': return '❌';
-      default: return '❓';
-    }
-  };
-
-  const updateItemStatus = (item) => {
-    let status = 'in_stock';
-    if (item.quantity === 0) {
-      status = 'out_of_stock';
-    } else if (item.quantity <= 10) {
-      status = 'low_stock';
-    }
-    return { ...item, status };
+    return {
+      color: COLORS.SUCCESS,
+      label: 'In Stock',
+      Icon: CheckCircle,
+    };
   };
 
   const handleAddItem = () => {
-    setNewItem({
-      vehicleModel: '',
-      color: '',
-      quantity: '',
-      warehouseLocation: '',
-      price: '',
-      description: '',
-    });
-    setShowAddModal(true);
+    navigation.navigate('AddInventory');
+  };
+
+  const handleViewItem = (item) => {
+    navigation.navigate('InventoryDetail', { item });
   };
 
   const handleEditItem = (item) => {
-    setEditingItem(item);
-    setNewItem({
-      vehicleModel: item.vehicleModel,
-      color: item.color,
-      quantity: item.quantity.toString(),
-      warehouseLocation: item.warehouseLocation,
-      price: item.price.toString(),
-      description: item.description,
-    });
-    setShowEditModal(true);
+    navigation.navigate('EditInventory', { item });
   };
 
-  const handleSaveItem = async () => {
-    if (!newItem.vehicleModel || !newItem.color || !newItem.quantity || !newItem.warehouseLocation || !newItem.price) {
-      showError('Lỗi', 'Vui lòng điền đầy đủ thông tin bắt buộc');
-      return;
-    }
-
-    try {
-      const itemData = {
-        vehicleModel: newItem.vehicleModel,
-        color: newItem.color,
-        quantity: parseInt(newItem.quantity),
-        warehouseLocation: newItem.warehouseLocation,
-        price: parseInt(newItem.price),
-        description: newItem.description,
-      };
-
-      let response;
-      if (editingItem) {
-        response = await inventoryService.updateInventoryItem(editingItem.id, itemData);
-      } else {
-        response = await inventoryService.createInventoryItem(itemData);
-      }
-
-      if (response.success) {
-        // Reload inventory and derived model/color options
-        await loadInventory();
-        const latest = await inventoryService.getInventory();
-        if (latest.success) {
-          const list = latest.data || [];
-          const nameToColors = {};
-          list.forEach((it) => {
-            const name = it.vehicleModel || 'Unknown';
-            if (!nameToColors[name]) nameToColors[name] = new Set();
-            if (it.color) nameToColors[name].add(it.color);
-          });
-          const names = Object.keys(nameToColors);
-          const map = {};
-          names.forEach((n) => { map[n] = Array.from(nameToColors[n]); });
-          setCatalogModels(names);
-          setModelToColors(map);
-        }
-        
-        if (editingItem) {
-          setShowEditModal(false);
-          setEditingItem(null);
-          showSuccess('Thành công', 'Cập nhật tồn kho thành công!');
-        } else {
-          setShowAddModal(false);
-          showSuccess('Thành công', 'Thêm mới tồn kho thành công!');
-        }
-
-        setNewItem({
-          vehicleModel: '',
-          color: '',
-          quantity: '',
-          warehouseLocation: '',
-          price: '',
-          description: '',
-        });
-      } else {
-        showError('Lỗi', response.error || 'Không thể lưu thông tin tồn kho');
-      }
-    } catch (error) {
-      console.error('Error saving item:', error);
-      showError('Lỗi', 'Không thể lưu thông tin tồn kho');
-    }
-  };
-
-  const handleDeleteItem = (itemId) => {
+  const handleDeleteItem = (item) => {
     showConfirm(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa mục tồn kho này?',
+      'Delete Inventory Item',
+      'Are you sure you want to delete this inventory item?',
       async () => {
         try {
-          const response = await inventoryService.deleteInventoryItem(itemId);
+          const response = await inventoryService.deleteInventoryItem(
+            item.electricMotorbikeId,
+            item.warehouseId,
+            item.colorId
+          );
           if (response.success) {
-            await loadInventory(); // Reload inventory
-            showSuccess('Thành công', 'Xóa tồn kho thành công!');
+            // Remove the item from state immediately
+            setInventory(prevInventory => {
+              return prevInventory.filter(prevItem => 
+                !(prevItem.electricMotorbikeId === item.electricMotorbikeId &&
+                  prevItem.warehouseId === item.warehouseId &&
+                  prevItem.colorId === item.colorId)
+              );
+            });
+            
+            showSuccess('Success', 'Inventory item deleted successfully!');
+            
+            // Reload inventory to ensure sync with server
+            loadInventory();
           } else {
-            showError('Lỗi', response.error || 'Không thể xóa mục tồn kho');
+            // Ensure error message is always a string
+            const errorMessage = typeof response.error === 'string' 
+              ? response.error 
+              : (response.error?.message || JSON.stringify(response.error) || 'Unable to delete inventory item');
+            showError('Error', errorMessage);
           }
         } catch (error) {
           console.error('Error deleting item:', error);
-          showError('Lỗi', 'Không thể xóa mục tồn kho');
+          showError('Error', 'Unable to delete inventory item');
         }
       }
     );
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(price);
+  const getMotorbikeName = (motorbikeId) => {
+    const motorbike = motorbikes.find(m => Number(m.id) === Number(motorbikeId));
+    return motorbike?.name || motorbike?.model || 'Unknown Motorbike';
   };
 
-  const renderInventoryCard = (item) => (
-    <View key={item.id} style={styles.inventoryCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemId}>{item.id}</Text>
-          <Text style={styles.vehicleModel}>{item.vehicleModel}</Text>
-        </View>
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusIcon}>{getStatusIcon(item.status)}</Text>
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+  const getWarehouseName = (warehouseId) => {
+    const warehouse = warehouses.find(w => Number(w.id) === Number(warehouseId));
+    return warehouse?.name || 'Unknown Warehouse';
+  };
+
+  const getWarehouseLocation = (warehouseId) => {
+    const warehouse = warehouses.find(w => Number(w.id) === Number(warehouseId));
+    return warehouse?.location || '';
+  };
+
+  const renderInventoryCard = (item) => {
+    // Ensure proper ID comparison (handle both number and string types)
+    const motorbike = motorbikes.find(m => 
+      Number(m.id) === Number(item.electricMotorbikeId)
+    );
+    const warehouse = warehouses.find(w => 
+      Number(w.id) === Number(item.warehouseId)
+    );
+    const statusMeta = getStatusMeta(item.quantity);
+
+    return (
+      <TouchableOpacity 
+        key={`${item.electricMotorbikeId}-${item.warehouseId}-${item.colorId}`} 
+        style={styles.inventoryCard}
+        onPress={() => handleViewItem(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.itemInfo}>
+            <Text style={styles.motorbikeName}>{motorbike?.name || 'Unknown'}</Text>
+            <Text style={styles.warehouseName}>{warehouse?.name || 'Unknown'}</Text>
+          </View>
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusBadge, { backgroundColor: statusMeta.color }]}>
+              <statusMeta.Icon size={14} color={COLORS.TEXT.WHITE} />
+              <Text style={styles.statusText}>{statusMeta.label}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.cardContent}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Màu sắc:</Text>
-          <Text style={styles.detailValue}>{item.color}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Số lượng:</Text>
-          <Text style={[styles.detailValue, { color: getStatusColor(item.status) }]}>
-            {item.quantity} xe
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Kho:</Text>
-          <Text style={styles.detailValue}>{item.warehouseLocation}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Giá:</Text>
-          <Text style={[styles.detailValue, styles.priceValue]}>{formatPrice(item.price)}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Cập nhật:</Text>
-          <Text style={styles.detailValue}>{item.lastUpdated}</Text>
-        </View>
-        {item.description && (
+        <View style={styles.cardContent}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mô tả:</Text>
-            <Text style={styles.detailValue}>{item.description}</Text>
+            <Text style={styles.detailLabel}>Model:</Text>
+            <Text style={styles.detailValue}>{motorbike?.model || 'N/A'}</Text>
           </View>
-        )}
-      </View>
-
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleEditItem(item)}
-        >
-          <Text style={styles.editButtonText}>Chỉnh sửa</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteItem(item.id)}
-        >
-          <Text style={styles.deleteButtonText}>Xóa</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderAddEditModal = () => (
-    <Modal
-      visible={showAddModal || showEditModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity
-            style={styles.modalCloseButton}
-            onPress={() => {
-              setShowAddModal(false);
-              setShowEditModal(false);
-              setEditingItem(null);
-              setNewItem({
-                vehicleModel: '',
-                color: '',
-                quantity: '',
-                warehouseLocation: '',
-                price: '',
-                description: '',
-              });
-            }}
-          >
-            <Text style={styles.modalCloseText}>Hủy</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>
-            {editingItem ? 'Chỉnh sửa tồn kho' : 'Thêm mới tồn kho'}
-          </Text>
-          <TouchableOpacity
-            style={styles.modalSaveButton}
-            onPress={handleSaveItem}
-          >
-            <Text style={styles.modalSaveText}>Lưu</Text>
-          </TouchableOpacity>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Warehouse Location:</Text>
+            <Text style={styles.detailValue}>{warehouse?.location || 'N/A'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Color:</Text>
+            <Text style={styles.detailValue}>{getColorName(item.colorId)}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Quantity:</Text>
+            <Text style={[styles.detailValue, { color: statusMeta.color }]}>
+              {item.quantity} units
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Stock Date:</Text>
+            <Text style={styles.detailValue}>
+              {item.stockDate ? new Date(item.stockDate).toLocaleDateString('en-US') : 'N/A'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Last Updated:</Text>
+            <Text style={styles.detailValue}>
+              {item.lastUpdate ? new Date(item.lastUpdate).toLocaleDateString('en-US') : 'N/A'}
+            </Text>
+          </View>
         </View>
 
-        <ScrollView style={styles.modalContent}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mẫu xe *</Text>
-            <View style={styles.modelSelector}>
-              {vehicleModels.map((model) => (
-                <TouchableOpacity
-                  key={model}
-                  style={[
-                    styles.modelOption,
-                    newItem.vehicleModel === model && styles.selectedModelOption
-                  ]}
-                  onPress={() => setNewItem({ ...newItem, vehicleModel: model, color: '' })}
-                >
-                  <Text style={[
-                    styles.modelOptionText,
-                    newItem.vehicleModel === model && styles.selectedModelOptionText
-                  ]}>
-                    {model}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Màu sắc *</Text>
-            <View style={styles.colorSelector}>
-              {availableColors.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[
-                    styles.colorOption,
-                    newItem.color === color && styles.selectedColorOption
-                  ]}
-                  onPress={() => setNewItem({ ...newItem, color: color })}
-                >
-                  <Text style={[
-                    styles.colorOptionText,
-                    newItem.color === color && styles.selectedColorOptionText
-                  ]}>
-                    {color}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Số lượng *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newItem.quantity}
-              onChangeText={(text) => setNewItem({ ...newItem, quantity: text })}
-              placeholder="Nhập số lượng xe"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Kho lưu trữ *</Text>
-            <View style={styles.warehouseSelector}>
-              {warehouseLocations.map((location) => (
-                <TouchableOpacity
-                  key={location}
-                  style={[
-                    styles.warehouseOption,
-                    newItem.warehouseLocation === location && styles.selectedWarehouseOption
-                  ]}
-                  onPress={() => setNewItem({ ...newItem, warehouseLocation: location })}
-                >
-                  <Text style={[
-                    styles.warehouseOptionText,
-                    newItem.warehouseLocation === location && styles.selectedWarehouseOptionText
-                  ]}>
-                    {location}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Giá bán *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={newItem.price}
-              onChangeText={(text) => setNewItem({ ...newItem, price: text })}
-              placeholder="Nhập giá bán (VND)"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mô tả</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={newItem.description}
-              onChangeText={(text) => setNewItem({ ...newItem, description: text })}
-              placeholder="Nhập mô tả sản phẩm (nếu có)"
-              placeholderTextColor={COLORS.TEXT.SECONDARY}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleEditItem(item)}
+          >
+            <Pencil size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleDeleteItem(item)}
+          >
+            <Trash2 size={16} color={COLORS.TEXT.WHITE} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // Calculate statistics
   const totalItems = inventory.length;
-  const inStockItems = inventory.filter(item => item.status === 'in_stock').length;
-  const lowStockItems = inventory.filter(item => item.status === 'low_stock').length;
-  const outOfStockItems = inventory.filter(item => item.status === 'out_of_stock').length;
-  const totalValue = inventory.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const inStockItems = inventory.filter(item => item.quantity > 10).length;
+  const lowStockItems = inventory.filter(item => item.quantity > 0 && item.quantity <= 10).length;
+  const outOfStockItems = inventory.filter(item => item.quantity === 0).length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -520,23 +345,23 @@ const InventoryManagementScreen = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quản lý tồn kho</Text>
+        <Text style={styles.headerTitle}>Inventory Management</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleAddItem}
         >
-          <Text style={styles.addIcon}>+</Text>
+          <Plus color={COLORS.TEXT.WHITE} size={18} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={18} color={COLORS.TEXT.SECONDARY} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm mẫu xe, màu sắc, kho..."
+          placeholder="Search motorbikes, warehouses..."
           placeholderTextColor={COLORS.TEXT.SECONDARY}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -547,26 +372,20 @@ const InventoryManagementScreen = ({ navigation }) => {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{totalItems}</Text>
-          <Text style={styles.statLabel}>Tổng mục</Text>
+          <Text style={styles.statLabel}>Total Items</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.SUCCESS }]}>{inStockItems}</Text>
-          <Text style={styles.statLabel}>Còn hàng</Text>
+          <Text style={styles.statLabel}>In Stock</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.WARNING }]}>{lowStockItems}</Text>
-          <Text style={styles.statLabel}>Sắp hết</Text>
+          <Text style={styles.statLabel}>Low Stock</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: COLORS.ERROR }]}>{outOfStockItems}</Text>
-          <Text style={styles.statLabel}>Hết hàng</Text>
+          <Text style={styles.statLabel}>Out of Stock</Text>
         </View>
-      </View>
-
-      {/* Total Value Card */}
-      <View style={styles.valueCard}>
-        <Text style={styles.valueLabel}>Tổng giá trị tồn kho</Text>
-        <Text style={styles.valueAmount}>{formatPrice(totalValue)}</Text>
       </View>
 
       {/* Tab Navigation */}
@@ -582,7 +401,7 @@ const InventoryManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'in_stock' && styles.activeTabText
           ]}>
-            Còn hàng ({inStockItems + lowStockItems})
+            In Stock ({inStockItems})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -596,7 +415,7 @@ const InventoryManagementScreen = ({ navigation }) => {
             styles.tabText,
             activeTab === 'out_of_stock' && styles.activeTabText
           ]}>
-            Hết hàng ({outOfStockItems})
+            Out of Stock ({outOfStockItems})
           </Text>
         </TouchableOpacity>
       </View>
@@ -611,26 +430,23 @@ const InventoryManagementScreen = ({ navigation }) => {
           filteredInventory.map(renderInventoryCard)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>
-              {activeTab === 'in_stock' ? '📦' : '❌'}
-            </Text>
+            {activeTab === 'in_stock' ? (
+              <PackageSearch size={64} color={COLORS.TEXT.SECONDARY} />
+            ) : (
+              <PackageX size={64} color={COLORS.TEXT.SECONDARY} />
+            )}
             <Text style={styles.emptyTitle}>
-              {activeTab === 'in_stock' 
-                ? 'Không có xe còn hàng' 
-                : 'Không có xe hết hàng'
-              }
+              {activeTab === 'in_stock' ? 'No Vehicles In Stock' : 'No Vehicles Out of Stock'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'in_stock'
-                ? 'Tất cả xe đều đã hết hàng'
-                : 'Tất cả xe đều còn hàng'
+              {activeTab === 'in_stock' 
+                ? 'All vehicles are currently out of stock.' 
+                : 'All vehicles are currently available.'
               }
             </Text>
           </View>
         )}
       </ScrollView>
-
-      {renderAddEditModal()}
       
       <CustomAlert
         visible={alertConfig.visible}
@@ -675,11 +491,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
-  },
   headerTitle: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
@@ -691,14 +502,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: SIZES.RADIUS.ROUND,
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addIcon: {
-    fontSize: SIZES.FONT.LARGE,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: 'bold',
   },
 
   // Search
@@ -715,11 +521,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  searchIcon: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginRight: SIZES.PADDING.SMALL,
+    gap: SIZES.PADDING.SMALL,
   },
   searchInput: {
     flex: 1,
@@ -744,33 +546,13 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: COLORS.SUCCESS,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.SECONDARY,
     textAlign: 'center',
-  },
-
-  // Value Card
-  valueCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    padding: SIZES.PADDING.MEDIUM,
-    marginHorizontal: SIZES.PADDING.MEDIUM,
-    marginBottom: SIZES.PADDING.MEDIUM,
-    alignItems: 'center',
-  },
-  valueLabel: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SIZES.PADDING.SMALL,
-  },
-  valueAmount: {
-    fontSize: SIZES.FONT.XXLARGE,
-    fontWeight: 'bold',
-    color: COLORS.SUCCESS,
   },
 
   // Tab Navigation
@@ -790,7 +572,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeTabButton: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: '#009DFF',
   },
   tabText: {
     fontSize: SIZES.FONT.MEDIUM,
@@ -828,15 +610,15 @@ const styles = StyleSheet.create({
   itemInfo: {
     flex: 1,
   },
-  itemId: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: 4,
-  },
-  vehicleModel: {
+  motorbikeName: {
     fontSize: SIZES.FONT.LARGE,
     fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    color: '#009DFF',
+    marginBottom: 4,
+  },
+  warehouseName: {
+    fontSize: SIZES.FONT.SMALL,
+    color: COLORS.TEXT.SECONDARY,
   },
   statusContainer: {
     marginLeft: SIZES.PADDING.SMALL,
@@ -848,14 +630,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: SIZES.RADIUS.SMALL,
   },
-  statusIcon: {
-    fontSize: SIZES.FONT.SMALL,
-    marginRight: 4,
-  },
   statusText: {
     fontSize: SIZES.FONT.XSMALL,
     color: COLORS.TEXT.WHITE,
     fontWeight: '600',
+    marginLeft: 4,
   },
   cardContent: {
     marginBottom: SIZES.PADDING.MEDIUM,
@@ -875,36 +654,19 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
   },
-  priceValue: {
-    color: COLORS.SUCCESS,
-    fontWeight: 'bold',
-  },
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: SIZES.PADDING.SMALL,
   },
-  editButton: {
-    backgroundColor: COLORS.PRIMARY,
+  iconButton: {
+    backgroundColor: '#000000',
     borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  editButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: COLORS.ERROR,
-    borderRadius: SIZES.RADIUS.SMALL,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-  },
-  deleteButtonText: {
-    fontSize: SIZES.FONT.SMALL,
-    color: COLORS.TEXT.WHITE,
-    fontWeight: '600',
+    padding: SIZES.PADDING.SMALL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    minHeight: 36,
   },
 
   // Empty State
@@ -912,10 +674,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SIZES.PADDING.XXXLARGE,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: SIZES.PADDING.MEDIUM,
   },
   emptyTitle: {
     fontSize: SIZES.FONT.LARGE,
@@ -987,74 +745,12 @@ const styles = StyleSheet.create({
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-
-  // Selectors
-  modelSelector: {
+  selectContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SIZES.PADDING.SMALL,
   },
-  modelOption: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    minWidth: '30%',
-    alignItems: 'center',
-  },
-  selectedModelOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  modelOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedModelOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-
-  colorSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZES.PADDING.SMALL,
-  },
-  colorOption: {
-    backgroundColor: COLORS.SURFACE,
-    borderRadius: SIZES.RADIUS.MEDIUM,
-    paddingHorizontal: SIZES.PADDING.MEDIUM,
-    paddingVertical: SIZES.PADDING.SMALL,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    minWidth: '22%',
-    alignItems: 'center',
-  },
-  selectedColorOption: {
-    borderColor: COLORS.PRIMARY,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-  },
-  colorOptionText: {
-    fontSize: SIZES.FONT.MEDIUM,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  selectedColorOptionText: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-
-  warehouseSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZES.PADDING.SMALL,
-  },
-  warehouseOption: {
+  selectOption: {
     backgroundColor: COLORS.SURFACE,
     borderRadius: SIZES.RADIUS.MEDIUM,
     paddingHorizontal: SIZES.PADDING.MEDIUM,
@@ -1064,18 +760,19 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     alignItems: 'center',
   },
-  selectedWarehouseOption: {
+  selectedOption: {
     borderColor: COLORS.PRIMARY,
     backgroundColor: 'rgba(255, 107, 53, 0.1)',
   },
-  warehouseOptionText: {
+  selectOptionText: {
     fontSize: SIZES.FONT.MEDIUM,
     color: COLORS.TEXT.PRIMARY,
   },
-  selectedWarehouseOptionText: {
+  selectedOptionText: {
     color: COLORS.PRIMARY,
     fontWeight: '600',
   },
 });
 
 export default InventoryManagementScreen;
+

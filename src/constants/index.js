@@ -24,6 +24,8 @@ export const SCREEN_NAMES = {
     LOGIN: 'Login',
     REGISTER: 'Register',
     FORGOT_PASSWORD: 'ForgotPassword',
+    VERIFY_CODE: 'VerifyCode',
+    RESET_PASSWORD: 'ResetPassword',
   },
   MAIN: {
     HOME: 'Home',
@@ -69,10 +71,12 @@ export const COLORS = {
     PURPLE: ['#7CA1FF', '#A7B1FF', '#FF7DA0'],
     PINK_PURPLE: ['#7CA1FF', '#9878DD', '#FF7DA0'],
     GREEN: ['#4CAF50', '#66BB6A', '#81C784'],
+    CYAN: ['#00BCD4', '#4DD0E1', '#80DEEA'],
     SUCCESS: ['#4CAF50', '#66BB6A', '#81C784'],
     ERROR: ['#F44336', '#EF5350', '#E57373'],
     WARNING: ['#FF9800', '#FFB74D', '#FFCC02'],
     INFO: ['#2196F3', '#42A5F5', '#64B5F6'],
+    TEAL: ['#14B8A6', '#0D9488', '#0F766E'],
   },
 };
 
